@@ -1,0 +1,22 @@
+# Define HTTP and HTTPS entry points
+entryPoints:
+  web:
+    address: ":80"
+
+# certificatesResolvers:
+#   myresolver:
+#     acme:
+#       email: pgluka7@gmail.com
+#       storage: acme.json
+#       httpChallenge:
+#         entryPoint: web
+
+# Docker configuration
+providers:
+  docker:
+    exposedByDefault: true
+
+# API and Dashboard configuration
+api:
+  dashboard: true
+  insecure: true  # Enable Dashboard on insecure mode - only recommended for testing

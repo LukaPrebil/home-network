@@ -1,0 +1,8 @@
+.env
+acme.json
+homeassistant/*.log*
+homeassistant/*.db*
+homeassistant/.HA_VERSION
+homeassistant/secrets.yaml
+homeassistant/.storage
+homeassistant/.cloud

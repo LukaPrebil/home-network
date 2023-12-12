@@ -1,0 +1,90 @@
+version: "3"
+services:
+  # traefik:
+  #   image: traefik:v2.10
+  #   container_name: traefik
+  #   restart: unless-stopped    
+  #   ports:
+  #     - "80:80"    # HTTP
+  #     - "8080:8080" # Dashboard
+  #     - "443:443"  # HTTPS
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     - ./traefik.yml:/traefik.yml
+  #     # - ./acme.json:/acme.json
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`) || (Host(`${DOMAIN}`) && Path(`/traefik`))"
+  #     - "traefik.http.routers.traefik.entrypoints=web"
+  #     - "traefik.http.middlewares.traefik-auth.basicauth.users=${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}"
+  #     # - "traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https"
+  #     # - "traefik.http.routers.traefik.middlewares=traefik-https-redirect"
+  #     # - "traefik.http.routers.traefik-secure.rule=Host(`traefik.${DOMAIN}`) || (Host(`${DOMAIN}`) && Path(`/traefik`))"
+  #     # - "traefik.http.routers.traefik-secure.entrypoints=websecure"
+  #     # - "traefik.http.routers.traefik-secure.tls.certresolver=myresolver"
+  #     # - "traefik.http.routers.traefik-secure.middlewares=traefik-auth"
+  #     # - "traefik.http.routers.traefik-secure.service=api@internal"
+  #     - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+  #   networks:
+  #     - web
+
+  homeassistant:
+    container_name: homeassistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    volumes:
+      - ./homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+  
+  pi_node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: pi_node_exporter
+    command:
+      - '--path.rootfs=/host'
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - '/:/host:ro,rslave'
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "81:80" # HTTP
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN}`) || (Host(`${DOMAIN}`) && Path(`/grafana`))"
+    #   - "traefik.http.routers.grafana.entrypoints=web"
+    #   # - "traefik.http.routers.grafana.tls.certresolver=myresolver"
+    networks:
+      - web
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    networks:
+      - internal
+
+volumes:
+  grafana_data:
+
+networks:
+  web:
+    driver: bridge
+  internal:
+    driver: bridge
