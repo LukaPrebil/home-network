@@ -1,7 +1,8 @@
 .env
 **/*.pem
-acme.json
-homeassistant/.storage/
+**/acme.json
+
+homeassistant/.storage
 homeassistant/*.log*
 homeassistant/*.db*
 homeassistant/.HA_VERSION
