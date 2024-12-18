@@ -2,7 +2,9 @@
 **/*.pem
 **/acme.json
 
-homeassistant/.storage
+homeassistant/.storage/*
+homeassistant/custom_components
+homeassistant/www
 homeassistant/*.log*
 homeassistant/*.db*
 homeassistant/.HA_VERSION
@@ -10,3 +12,5 @@ homeassistant/secrets.yaml
 homeassistant/.cloud
 
 mosquitto/log/
+
+**/__pycache__/
