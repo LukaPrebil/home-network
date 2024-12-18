@@ -11,6 +11,6 @@ homeassistant/.HA_VERSION
 homeassistant/secrets.yaml
 homeassistant/.cloud
 
-mosquitto/log/
+mosquitto/
 
 **/__pycache__/
