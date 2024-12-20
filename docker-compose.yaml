@@ -35,9 +35,30 @@ services:
     networks:
       - internal
 
+  glances:
+    container_name: glances
+    image: nicolargo/glances:latest
+    command: glances -w  # Run Glances in web mode
+    ports:
+      - "61208:61208"  # Web UI
+      - "61209:61209"  # API
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: always
+    privileged: true
 
-volumes:
-  grafana_data:
+  cadvisor:
+    container_name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:latest
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: always
+    privileged: true
 
 networks:
   web:
