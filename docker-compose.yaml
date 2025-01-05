@@ -12,28 +12,6 @@ services:
       - ./homeassistant:/config
       - /etc/localtime:/etc/localtime:ro
       - /run/dbus:/run/dbus:ro 
-  
-  pi_node_exporter:
-    image: quay.io/prometheus/node-exporter:latest
-    container_name: pi_node_exporter
-    command:
-      - '--path.rootfs=/host'
-    network_mode: host
-    pid: host
-    restart: unless-stopped
-    volumes:
-      - '/:/host:ro,rslave'
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
-    restart: unless-stopped
-    networks:
-      - internal
 
   glances:
     container_name: glances
@@ -59,6 +37,28 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
     restart: always
     privileged: true
+
+  ddns-updater:
+    container_name: ddns-updater
+    image: qmcgaw/ddns-updater:latest
+    network_mode: bridge
+    ports:
+      - 8000:8000/tcp
+    volumes:
+      - ./ddns-data:/updater/data
+    restart: always
+
+  nginx:
+    container_name: nginx-proxy-manager
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - "80:80"   # HTTP
+      - "443:443" # HTTPS
+      - "81:81"   # NPM Web UI
+    volumes:
+      - ./npm_data:/data
+      - ./npm_letsencrypt:/etc/letsencrypt
 
 networks:
   web:

@@ -13,4 +13,8 @@ homeassistant/.cloud
 
 mosquitto/
 
+ddns-data/
+npm_data/
+npm_letsencrypt/
+
 **/__pycache__/
