@@ -24,18 +24,28 @@ services:
     restart: always
     privileged: true
 
-  cadvisor:
-    container_name: cadvisor
-    image: gcr.io/cadvisor/cadvisor:latest
-    ports:
-      - "8081:8080"
+  # cadvisor:
+  #   container_name: cadvisor
+  #   image: gcr.io/cadvisor/cadvisor:latest
+  #   ports:
+  #     - "8081:8080"
+  #   volumes:
+  #     - /:/rootfs:ro
+  #     - /var/run:/var/run:ro
+  #     - /sys:/sys:ro
+  #     - /var/lib/docker/:/var/lib/docker:ro
+  #   restart: always
+  #   privileged: true
+
+  uptime-kuma:
+    container_name: uptime-kuma
+    image: louislam/uptime-kuma:latest
     volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    restart: always
-    privileged: true
+      - ./kuma_data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - 3001:3001
+    restart: unless-stopped
 
   ddns-updater:
     container_name: ddns-updater
