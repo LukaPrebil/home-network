@@ -69,6 +69,16 @@ services:
       - ./npm_data:/data
       - ./npm_letsencrypt:/etc/letsencrypt
 
+  octoeverywhere-elegoo-connect:
+    container_name: octoeverywhere-cc
+    image: octoeverywhere/octoeverywhere:latest
+    environment:
+      - COMPANION_MODE=elegoo
+      - PRINTER_IP=192.168.1.131
+    restart: always
+    volumes:
+      - ./octo_data:/data
+
 networks:
   web:
     driver: bridge

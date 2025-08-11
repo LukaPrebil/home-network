@@ -16,6 +16,7 @@ mosquitto/
 ddns-data/
 npm_data/
 kuma_data/
+octo_data/
 npm_letsencrypt/
 
 **/__pycache__/
