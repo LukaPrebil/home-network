@@ -74,7 +74,7 @@ services:
     image: octoeverywhere/octoeverywhere:latest
     environment:
       - COMPANION_MODE=elegoo
-      - PRINTER_IP=192.168.1.131
+      - PRINTER_IP=192.168.1.100
     restart: always
     volumes:
       - ./octo_data:/data
