@@ -24,19 +24,6 @@ services:
     restart: always
     privileged: true
 
-  # cadvisor:
-  #   container_name: cadvisor
-  #   image: gcr.io/cadvisor/cadvisor:latest
-  #   ports:
-  #     - "8081:8080"
-  #   volumes:
-  #     - /:/rootfs:ro
-  #     - /var/run:/var/run:ro
-  #     - /sys:/sys:ro
-  #     - /var/lib/docker/:/var/lib/docker:ro
-  #   restart: always
-  #   privileged: true
-
   uptime-kuma:
     container_name: uptime-kuma
     image: louislam/uptime-kuma:latest
@@ -78,6 +65,20 @@ services:
     restart: always
     volumes:
       - ./octo_data:/data
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"  # Standard MQTT port
+      - "9001:9001"  # MQTT over WebSockets
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    # Optional: If you want to create users later, add this line
+    # command: mosquitto -c /mosquitto-no-auth.conf
 
 networks:
   web:
