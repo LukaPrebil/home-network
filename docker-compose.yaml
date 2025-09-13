@@ -77,8 +77,22 @@ services:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
-    # Optional: If you want to create users later, add this line
-    # command: mosquitto -c /mosquitto-no-auth.conf
+
+  omada-controller:
+    image: mbentley/omada-controller:5
+    container_name: omada-controller
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Ljubljana
+      - OMADA_UID=1000
+      - OMADA_GID=1000
+      - SHOW_SERVER_LOGS=true
+      - SHOW_MONGODB_LOGS=false
+    volumes:
+      - ./omada/data:/opt/tplink/EAPController/data
+      - ./omada/work:/opt/tplink/EAPController/work
+      - ./omada/logs:/opt/tplink/EAPController/logs
 
 networks:
   web:
