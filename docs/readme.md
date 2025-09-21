@@ -7,7 +7,7 @@ This document outlines the architecture, services, and configuration of my home 
 The network is designed around four core principles:
 
 * **Security:** A segmented VLAN architecture isolates traffic between trusted devices, servers, IoT gadgets, and guests. Firewall rules are implemented with a "deny by default" approach.
-* **Resilience:** Critical services are designed with redundancy in mind, including a secondary DNS server and a failover LACP bond for the primary server.
+* **Resilience:** Critical services are designed with redundancy in mind, including a secondary DNS server and a failover connection for the primary server.
 * **Performance:** The network core is a 10Gbps backbone, with dedicated high-speed links for the NAS and primary workstation to handle demanding tasks without bottlenecks.
 * **Local Control:** IoT devices are prevented from accessing the internet, forcing all communication through Home Assistant for maximum privacy and security.
 
@@ -20,7 +20,7 @@ The network is designed around four core principles:
 | **Router**    | Omada ER707-M2                   | Multi-WAN, VPN, Firewall         |
 | **Switch 1**  | YuanLey 4x2.5G PoE + 2x10G SFP+  | High-Speed & PoE Switch          |
 | **Switch 2**  | MikroTik CSS326-24G-2S+RM        | 24-Port Distribution Switch      |
-| **Server 1**  | Minisforum N5 Pro                | Proxmox Host, 2xSFP+, 2x2.5GbE   |
+| **Server 1**  | Minisforum N5 Pro                | Proxmox Host, 1x 10GbE, 1x5GbE   |
 | **Server 2**  | Raspberry Pi 4                   | Zigbee & Bluetooth Hub           |
 | **Server 3**  | Raspberry Pi 2                   | MQTT & Redundant DNS             |
 | **WiFi**      | 3 x Omada EAP650                 | WiFi 6 Access Points             |
@@ -75,9 +75,8 @@ graph TD
     sw_yuanley <-->|"10Gb SFP+<br>Backbone (Trunk)"| sw_mikrotik
 
     %% Server Connections
-    nas ---|"10Gb SFP+<br>(VLAN Trunk)"| sw_yuanley
-    nas ---|"10Gb SFP+<br>(Direct Link)"| desktop_pc
-    nas ---|"5Gb LACP<br>(2x2.5GbE)"| sw_yuanley
+    nas ---|"10GbE<br>(VLAN Trunk)"| sw_yuanley
+    nas ---|"5Gb <br>(2.5GbE)"| sw_yuanley
     rpi4 ---|"1Gbps<br>VLAN 30"| sw_mikrotik
     rpi2 ---|"1Gbps<br>VLAN 30"| sw_mikrotik
 
