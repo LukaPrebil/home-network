@@ -178,4 +178,4 @@ This section details the final physical layout of the 7U wall-mounted network ra
 | **U2** | 📠 Custom 3D Mount | A custom-printed mount for the Telekom Fiber Modem, providing a secure fit and better airflow than a shelf. |
 | **U1** | (Open) | Space is kept free for airflow and future expansion. A PDU is mounted vertically on the back rail of this unit. |
 
-![Rack layout image](rack-layout.png)
+![Rack layout image](assets/rack-layout.png)
