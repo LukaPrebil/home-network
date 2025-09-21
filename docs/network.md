@@ -163,3 +163,17 @@ This section contains the specific details required for the automated setup and 
 * **Privilege Escalation:** Granular `sudo` rules to provide least-privilege access for required commands.
 * **Filesystem Layout:** Persistent application data will be stored in `/srv/docker/[service_name]`. TrueNAS will manage two primary volumes: one for SSD storage and one for bulk HDD storage.
 * **Secrets Management:** All sensitive variables (API keys, passwords) will be encrypted and stored locally using **Ansible Vault**.
+
+## 7. Physical Rack Layout
+
+This section details the final physical layout of the 7U wall-mounted network rack. The design prioritizes a clean front appearance, logical grouping of hardware, and good airflow. The primary server (Minisforum N5 Pro) is located on top of the cabinet to ensure unrestricted airflow and to remove its weight from the wall mount.
+
+| Unit | Component | Purpose / Notes |
+| :--- | :--- | :--- |
+| **U7** | 📄 Patch Panel | Terminates all incoming Ethernet drops. Incoming cable loom is routed up the side of the rack to this panel. |
+| **U6** | 🔌 MikroTik Switch | Main 24-port distribution switch. Connected to the patch panel with short (0.15m) patch cables. |
+| **U5** | ⚡ Custom 1U Mount | Houses the YuanLey PoE Switch and both Raspberry Pis. Connected to the MikroTik via a 10Gbps SFP+ backbone. |
+| **U4** | 🛡️ Omada Router | The main network router and firewall, completing the top-mounted "network block". |
+| **U3** | 🖌️ 1U Brush Panel | Provides a clean pass-through for cables running from the modem up to the router's WAN port. |
+| **U2** | 📠 Custom 3D Mount | A custom-printed mount for the Telekom Fiber Modem, providing a secure fit and better airflow than a shelf. |
+| **U1** | (Open) | Space is kept free for airflow and future expansion. A PDU is mounted vertically on the back rail of this unit. |
