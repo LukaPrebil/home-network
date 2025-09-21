@@ -54,7 +54,7 @@ graph TD
         end
         
         subgraph "Servers & Services"
-            nas["<br>🗄️<br><b>Minisforum N5 Pro</b><br>Host OS: Proxmox<br><b>VMs on VLANs 30 & 60</b><br><br><u>Services:</u><br>- TrueNAS Scale (VLAN 30)<br>- Immich VM (VLAN 30)<br>- Plex/Jellyfin VM (VLAN 30)<br>- NPM VM (VLAN 60)<br>- AdGuard #1 (VLAN 30)"]
+            nas["<br>🗄️<br><b>Minisforum N5 Pro</b><br>Host OS: Proxmox<br><b>VMs on VLANs 30 & 60</b><br><br><u>Services:</u><br>- TrueNAS Scale (VLAN 30)<br>- Home Assistant OS VM (VLAN 30)<br>- Immich VM (VLAN 30)<br>- Plex/Jellyfin VM (VLAN 30)<br>- NPM VM (VLAN 60)<br>- AdGuard #1 (VLAN 30)"]
             rpi4["<br>🍓<br><b>Raspberry Pi 4</b><br><b>VLAN 30: Servers</b><br><br><u>Services:</u><br>- Zigbee2MQTT<br>- Bluetooth Proxy"]
             rpi2["<br>🍓<br><b>Raspberry Pi 2</b><br><b>VLAN 30: Servers</b><br><br><u>Services:</u><br>- Mosquitto MQTT<br>- AdGuard #2 (Redundant)"]
         end
