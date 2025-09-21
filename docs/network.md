@@ -108,16 +108,21 @@ graph TD
 ## 5. Server Roles
 
 ### Minisforum N5 Pro (Proxmox Host)
-
 * **OS:** Proxmox VE
-* **Purpose:** Primary hypervisor for running all major services in VMs and LXCs.
-* **Key Services:**
+* **Purpose:** Primary hypervisor for running all major services in dedicated VMs.
+* **Key VMs & Services:**
+    * **Home Assistant OS VM:** A dedicated VM for the core smart home controller. See details below.
     * **TrueNAS Scale VM:** Manages ZFS storage pools and provides network shares.
-    * **Docker VM:** Hosts containerized services like AdGuard Home, Nginx Proxy Manager, and the \*Arr suite.
+    * **Docker Host VM:** Hosts containerized services like AdGuard Home, the \*Arr suite, etc.
+    * **NPM VM:** An isolated VM for the Nginx Proxy Manager in the public-facing VLAN.
     * **Dedicated VMs/LXCs:** For resource-intensive applications like Immich and Plex/Jellyfin.
 
-### Raspberry Pi 4
+### Home Assistant VM (on N5 Pro)
+* **OS:** Home Assistant OS
+* **Purpose:** The central controller for all smart home devices and automations.
+* **Details:** Runs the full HA OS to get the benefit of the Supervisor and Add-on store, ensuring maximum stability and easy management via Proxmox snapshots.
 
+### Raspberry Pi 4
 * **OS:** Raspberry Pi OS Lite (or similar)
 * **Purpose:** Dedicated hub for physical smart home radio protocols.
 * **Key Services:**
@@ -125,12 +130,13 @@ graph TD
     * **Bluetooth Proxy:** Extends Home Assistant's Bluetooth range.
 
 ### Raspberry Pi 2
-
 * **OS:** Raspberry Pi OS Lite (or similar)
 * **Purpose:** Runs lightweight, high-availability services.
 * **Key Services:**
     * **Mosquitto:** The central MQTT broker for all IoT communication.
     * **AdGuard Home (Secondary):** Acts as a redundant DNS server for network-wide resilience.
+
+---
 
 ## 6. Automation & Low-Level Design
 
@@ -147,6 +153,7 @@ This section contains the specific details required for the automated setup and 
 | **NPM VM** | `nginx` | 60 (Public) | `192.168.60.2` |
 | **Raspberry Pi 4** | `rpi4` | 30 (Servers) | `192.168.30.5` |
 | **Raspberry Pi 2** | `rpi2` | 30 (Servers) | `192.168.30.6` |
+| **Home Assistant VM** | `haos` | 30 (Servers) | `192.168.30.7` |
 | **Desktop PC** | `desktop-pc` | 20 (Trusted) | `192.168.20.2` |
 
 ### Automation Configuration
