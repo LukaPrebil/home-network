@@ -131,3 +131,28 @@ graph TD
 * **Key Services:**
     * **Mosquitto:** The central MQTT broker for all IoT communication.
     * **AdGuard Home (Secondary):** Acts as a redundant DNS server for network-wide resilience.
+
+## 6. Automation & Low-Level Design
+
+This section contains the specific details required for the automated setup and management of the network and services using Ansible.
+
+### Static IP Address Map
+
+| Device/Role | Hostname | VLAN | Static IP Address |
+| :--- | :--- | :--- | :--- |
+| **Omada Router** | `gateway` | N/A | `192.168.10.1`, `192.168.20.1`, etc. |
+| **Minisforum N5 Pro** | `n5p` | 30 (Servers) | `192.168.30.2` |
+| **TrueNAS VM** | `tn-storage` | 30 (Servers) | `192.168.30.3` |
+| **Docker Host VM** | `containers` | 30 (Servers) | `192.168.30.4` |
+| **NPM VM** | `nginx` | 60 (Public) | `192.168.60.2` |
+| **Raspberry Pi 4** | `rpi4` | 30 (Servers) | `192.168.30.5` |
+| **Raspberry Pi 2** | `rpi2` | 30 (Servers) | `192.168.30.6` |
+| **Desktop PC** | `desktop-pc` | 20 (Trusted) | `192.168.20.2` |
+
+### Automation Configuration
+
+* **Ansible User:** `ansible_user`
+* **Authentication:** SSH key-based authentication.
+* **Privilege Escalation:** Granular `sudo` rules to provide least-privilege access for required commands.
+* **Filesystem Layout:** Persistent application data will be stored in `/srv/docker/[service_name]`. TrueNAS will manage two primary volumes: one for SSD storage and one for bulk HDD storage.
+* **Secrets Management:** All sensitive variables (API keys, passwords) will be encrypted and stored locally using **Ansible Vault**.
