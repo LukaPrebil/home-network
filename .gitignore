@@ -21,3 +21,5 @@ npm_letsencrypt/
 omada/
 
 **/__pycache__/
+
+.vscode/
