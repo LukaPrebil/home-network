@@ -76,7 +76,7 @@ graph TD
 
     %% Server Connections
     nas ---|"10GbE<br>(VLAN Trunk)"| sw_yuanley
-    nas ---|"5Gb <br>(2.5GbE)"| sw_yuanley
+    nas ---|"1Gb <br>(1GbE)"| sw_mikrotik
     rpi4 ---|"1Gbps<br>VLAN 30"| sw_mikrotik
     rpi2 ---|"1Gbps<br>VLAN 30"| sw_mikrotik
 
@@ -85,7 +85,7 @@ graph TD
     sw_yuanley --"PoE<br>(Trunk)"--> ap1
     sw_yuanley --"PoE<br>(Trunk)"--> ap2
     sw_yuanley --"PoE<br>(Trunk)"--> ap3
-    desktop_pc ---|"1Gbps/2.5Gbps<br>VLAN 20"| sw_mikrotik
+    desktop_pc ---|"1Gbps/10Gbps<br>VLAN 20"| sw_mikrotik
     ap1 --- iot_devices
 
 ```
