@@ -12,60 +12,107 @@ Last Updated: 2025-10-10
   - `ssh luka@n5p` (as admin)
   - Web UI: https://192.168.1.128:8006
 
+### TrueNAS Storage (tn-storage)
+- **IP:** 192.168.1.150 (DHCP, temporary, will move to 192.168.30.3)
+- **Status:** ✅ Fully configured and operational
+- **Access:**
+  - `ssh tn-storage` (as root)
+  - Web UI: http://192.168.1.150 (login as truenas_admin)
+- **Storage:**
+  - ZFS Pool: `tank` (RAIDZ1, 3x 1TB NVMe, ~2TB usable)
+  - Datasets:
+    - `tank/proxmox-vms` (200GB quota) - VM disk images
+    - `tank/proxmox-templates` (20GB quota) - Templates/ISOs
+    - `tank/docker-volumes` (100GB quota) - Docker persistent data
+    - `tank/media` (no quota) - Media files for Plex/Jellyfin
+    - `tank/backups` (no quota) - System backups
+  - All datasets exported via NFS to Proxmox
+
 ### Ansible Connectivity
-- ✅ `ansible all -m ping` works
+- ✅ `ansible all -m ping` works for both n5p and tn-storage
 - ✅ `ansible-playbook site.yml` runs successfully
 - ✅ Secrets encrypted with Ansible Vault
+- ✅ Privilege escalation working on all hosts (sudo configured)
 
 ## What's Ready
 
 ### Proxmox Configuration
-- VLAN-aware bridge on enp197s0
-- Storage: local (ISOs/backups), local-lvm (VM disks)
-- Users configured with SSH keys
-- Ready to provision VMs
+- ✅ VLAN-aware bridge on enp197s0
+- ✅ DNS resolution configured (public DNS servers)
+- ✅ Storage backends:
+  - `local` - ISOs/backups on boot drive
+  - `local-lvm` - VM boot disks (56GB available)
+  - `truenas-vms` - VM disks on TrueNAS (200GB NFS)
+  - `truenas-templates` - Templates/ISOs on TrueNAS (20GB NFS)
+- ✅ Users configured with SSH keys
+- ✅ Sudo and privilege escalation configured
+- ✅ Ready to provision VMs with full storage backend
 
-### What Proxmox Needs Before VM Creation
-Before creating VMs, we should:
+### TrueNAS Configuration
+- ✅ VM provisioned with PCIe NVMe passthrough
+- ✅ ZFS pool created and healthy
+- ✅ Datasets with appropriate quotas
+- ✅ NFS shares configured and exported
+- ✅ Integrated with Proxmox storage
+- ✅ Network access from both current (192.168.1.0/24) and future (192.168.30.0/24) networks
 
-1. **Upload OS Images** (if not using cloud-init)
-   - Ubuntu Server ISO
-   - Debian ISO
-   - Home Assistant OS image
+## Completed Playbooks
 
-2. **OR: Create Cloud-Init Templates** (recommended)
-   - Download cloud image
-   - Create VM template with cloud-init
-   - Use Ansible to clone and customize
+### Infrastructure
+- ✅ `site.yml` - Main playbook (configures Proxmox host)
+- ✅ `provision-truenas.yml` - Provisions TrueNAS VM on Proxmox
+- ✅ `configure-truenas.yml` - Configures TrueNAS storage (ZFS, NFS, Proxmox integration)
 
-## Next Immediate Steps
+All playbooks are fully automated and idempotent.
 
-Choose one path:
+## Next Steps
 
-### Option A: Manual VM Creation (Quick Start)
-1. Upload ISOs via Proxmox web UI
-2. Create VMs manually through web UI
-3. Use Ansible to configure them after creation
+### Immediate: VM Provisioning Infrastructure
+Before creating service VMs, we need:
 
-### Option B: Automated VM Provisioning (Better Long-Term)
-1. Create Ansible playbook to:
-   - Download cloud-init images
-   - Create VM templates
-   - Provision VMs from templates
-2. Everything Infrastructure-as-Code
+1. **Create Cloud-Init Template Playbook** ⏳
+   - Download Ubuntu Server 24.04 LTS cloud image
+   - Create VM template with cloud-init support
+   - Configure for easy cloning
 
-**Recommendation:** Option B - it takes a bit more setup now but pays off quickly.
+2. **Create Docker Host VM Playbook** ⏳
+   - Provision first service VM from cloud-init template
+   - Configure Docker and Docker Compose
+   - Set up directory structure (`/srv/docker/`)
+   - Mount TrueNAS NFS share for persistent volumes
 
-## Ready to Start VMs?
+### Future Service VMs
+After Docker Host is ready:
+- AdGuard Home (DNS/DHCP)
+- Nginx Proxy Manager (reverse proxy)
+- Monitoring stack (Prometheus/Grafana)
+- Home Assistant OS
+- Media services (Plex/Jellyfin)
+- Immich (photo management)
 
-Yes! Proxmox is ready. We can start provisioning VMs. The recommended first VM is:
-- **Docker Host** (`containers` - 192.168.30.4 when VLANs are active)
-  - Will host AdGuard, monitoring, and other containerized services
-  - Good test case for the automation workflow
+## Storage Architecture
+
+```
+Proxmox (n5p)
+├── local (boot drive)
+│   └── ISOs, backups, configs
+├── local-lvm (boot drive)
+│   └── VM boot disks only
+└── TrueNAS NFS Mounts
+    ├── truenas-vms → /mnt/tank/proxmox-vms
+    │   └── VM disk images (200GB)
+    ├── truenas-templates → /mnt/tank/proxmox-templates
+    │   └── Cloud-init templates, ISOs (20GB)
+    └── (Future: direct NFS mount to VMs)
+        ├── /srv/docker → /mnt/tank/docker-volumes
+        ├── /mnt/media → /mnt/tank/media
+        └── /mnt/backups → /mnt/tank/backups
+```
 
 ## Notes
 
 - Currently on flat 192.168.1.0/24 network
 - VLANs will be activated when Omada router is deployed
-- Proxmox host runs as `ansible_user` (no sudo needed for most operations)
-- For privileged operations on Proxmox, playbooks should target root via API or SSH
+- All IPs are temporary and will migrate to VLAN 30 (192.168.30.0/24)
+- TrueNAS datasets have conservative quotas that can be increased as needed
+- All infrastructure is defined in code and fully reproducible

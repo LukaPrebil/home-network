@@ -171,9 +171,11 @@ This section contains the specific details required for the automated setup and 
 
 **Temporary Configuration (During Build-Out):**
 - Network: `192.168.1.0/24` (existing home network)
-- N5 Pro IP: `192.168.1.128`
+- N5 Pro (Proxmox): `192.168.1.128`
+- TrueNAS VM: `192.168.1.150` (DHCP)
 - Router: Not yet deployed (using existing home router at `192.168.1.1`)
 - VLANs: Not yet active (waiting for Omada router deployment)
+- All services accessible on temporary IPs until VLAN migration
 
 **Note:** The network is currently in a transitional state. Once the Omada router is deployed, we will migrate to the VLAN architecture defined in Section 4.
 
@@ -183,30 +185,59 @@ This section contains the specific details required for the automated setup and 
 - ✅ YuanLey 4x2.5G PoE Switch deployed
 - ✅ MikroTik CSS326 Switch deployed
 - ✅ Omada EAP650 Access Points deployed (3x)
+- ✅ Minisforum N5 Pro deployed with 3x 1TB NVMe drives
 
 #### Proxmox Host (n5p)
 - ✅ Proxmox VE installed
 - ✅ Network bridge (vmbr0) configured with VLAN awareness on interface enp197s0
 - ✅ VLAN kernel module (8021q) enabled
-- ✅ Storage configured (local for ISOs/backups, local-lvm for VM disks)
+- ✅ DNS resolution configured (public DNS servers)
+- ✅ Storage configured:
+  - `local` - ISOs/backups on boot drive
+  - `local-lvm` - VM boot disks (56GB available)
+  - `truenas-vms` - VM disks on TrueNAS (200GB NFS)
+  - `truenas-templates` - Templates/ISOs on TrueNAS (20GB NFS)
 - ✅ Ansible automation user created (`ansible_user`)
 - ✅ Admin user created (`luka`)
 - ✅ SSH hardening applied (key-only authentication, no password auth)
+- ✅ Sudo and privilege escalation configured
 - ✅ Timezone set to Europe/Ljubljana
 - ✅ Subscription nag removed
 
+#### TrueNAS Storage VM (tn-storage)
+- ✅ VM provisioned on Proxmox with PCIe NVMe passthrough
+  - 4 CPU cores, 20GB RAM, 32GB boot disk
+  - 3x 1TB NVMe drives passed through for ZFS
+- ✅ TrueNAS Scale 25.04.2.4 (Fangtooth) installed
+- ✅ ZFS pool created:
+  - Pool name: `tank`
+  - Type: RAIDZ1
+  - Capacity: ~2TB usable
+- ✅ ZFS datasets configured with quotas:
+  - `tank/proxmox-vms` (200GB) - VM disk images
+  - `tank/proxmox-templates` (20GB) - Templates/ISOs
+  - `tank/docker-volumes` (100GB) - Docker persistent data
+  - `tank/media` (no quota) - Media files
+  - `tank/backups` (no quota) - System backups
+- ✅ NFS shares configured and exported
+- ✅ Integrated with Proxmox storage backends
+
 #### Ansible Configuration
 - ✅ Directory structure created (`ansible/`)
-- ✅ Common role (users, SSH hardening, timezone)
-- ✅ Proxmox role (network bridges, VLAN support)
+- ✅ Common role (users, SSH hardening, timezone, sudo)
+- ✅ Proxmox role (network bridges, VLAN support, DNS)
 - ✅ Inventory and variables configured
 - ✅ Secrets encrypted with Ansible Vault
-- ✅ Playbooks tested and working
+- ✅ Playbooks fully automated and idempotent:
+  - `site.yml` - Main playbook (configures Proxmox host)
+  - `provision-truenas.yml` - Provisions TrueNAS VM
+  - `configure-truenas.yml` - Configures TrueNAS storage (ZFS, NFS, Proxmox integration)
+- ✅ TrueNAS API integration via midclt (JSON-RPC)
 
 ### In Progress
 
-- 🚧 VM provisioning playbooks (next step)
-- 🚧 Cloud-init templates for automated VM deployment
+- 🚧 Cloud-init template playbook for Ubuntu VMs
+- 🚧 Docker Host VM provisioning playbook
 
 ### Not Started
 
