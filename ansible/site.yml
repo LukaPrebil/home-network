@@ -5,11 +5,15 @@
 - name: Configure all Linux servers with common settings
   hosts: linux_servers
   become: true
+  vars_files:
+    - secrets.yml
   roles:
     - common
 
 - name: Configure Proxmox hosts
   hosts: proxmox_hosts
   become: true
+  vars_files:
+    - secrets.yml
   roles:
     - proxmox

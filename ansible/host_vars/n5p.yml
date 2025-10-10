@@ -13,7 +13,7 @@ primary_interface: enp1s0  # Update based on actual interface name
 # Additional user for management
 admin_users:
   - name: luka
-    shell: /usr/bin/zsh
+    shell: /bin/bash
     groups:
       - sudo
     ssh_key: "{{ vault_luka_ssh_public_key }}"

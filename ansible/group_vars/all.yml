@@ -14,13 +14,13 @@ timezone: Europe/Ljubljana
 
 # Common packages
 common_packages:
-  - vim
   - curl
   - wget
   - git
   - htop
   - net-tools
   - sudo
+  - vim-tiny
 
 # Ansible automation user
 automation_user:
