@@ -1,0 +1,19 @@
+---
+# Variables for cloud-init template creation
+
+# Ubuntu cloud image configuration
+ubuntu_version: "25.04"
+ubuntu_codename: "plucky"
+cloud_image_filename: "ubuntu-25.04-server-cloudimg-amd64.img"
+cloud_image_url: "https://cloud-images.ubuntu.com/releases/{{ ubuntu_version }}/release/{{ cloud_image_filename }}"
+cloud_image_path: "/mnt/pve/truenas-templates/template/iso/{{ cloud_image_filename }}"
+
+# Template VM configuration
+template_vmid: 9000
+template_name: "ubuntu-2504-cloudinit-template"
+template_cores: 2
+template_memory: 2048  # 2GB
+template_disk_size: 10G
+boot_disk_storage: "truenas-vms"  # VM disks must be on truenas-vms, not truenas-templates
+cloudinit_storage: "truenas-vms"  # Cloud-init drive also on truenas-vms
+network_bridge: "vmbr0"

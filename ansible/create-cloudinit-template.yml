@@ -1,0 +1,214 @@
+---
+# Playbook to create Ubuntu 25.04 cloud-init template on Proxmox
+# This creates a reusable template for rapid VM provisioning
+
+- name: Download Ubuntu 25.04 cloud image
+  hosts: n5p
+  become: true
+  vars_files:
+    - secrets.yml
+    - group_vars/cloudinit_template.yml
+  tasks:
+    - name: Ensure cloud image directory exists on TrueNAS storage
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-templates/template/iso
+        state: directory
+        mode: '0755'
+
+    - name: Check if cloud image already exists
+      ansible.builtin.stat:
+        path: "{{ cloud_image_path }}"
+      register: cloud_image_stat
+
+    - name: Download Ubuntu cloud image
+      ansible.builtin.get_url:
+        url: "{{ cloud_image_url }}"
+        dest: "{{ cloud_image_path }}"
+        mode: '0644'
+        timeout: 600
+      when: not cloud_image_stat.stat.exists
+      register: image_download
+
+    - name: Display image download status
+      ansible.builtin.debug:
+        msg: "Ubuntu {{ ubuntu_version }} cloud image {{ 'downloaded' if image_download is changed else 'already exists' }} at {{ cloud_image_path }}"
+
+- name: Create cloud-init template VM
+  hosts: n5p
+  become: true
+  vars_files:
+    - secrets.yml
+    - group_vars/cloudinit_template.yml
+  tasks:
+    - name: Check if template VM already exists
+      ansible.builtin.shell:
+        cmd: "qm status {{ template_vmid }}"
+      register: vm_exists
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if template VM already exists
+      ansible.builtin.fail:
+        msg: "VM {{ template_vmid }} already exists. Delete it first with 'qm destroy {{ template_vmid }}' or choose a different VMID."
+      when: vm_exists.rc == 0
+
+    - name: Create base VM for cloud-init template
+      ansible.builtin.shell:
+        cmd: >
+          qm create {{ template_vmid }}
+          --name {{ template_name }}
+          --memory {{ template_memory }}
+          --cores {{ template_cores }}
+          --cpu host
+          --machine q35
+          --net0 virtio,bridge={{ network_bridge }},firewall=1
+          --ostype l26
+          --scsihw virtio-scsi-single
+          --serial0 socket
+          --vga serial0
+          --agent enabled=1
+      register: vm_create
+
+    - name: Import cloud image as VM disk
+      ansible.builtin.shell:
+        cmd: >
+          qm importdisk {{ template_vmid }} {{ cloud_image_path }} {{ boot_disk_storage }}
+      register: disk_import
+      when: vm_create is succeeded
+
+    - name: Attach imported disk to VM
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ template_vmid }}
+          --scsi0 {{ boot_disk_storage }}:{{ template_vmid }}/vm-{{ template_vmid }}-disk-0.raw,discard=on,iothread=1,ssd=1
+      when: disk_import is succeeded
+
+    - name: Add cloud-init drive
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ template_vmid }}
+          --ide2 {{ cloudinit_storage }}:cloudinit
+      when: disk_import is succeeded
+
+    - name: Configure boot order
+      ansible.builtin.shell:
+        cmd: qm set {{ template_vmid }} --boot order=scsi0
+      when: disk_import is succeeded
+
+    - name: Resize boot disk to configured size
+      ansible.builtin.shell:
+        cmd: qm resize {{ template_vmid }} scsi0 {{ template_disk_size }}
+      when: disk_import is succeeded
+
+- name: Configure cloud-init defaults
+  hosts: n5p
+  become: true
+  vars_files:
+    - secrets.yml
+    - group_vars/cloudinit_template.yml
+  tasks:
+    - name: Write SSH key to temporary file
+      ansible.builtin.copy:
+        content: "{{ vault_ansible_ssh_public_key }}"
+        dest: /tmp/cloudinit_ssh_key.pub
+        mode: '0644'
+
+    - name: Set cloud-init user and SSH key
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ template_vmid }}
+          --ciuser ubuntu
+          --sshkeys /tmp/cloudinit_ssh_key.pub
+      register: cloudinit_user
+
+    - name: Remove temporary SSH key file
+      ansible.builtin.file:
+        path: /tmp/cloudinit_ssh_key.pub
+        state: absent
+
+    - name: Set cloud-init DNS servers
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ template_vmid }}
+          --nameserver "{{ dns_servers | join(' ') }}"
+      register: cloudinit_dns
+
+    - name: Set cloud-init IP configuration to DHCP
+      ansible.builtin.shell:
+        cmd: qm set {{ template_vmid }} --ipconfig0 ip=dhcp
+      register: cloudinit_ip
+
+    - name: Display cloud-init configuration status
+      ansible.builtin.debug:
+        msg: "Cloud-init configured with user 'ubuntu', SSH key, DNS servers, and DHCP"
+
+- name: Convert VM to template
+  hosts: n5p
+  become: true
+  vars_files:
+    - group_vars/cloudinit_template.yml
+  tasks:
+    - name: Convert VM to template
+      ansible.builtin.shell:
+        cmd: qm template {{ template_vmid }}
+      register: template_convert
+
+    - name: Verify template creation
+      ansible.builtin.shell:
+        cmd: qm config {{ template_vmid }}
+      register: template_config
+      changed_when: false
+
+    - name: Display template configuration
+      ansible.builtin.debug:
+        msg: "{{ template_config.stdout_lines }}"
+
+    - name: Display success message and next steps
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Cloud-Init Template Created Successfully!"
+          - "=============================================="
+          - ""
+          - "Template ID: {{ template_vmid }}"
+          - "Template Name: {{ template_name }}"
+          - "Ubuntu Version: 25.04 (Plucky Puffin)"
+          - ""
+          - "Template Configuration:"
+          - "  CPU: 2 cores"
+          - "  Memory: 2GB"
+          - "  Disk: 10GB (resizable during clone)"
+          - "  Storage: truenas-templates"
+          - "  Network: {{ network_bridge }} (VLAN untagged)"
+          - "  Default User: ubuntu"
+          - "  SSH Key: Injected from vault"
+          - ""
+          - "IMPORTANT - VLAN Configuration:"
+          - "  ⚠️  This template has NO VLAN tag set!"
+          - "  ⚠️  You MUST specify a VLAN tag when cloning VMs"
+          - ""
+          - "To clone this template:"
+          - ""
+          - "Option 1 - Use the automated clone playbook (RECOMMENDED):"
+          - "  ansible-playbook clone-vm-from-template.yml -e vm_name=my-vm -e vlan_id=30"
+          - ""
+          - "Option 2 - Manual clone via Proxmox CLI:"
+          - "  qm clone {{ template_vmid }} <NEW_VMID> --name <VM_NAME> --full"
+          - "  qm set <NEW_VMID> --net0 virtio,bridge=vmbr0,tag=<VLAN_ID>,firewall=1"
+          - "  qm set <NEW_VMID> --ipconfig0 ip=<IP_ADDRESS>/24,gw=<GATEWAY>"
+          - "  qm start <NEW_VMID>"
+          - ""
+          - "Option 3 - Manual clone via Proxmox Web UI:"
+          - "  1. Right-click template → Clone → Full Clone"
+          - "  2. Navigate to VM → Hardware → Network Device → Edit"
+          - "  3. Set VLAN Tag (e.g., 30 for Servers)"
+          - "  4. Navigate to Cloud-Init → Set static IP or DHCP"
+          - "  5. Start the VM"
+          - ""
+          - "Recommended VLAN assignments:"
+          - "  - VLAN 30 (Servers): Most service VMs"
+          - "  - VLAN 60 (Public): Nginx Proxy Manager"
+          - "  - VLAN 20 (Trusted): Development/testing VMs"
+          - ""
+          - "Next: Use 'clone-vm-from-template.yml' to provision VMs"
+          - "=============================================="

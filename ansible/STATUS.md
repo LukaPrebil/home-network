@@ -16,7 +16,7 @@ Last Updated: 2025-10-10
 - **IP:** 192.168.1.150 (DHCP, temporary, will move to 192.168.30.3)
 - **Status:** ✅ Fully configured and operational
 - **Access:**
-  - `ssh tn-storage` (as root)
+  - `ssh tn-storage` (as truenas_admin)
   - Web UI: http://192.168.1.150 (login as truenas_admin)
 - **Storage:**
   - ZFS Pool: `tank` (RAIDZ1, 3x 1TB NVMe, ~2TB usable)
@@ -63,20 +63,44 @@ Last Updated: 2025-10-10
 - ✅ `provision-truenas.yml` - Provisions TrueNAS VM on Proxmox
 - ✅ `configure-truenas.yml` - Configures TrueNAS storage (ZFS, NFS, Proxmox integration)
 
+### VM Provisioning
+- ✅ `create-cloudinit-template.yml` - Creates Ubuntu 25.04 cloud-init template
+- ✅ `provision-vms.yml` - Provisions VMs from template (declarative, idempotent)
+
 All playbooks are fully automated and idempotent.
+
+## What's Ready
+
+### Cloud-Init Template
+- ✅ Ubuntu 25.04 (Plucky Puffin) cloud-init template
+- ✅ Template ID: 9000
+- ✅ Pre-configured with SSH keys and DNS
+- ✅ Stored on truenas-templates
+- ✅ Ready for VM cloning with VLAN support
+
+### VM Provisioning System
+- ✅ Declarative VM definitions in `group_vars/vms.yml`
+- ✅ Automated provisioning with `provision-vms.yml`
+- ✅ VLAN enforcement during VM creation
+- ✅ Idempotent (skips existing VMs)
+- ✅ Cloud-init integration for automated configuration
 
 ## Next Steps
 
-### Immediate: VM Provisioning Infrastructure
-Before creating service VMs, we need:
+### Immediate: Service VM Deployment
+Now that the VM provisioning system is ready:
 
-1. **Create Cloud-Init Template Playbook** ⏳
-   - Download Ubuntu Server 24.04 LTS cloud image
-   - Create VM template with cloud-init support
-   - Configure for easy cloning
+1. **Define VMs in `group_vars/vms.yml`** ⏳
+   - Uncomment and customize VM definitions
+   - Docker Host (containers) - VLAN 30
+   - Nginx Proxy Manager (nginx) - VLAN 60
+   - Other service VMs as needed
 
-2. **Create Docker Host VM Playbook** ⏳
-   - Provision first service VM from cloud-init template
+2. **Run VM Provisioning** ⏳
+   - Execute: `ansible-playbook provision-vms.yml`
+   - Verify VMs are accessible via SSH
+
+3. **Create Docker Host Role** ⏳
    - Configure Docker and Docker Compose
    - Set up directory structure (`/srv/docker/`)
    - Mount TrueNAS NFS share for persistent volumes
