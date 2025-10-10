@@ -1,0 +1,11 @@
+---
+# Main tasks for Docker role
+
+- name: Include Docker installation tasks
+  ansible.builtin.include_tasks: install.yml
+
+- name: Include Docker configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Include NFS mount tasks
+  ansible.builtin.include_tasks: nfs.yml

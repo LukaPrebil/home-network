@@ -4,10 +4,11 @@
 # Network configuration
 domain: home.local
 dns_servers:
-  - 192.168.30.6  # rpi2 - AdGuard Home (Primary when setup)
-  - 192.168.30.2  # n5p - AdGuard Home (Secondary when setup)
-  - 193.110.81.0  # DNS0 fallback
-  - 185.253.5.0   # DNS0 fallback
+  - 193.110.81.0  # DNS0 public DNS (primary)
+  - 185.253.5.0   # DNS0 public DNS (secondary)
+  # Future: Will add AdGuard Home servers when deployed
+  # - 192.168.30.6  # rpi2 - AdGuard Home (Primary)
+  # - 192.168.30.2  # n5p - AdGuard Home (Secondary)
 
 # Timezone
 timezone: Europe/Ljubljana

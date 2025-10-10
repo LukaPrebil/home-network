@@ -67,6 +67,9 @@ Last Updated: 2025-10-10
 - ✅ `create-cloudinit-template.yml` - Creates Ubuntu 25.04 cloud-init template
 - ✅ `provision-vms.yml` - Provisions VMs from template (declarative, idempotent)
 
+### VM Configuration
+- ✅ `configure-containers.yml` - Configures Docker Host with common + docker roles
+
 All playbooks are fully automated and idempotent.
 
 ## What's Ready
@@ -85,25 +88,41 @@ All playbooks are fully automated and idempotent.
 - ✅ Idempotent (skips existing VMs)
 - ✅ Cloud-init integration for automated configuration
 
+### Docker Host (containers)
+- **IP:** 192.168.1.140 (temporary, will move to 192.168.30.4)
+- **Status:** ✅ Provisioned and running
+- **VMID:** 101
+- **Resources:** 4 cores, 8GB RAM, 50GB disk
+- **Access:** `ssh ubuntu@192.168.1.140` or `ssh ansible_user@192.168.1.140`
+- **Role:** Docker role created and ready (`roles/docker/`)
+- **Note:** Docker installation pending due to intermittent DNS resolution issue
+
+### Docker Role
+- ✅ Role structure created (`roles/docker/`)
+- ✅ Installation tasks (Docker CE, Compose, prerequisites)
+- ✅ Configuration tasks (users, daemon config)
+- ✅ NFS mount tasks for TrueNAS volumes
+- ✅ Modern GPG key handling (no deprecated apt-key)
+- ⚠️  Known issue: Intermittent DNS resolution during GPG key download
+
 ## Next Steps
 
-### Immediate: Service VM Deployment
-Now that the VM provisioning system is ready:
+### Immediate: Complete Docker Host Setup
 
-1. **Define VMs in `group_vars/vms.yml`** ⏳
-   - Uncomment and customize VM definitions
-   - Docker Host (containers) - VLAN 30
-   - Nginx Proxy Manager (nginx) - VLAN 60
-   - Other service VMs as needed
+1. **Resolve DNS Issue** ⏳
+   - Investigate systemd-resolved vs Python urllib DNS resolution
+   - Current workaround: Docker repository already configured
+   - Can install manually: `sudo apt install docker-ce docker-ce-cli containerd.io`
 
-2. **Run VM Provisioning** ⏳
-   - Execute: `ansible-playbook provision-vms.yml`
-   - Verify VMs are accessible via SSH
+2. **Deploy Services on Docker Host** ⏳
+   - AdGuard Home (DNS/DHCP)
+   - Monitoring stack (Prometheus/Grafana)
+   - *Arr suite for media management
 
-3. **Create Docker Host Role** ⏳
-   - Configure Docker and Docker Compose
-   - Set up directory structure (`/srv/docker/`)
-   - Mount TrueNAS NFS share for persistent volumes
+3. **Create VLAN Migration Playbook** ⏳
+   - Needed when Omada router is deployed
+   - Will reconfigure all VMs from flat network to VLANs
+   - Update IPs from 192.168.1.x to 192.168.30.x range
 
 ### Future Service VMs
 After Docker Host is ready:

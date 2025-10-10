@@ -1,0 +1,42 @@
+---
+# Docker configuration tasks
+
+- name: Add users to docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: yes
+  loop: "{{ docker_users }}"
+  when: docker_users is defined and docker_users | length > 0
+
+- name: Create Docker base directory
+  ansible.builtin.file:
+    path: "{{ docker_base_dir }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: docker
+
+- name: Configure Docker daemon
+  ansible.builtin.copy:
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "data-root": "/var/lib/docker"
+      }
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  notify: Restart Docker
+
+- name: Verify Docker installation
+  ansible.builtin.command: docker --version
+  register: docker_version
+  changed_when: false
+
+- name: Display Docker version
+  ansible.builtin.debug:
+    msg: "Docker installed: {{ docker_version.stdout }}"

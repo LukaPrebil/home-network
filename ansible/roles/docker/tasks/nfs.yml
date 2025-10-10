@@ -1,0 +1,38 @@
+---
+# NFS mount configuration for Docker volumes
+
+- name: Install NFS client packages
+  ansible.builtin.apt:
+    name:
+      - nfs-common
+    state: present
+
+- name: Ensure Docker base directory exists (before mounting)
+  ansible.builtin.file:
+    path: "{{ docker_nfs_mount_point }}"
+    state: directory
+    mode: '0755'
+
+- name: Check if NFS share is already mounted
+  ansible.builtin.command: mountpoint -q {{ docker_nfs_mount_point }}
+  register: nfs_mounted
+  failed_when: false
+  changed_when: false
+
+- name: Mount TrueNAS NFS share for Docker volumes
+  ansible.posix.mount:
+    path: "{{ docker_nfs_mount_point }}"
+    src: "{{ truenas_nfs_server }}:{{ truenas_docker_volumes_share }}"
+    fstype: nfs
+    opts: defaults,nofail,_netdev
+    state: mounted
+  when: nfs_mounted.rc != 0
+
+- name: Verify NFS mount
+  ansible.builtin.command: df -h {{ docker_nfs_mount_point }}
+  register: nfs_df
+  changed_when: false
+
+- name: Display NFS mount info
+  ansible.builtin.debug:
+    msg: "{{ nfs_df.stdout_lines }}"
