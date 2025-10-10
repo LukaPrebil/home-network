@@ -1,0 +1,9 @@
+# Managed by Ansible - DNS configuration
+# Using public DNS until internal AdGuard Home is deployed
+
+nameserver 193.110.81.0
+nameserver 185.253.5.0
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+
+search {{ domain }}

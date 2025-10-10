@@ -7,6 +7,13 @@
     state: directory
     mode: '0755'
 
+- name: Configure DNS servers in /etc/resolv.conf
+  ansible.builtin.template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+    mode: '0644'
+  notify: Test DNS resolution
+
 - name: Configure main network bridge (vmbr0) with VLAN awareness
   ansible.builtin.blockinfile:
     path: /etc/network/interfaces

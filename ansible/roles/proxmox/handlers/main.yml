@@ -8,6 +8,12 @@
       Run: systemctl restart networking
       Or reboot the system for safety.
 
+- name: Test DNS resolution
+  ansible.builtin.command: host download.truenas.com
+  register: dns_test
+  changed_when: false
+  failed_when: false
+
 - name: Restart pveproxy
   ansible.builtin.systemd:
     name: pveproxy
