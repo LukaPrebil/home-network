@@ -1,0 +1,41 @@
+---
+# Proxmox system configuration tasks
+
+- name: Install required Proxmox packages
+  ansible.builtin.apt:
+    name:
+      - bridge-utils
+      - vlan
+      - ifupdown2  # Provides better network reload capabilities
+    state: present
+    update_cache: true
+
+- name: Enable 8021q module for VLAN support
+  community.general.modprobe:
+    name: 8021q
+    state: present
+
+- name: Ensure 8021q module loads on boot
+  ansible.builtin.lineinfile:
+    path: /etc/modules
+    line: '8021q'
+    create: true
+    mode: '0644'
+
+- name: Configure Proxmox subscription notice (remove nag for community)
+  ansible.builtin.replace:
+    path: /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+    regexp: "if \\(data\\.status !== 'Active'\\) \\{"
+    replace: "if (false) {"
+  notify: Restart pveproxy
+  when: ansible_facts['distribution'] == 'Debian'
+  ignore_errors: true
+
+- name: Ensure Proxmox web interface is configured
+  ansible.builtin.lineinfile:
+    path: /etc/default/pveproxy
+    regexp: '^ALLOW_FROM='
+    line: 'ALLOW_FROM="192.168.0.0/16"'
+    create: true
+    mode: '0644'
+  notify: Restart pveproxy

@@ -1,0 +1,15 @@
+---
+# Main playbook for homelab infrastructure
+# This playbook applies roles to all managed hosts
+
+- name: Configure all Linux servers with common settings
+  hosts: linux_servers
+  become: true
+  roles:
+    - common
+
+- name: Configure Proxmox hosts
+  hosts: proxmox_hosts
+  become: true
+  roles:
+    - proxmox

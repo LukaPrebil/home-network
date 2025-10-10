@@ -1,0 +1,19 @@
+---
+# Host-specific variables for n5p (Minisforum N5 Pro)
+
+# Current network configuration (will transition to VLAN 30 later)
+current_ip: 192.168.1.128
+target_ip: 192.168.30.2  # Final IP in VLAN 30
+
+# Hardware details
+cpu_cores: 8
+memory_gb: 16
+primary_interface: enp1s0  # Update based on actual interface name
+
+# Additional user for management
+admin_users:
+  - name: luka
+    shell: /usr/bin/zsh
+    groups:
+      - sudo
+    ssh_key: "{{ vault_luka_ssh_public_key }}"

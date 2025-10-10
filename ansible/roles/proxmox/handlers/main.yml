@@ -1,0 +1,14 @@
+---
+# Handlers for proxmox role
+
+- name: Restart networking
+  ansible.builtin.debug:
+    msg: |
+      Network configuration changed. Manual restart required.
+      Run: systemctl restart networking
+      Or reboot the system for safety.
+
+- name: Restart pveproxy
+  ansible.builtin.systemd:
+    name: pveproxy
+    state: restarted

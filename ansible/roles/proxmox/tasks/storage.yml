@@ -1,0 +1,25 @@
+---
+# Proxmox storage configuration tasks
+
+- name: Check existing Proxmox storage configuration
+  ansible.builtin.command: pvesm status
+  register: storage_status
+  changed_when: false
+  failed_when: false
+
+- name: Display current storage status
+  ansible.builtin.debug:
+    var: storage_status.stdout_lines
+  when: storage_status.stdout_lines is defined
+
+- name: Ensure directory storage paths exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ proxmox_storage }}"
+  when: item.type == "dir"
+
+# Note: Storage configuration is typically done through the Proxmox GUI or pvesm commands
+# The default local and local-lvm storage should already be configured
+# Additional storage (like NFS, ZFS pools) can be added later

@@ -1,0 +1,21 @@
+# Ansible vault password file
+.vault_pass
+
+# Encrypted secrets (keep encrypted version in git)
+# secrets.yml is encrypted and should be committed
+# But exclude any unencrypted versions
+secrets.yml.decrypted
+
+# Retry files
+*.retry
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

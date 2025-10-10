@@ -1,0 +1,31 @@
+---
+# Global variables for all hosts
+
+# Network configuration
+domain: home.local
+dns_servers:
+  - 192.168.30.6  # rpi2 - AdGuard Home (Primary when setup)
+  - 192.168.30.2  # n5p - AdGuard Home (Secondary when setup)
+  - 193.110.81.0  # DNS0 fallback
+  - 185.253.5.0   # DNS0 fallback
+
+# Timezone
+timezone: Europe/Ljubljana
+
+# Common packages
+common_packages:
+  - vim
+  - curl
+  - wget
+  - git
+  - htop
+  - net-tools
+  - sudo
+
+# Ansible automation user
+automation_user:
+  name: ansible_user
+  shell: /bin/bash
+  groups:
+    - sudo
+  ssh_key: "{{ vault_ansible_ssh_public_key }}"

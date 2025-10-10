@@ -1,0 +1,40 @@
+---
+# Proxmox network configuration tasks
+
+- name: Ensure /etc/network/interfaces.d directory exists
+  ansible.builtin.file:
+    path: /etc/network/interfaces.d
+    state: directory
+    mode: '0755'
+
+- name: Configure main network bridge (vmbr0) with VLAN awareness
+  ansible.builtin.blockinfile:
+    path: /etc/network/interfaces
+    marker: "# {mark} ANSIBLE MANAGED - vmbr0"
+    block: |
+      auto vmbr0
+      iface vmbr0 inet static
+              address {{ proxmox_bridges[0].address }}
+              gateway {{ proxmox_bridges[0].gateway }}
+              bridge-ports {{ primary_interface }}
+              bridge-stp off
+              bridge-fd 0
+              bridge-vlan-aware yes
+              bridge-vids 2-4094
+              # {{ proxmox_bridges[0].comment }}
+    create: false
+  notify: Restart networking
+
+- name: Display network reconfiguration notice
+  ansible.builtin.debug:
+    msg: |
+      Network bridge configuration has been updated.
+      IMPORTANT: The networking service needs to be restarted for changes to take effect.
+      This may temporarily interrupt the connection.
+
+      To apply changes manually:
+      1. Review the configuration: cat /etc/network/interfaces
+      2. Test the configuration: ifup --no-act vmbr0
+      3. Apply changes: systemctl restart networking (or reboot for safety)
+
+      VLANs can now be configured on VMs by assigning them to vmbr0 with VLAN tags.

@@ -1,0 +1,62 @@
+---
+# User management tasks
+
+- name: Create ansible automation user
+  ansible.builtin.user:
+    name: "{{ automation_user.name }}"
+    shell: "{{ automation_user.shell }}"
+    groups: "{{ automation_user.groups }}"
+    append: true
+    create_home: true
+    state: present
+
+- name: Set up SSH directory for ansible user
+  ansible.builtin.file:
+    path: "/home/{{ automation_user.name }}/.ssh"
+    state: directory
+    owner: "{{ automation_user.name }}"
+    group: "{{ automation_user.name }}"
+    mode: '0700'
+
+- name: Add SSH authorized key for ansible user
+  ansible.builtin.authorized_key:
+    user: "{{ automation_user.name }}"
+    key: "{{ automation_user.ssh_key }}"
+    state: present
+
+- name: Configure passwordless sudo for ansible user
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/{{ automation_user.name }}
+    line: "{{ automation_user.name }} ALL=(ALL) NOPASSWD:ALL"
+    create: true
+    mode: '0440'
+    validate: '/usr/sbin/visudo -cf %s'
+
+- name: Create admin users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    shell: "{{ item.shell }}"
+    groups: "{{ item.groups }}"
+    append: true
+    create_home: true
+    state: present
+  loop: "{{ admin_users | default([]) }}"
+  when: admin_users is defined
+
+- name: Set up SSH directory for admin users
+  ansible.builtin.file:
+    path: "/home/{{ item.name }}/.ssh"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "{{ item.name }}"
+    mode: '0700'
+  loop: "{{ admin_users | default([]) }}"
+  when: admin_users is defined
+
+- name: Add SSH authorized keys for admin users
+  ansible.builtin.authorized_key:
+    user: "{{ item.name }}"
+    key: "{{ item.ssh_key }}"
+    state: present
+  loop: "{{ admin_users | default([]) }}"
+  when: admin_users is defined

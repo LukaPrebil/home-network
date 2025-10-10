@@ -1,0 +1,15 @@
+---
+# Main tasks for proxmox role
+# This role configures Proxmox network bridges, storage, and prepares for VM creation
+
+- name: Import network configuration tasks
+  ansible.builtin.import_tasks: network.yml
+  tags: network
+
+- name: Import storage configuration tasks
+  ansible.builtin.import_tasks: storage.yml
+  tags: storage
+
+- name: Import system configuration tasks
+  ansible.builtin.import_tasks: system.yml
+  tags: system

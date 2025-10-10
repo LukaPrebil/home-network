@@ -1,0 +1,19 @@
+---
+# Main tasks for common role
+# This role sets up users, zsh, and basic security on all hosts
+
+- name: Import user management tasks
+  ansible.builtin.import_tasks: users.yml
+  tags: users
+
+- name: Import package installation tasks
+  ansible.builtin.import_tasks: packages.yml
+  tags: packages
+
+- name: Import security configuration tasks
+  ansible.builtin.import_tasks: security.yml
+  tags: security
+
+- name: Import timezone configuration tasks
+  ansible.builtin.import_tasks: timezone.yml
+  tags: timezone

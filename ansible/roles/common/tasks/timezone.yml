@@ -1,0 +1,19 @@
+---
+# Timezone configuration tasks
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+
+- name: Ensure NTP service is installed
+  ansible.builtin.apt:
+    name: systemd-timesyncd
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Ensure NTP service is enabled and running
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    enabled: true
+    state: started
+  when: ansible_os_family == "Debian"

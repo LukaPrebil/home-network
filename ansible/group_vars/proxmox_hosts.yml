@@ -1,0 +1,65 @@
+---
+# Variables specific to Proxmox hosts
+
+# Proxmox API credentials (for VM management)
+proxmox_api_user: "root@pam"
+proxmox_api_password: "{{ vault_proxmox_api_password }}"
+proxmox_validate_certs: false
+
+# VLAN configuration for bridges
+vlan_config:
+  vlan10:
+    id: 10
+    name: Management
+    subnet: 192.168.10.0/24
+    gateway: 192.168.10.1
+  vlan20:
+    id: 20
+    name: Trusted
+    subnet: 192.168.20.0/24
+    gateway: 192.168.20.1
+  vlan30:
+    id: 30
+    name: Servers
+    subnet: 192.168.30.0/24
+    gateway: 192.168.30.1
+  vlan40:
+    id: 40
+    name: IoT
+    subnet: 192.168.40.0/24
+    gateway: 192.168.40.1
+    internet_access: false
+  vlan50:
+    id: 50
+    name: Cameras
+    subnet: 192.168.50.0/24
+    gateway: 192.168.50.1
+    internet_access: false
+  vlan60:
+    id: 60
+    name: Public_Services
+    subnet: 192.168.60.0/24
+    gateway: 192.168.60.1
+  vlan99:
+    id: 99
+    name: Guest
+    subnet: 192.168.99.0/24
+    gateway: 192.168.99.1
+
+# Network bridges to create
+proxmox_bridges:
+  - name: vmbr0
+    address: 192.168.1.128/24  # Current network during setup
+    gateway: 192.168.1.1
+    comment: "Main bridge - will be VLAN-aware"
+    vlan_aware: true
+
+# Storage configuration
+proxmox_storage:
+  - name: local
+    type: dir
+    path: /var/lib/vz
+    content: "vztmpl,iso,backup"
+  - name: local-lvm
+    type: lvmthin
+    content: "rootdir,images"
