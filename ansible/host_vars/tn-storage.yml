@@ -1,0 +1,107 @@
+---
+# TrueNAS Storage VM configuration
+
+# Network
+ansible_host: 192.168.1.150  # Temporary DHCP IP
+truenas_ip_final: 192.168.30.3  # Final IP after VLAN migration
+truenas_web_user: truenas_admin  # TrueNAS 25.04 uses admin user for web UI
+truenas_web_password: "{{ vault_truenas_root_password }}"  # Using vault password
+# For SSH access (if needed later)
+ansible_user: root
+ansible_ssh_private_key_file: ~/.ssh/homelab_ansible
+
+# VM Details
+truenas_vmid: 100
+truenas_hostname: tn-storage
+
+# ZFS Pool Configuration
+zfs_pool_name: tank
+# Device names (verified via lsblk)
+zfs_pool_devices:
+  - /dev/nvme0n1  # 1TB WD Red SN700
+  - /dev/nvme1n1  # 1TB WD Red SN700
+  - /dev/nvme2n1  # 1TB WD Red SN700
+zfs_pool_type: raidz1  # RAIDZ1 with 3 disks = ~2TB usable
+
+# ZFS Datasets with quotas (can be increased later)
+zfs_datasets:
+  - name: "{{ zfs_pool_name }}/proxmox-vms"
+    quota: 200G
+    description: "VM disk images for Proxmox"
+    compression: lz4
+
+  - name: "{{ zfs_pool_name }}/proxmox-templates"
+    quota: 20G
+    description: "VM templates and ISOs"
+    compression: lz4
+
+  - name: "{{ zfs_pool_name }}/docker-volumes"
+    quota: 100G
+    description: "Docker persistent volumes"
+    compression: lz4
+
+  - name: "{{ zfs_pool_name }}/media"
+    quota: none
+    description: "Media files (Plex/Jellyfin)"
+    compression: lz4
+    recordsize: 1M  # Better for large files
+
+  - name: "{{ zfs_pool_name }}/backups"
+    quota: none
+    description: "System and data backups"
+    compression: zstd  # Better compression for backups
+
+# NFS Share Configuration
+nfs_shares:
+  - path: "/mnt/{{ zfs_pool_name }}/proxmox-vms"
+    name: proxmox-vms
+    allowed_networks:
+      - 192.168.1.0/24  # Current network
+      - 192.168.30.0/24  # Future VLAN
+    options:
+      - rw
+      - sync
+      - no_subtree_check
+      - no_root_squash
+
+  - path: "/mnt/{{ zfs_pool_name }}/proxmox-templates"
+    name: proxmox-templates
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - sync
+      - no_subtree_check
+      - no_root_squash
+
+  - path: "/mnt/{{ zfs_pool_name }}/docker-volumes"
+    name: docker-volumes
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - sync
+      - no_subtree_check
+      - no_root_squash
+
+  - path: "/mnt/{{ zfs_pool_name }}/media"
+    name: media
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - async  # Better performance for media
+      - no_subtree_check
+
+  - path: "/mnt/{{ zfs_pool_name }}/backups"
+    name: backups
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - sync
+      - no_subtree_check
