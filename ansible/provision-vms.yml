@@ -1,0 +1,267 @@
+---
+# Playbook to provision VMs from cloud-init template
+# VMs are defined in group_vars/vms.yml
+#
+# Usage:
+#   ansible-playbook provision-vms.yml
+#
+# This will create VMs that don't already exist (idempotent)
+
+- name: Validate VM definitions
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/vms.yml
+  tasks:
+    - name: Check if any VMs are defined
+      ansible.builtin.fail:
+        msg: |
+          ERROR: No VMs defined in group_vars/vms.yml
+          Please add VMs to the 'vms_to_create' list before running this playbook.
+      when: vms_to_create | length == 0
+
+    - name: Validate each VM definition
+      ansible.builtin.assert:
+        that:
+          - item.name is defined
+          - item.vlan_id is defined
+          - item.ip is defined
+          - item.gateway is defined
+          - item.vlan_id | string in ['10', '20', '30', '40', '50', '60', '99']
+        fail_msg: |
+          Invalid VM definition: {{ item }}
+          Required fields: name, vlan_id, ip, gateway
+          Valid VLANs: 10, 20, 30, 40, 50, 60, 99
+      loop: "{{ vms_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Display VMs to be processed
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "VMs defined: {{ vms_to_create | length }}"
+          - "=============================================="
+          - "{% for vm in vms_to_create %}{{ loop.index }}. {{ vm.name }} (VLAN {{ vm.vlan_id }}, IP {{ vm.ip }}){% endfor %}"
+          - "=============================================="
+
+- name: Clone VMs from template
+  hosts: n5p
+  become: true
+  vars_files:
+    - secrets.yml
+    - group_vars/cloudinit_template.yml
+    - group_vars/vms.yml
+  vars:
+    # VLAN network mapping for display purposes
+    vlan_networks:
+      "10": "192.168.10.0/24 (Management)"
+      "20": "192.168.20.0/24 (Trusted)"
+      "30": "192.168.30.0/24 (Servers)"
+      "40": "192.168.40.0/24 (IoT)"
+      "50": "192.168.50.0/24 (Cameras)"
+      "60": "192.168.60.0/24 (Public Services)"
+      "99": "192.168.99.0/24 (Guest)"
+  tasks:
+    - name: Check if template exists
+      ansible.builtin.shell:
+        cmd: "qm status {{ template_vmid }}"
+      register: template_exists
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if template does not exist
+      ansible.builtin.fail:
+        msg: |
+          ERROR: Template VM {{ template_vmid }} ({{ template_name }}) does not exist.
+          Please run 'ansible-playbook create-cloudinit-template.yml' first.
+      when: template_exists.rc != 0
+
+    - name: Check which VMs already exist
+      ansible.builtin.shell:
+        cmd: "qm list | grep -w '{{ item.name }}' || true"
+      register: existing_vms_check
+      changed_when: false
+      loop: "{{ vms_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Build list of VMs to create (filter out existing ones)
+      ansible.builtin.set_fact:
+        vms_to_provision: "{{ vms_to_provision | default([]) + [item.item] }}"
+      when: item.stdout == ""
+      loop: "{{ existing_vms_check.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: Display VMs that already exist (skipped)
+      ansible.builtin.debug:
+        msg:
+          - "Skipping existing VMs:"
+          - "{% for item in existing_vms_check.results %}{% if item.stdout != '' %}  - {{ item.item.name }} (already exists){% endif %}{% endfor %}"
+      when: existing_vms_check.results | selectattr('stdout', 'ne', '') | list | length > 0
+
+    - name: Display VMs to be created
+      ansible.builtin.debug:
+        msg:
+          - "Creating {{ vms_to_provision | default([]) | length }} new VM(s):"
+          - "{% for vm in vms_to_provision | default([]) %}  - {{ vm.name }}{% endfor %}"
+      when: vms_to_provision is defined and vms_to_provision | length > 0
+
+    - name: End play if no VMs need to be created
+      ansible.builtin.meta: end_play
+      when: vms_to_provision is not defined or vms_to_provision | length == 0
+
+    - name: Clone VMs from template
+      ansible.builtin.shell:
+        cmd: >
+          qm clone {{ template_vmid }} {{ item.vmid | default(omit) }}
+          --name {{ item.name }}
+          --full
+          --storage {{ item.storage | default(vm_defaults.storage) }}
+          --description "{{ item.description | default('VM cloned from ' + template_name) }}"
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: clone_results
+
+    - name: Get actual VMIDs for cloned VMs
+      ansible.builtin.shell:
+        cmd: "qm list | grep -w '{{ item.name }}' | awk '{print $1}'"
+      register: vmid_results
+      changed_when: false
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Build VM VMID mapping
+      ansible.builtin.set_fact:
+        vm_vmid_map: "{{ vm_vmid_map | default({}) | combine({item.item.name: item.stdout}) }}"
+      loop: "{{ vmid_results.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout }}"
+
+    - name: Configure network with VLAN tag
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ vm_vmid_map[item.name] }}
+          --net0 virtio,bridge={{ item.network_bridge | default(vm_defaults.network_bridge) }},tag={{ item.vlan_id }},firewall=1
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - VLAN {{ item.vlan_id }}"
+
+    - name: Configure static IP addresses
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ vm_vmid_map[item.name] }}
+          --ipconfig0 ip={{ item.ip }}/24,gw={{ item.gateway }}
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - {{ item.ip }}"
+
+    - name: Set hostname via cloud-init
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ vm_vmid_map[item.name] }}
+          --searchdomain {{ domain }}
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Update CPU cores if specified
+      ansible.builtin.shell:
+        cmd: qm set {{ vm_vmid_map[item.name] }} --cores {{ item.cores }}
+      when: item.cores is defined
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - {{ item.cores | default('default') }} cores"
+
+    - name: Update memory if specified
+      ansible.builtin.shell:
+        cmd: qm set {{ vm_vmid_map[item.name] }} --memory {{ item.memory }}
+      when: item.memory is defined
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - {{ item.memory | default('default') }}MB RAM"
+
+    - name: Resize disk if specified
+      ansible.builtin.shell:
+        cmd: qm resize {{ vm_vmid_map[item.name] }} scsi0 {{ item.disk_size }}
+      when: item.disk_size is defined
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - {{ item.disk_size | default('no resize') }}"
+
+    - name: Start all new VMs
+      ansible.builtin.shell:
+        cmd: qm start {{ vm_vmid_map[item.name] }}
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: vm_starts
+
+    - name: Display provisioning summary
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "VM Provisioning Complete!"
+          - "=============================================="
+          - ""
+          - "Created {{ vms_to_provision | length }} new VM(s):"
+          - "{% for vm in vms_to_provision %}  {{ loop.index }}. {{ vm.name }} (VMID: {{ vm_vmid_map[vm.name] }}, VLAN: {{ vm.vlan_id }}, IP: {{ vm.ip }}){% endfor %}"
+          - ""
+          - "All VMs are starting with cloud-init configuration..."
+          - ""
+          - "Next Steps:"
+          - "1. Wait ~60 seconds for all VMs to complete cloud-init"
+          - "2. Verify VMs are accessible:"
+          - "{% for vm in vms_to_provision %}   ssh ubuntu@{{ vm.ip }}{% endfor %}"
+          - ""
+          - "3. Add VMs to Ansible inventory (inventory/hosts.yml)"
+          - "4. Run common role to provision ansible_user on each VM"
+          - ""
+          - "VM Details:"
+          - "{% for vm in vms_to_provision %}  - {{ vm.name }}: {{ vm.ip }} on {{ vlan_networks[vm.vlan_id | string] }}{% endfor %}"
+          - "=============================================="
+
+- name: Wait for new VMs to be ready
+  hosts: n5p
+  become: true
+  vars_files:
+    - group_vars/vms.yml
+  tasks:
+    - name: Check if any VMs were provisioned
+      ansible.builtin.set_fact:
+        has_new_vms: "{{ vms_to_provision is defined and vms_to_provision | length > 0 }}"
+
+    - name: End play if no new VMs were created
+      ansible.builtin.meta: end_play
+      when: not has_new_vms
+
+    - name: Wait for new VMs to be accessible via SSH
+      ansible.builtin.wait_for:
+        host: "{{ item.ip }}"
+        port: 22
+        delay: 10
+        timeout: 300
+        state: started
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.ip }})"
+      when: has_new_vms
+
+    - name: Display readiness status
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "All new VMs are now accessible via SSH!"
+          - "=============================================="
+          - ""
+          - "You can now SSH to your VMs:"
+          - "{% for vm in vms_to_provision %}  ssh ubuntu@{{ vm.ip }}{% endfor %}"
+          - ""
+          - "Cloud-init logs can be checked with:"
+          - "  cloud-init status --wait"
+          - "  cloud-init status --long"
+          - "=============================================="
+      when: has_new_vms
