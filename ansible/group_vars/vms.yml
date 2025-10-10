@@ -2,19 +2,19 @@
 # VM definitions for cloning from cloud-init template
 # Each VM will be cloned from the ubuntu-2504-cloudinit-template
 
-vms_to_create: []
-  # Example VM definitions (uncomment and customize as needed)
+vms_to_create:
+  - name: containers
+    vmid: 101
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.140  # Temporary IP (will migrate to 192.168.30.4 when VLANs are active)
+    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    cores: 4
+    memory: 8192  # 8GB
+    disk_size: "+40G"  # Increase disk by 40GB (total 50GB)
+    storage: truenas-vms
+    description: "Docker Host VM - runs containerized services"
 
-  # - name: containers
-  #   vmid: 101
-  #   vlan_id: 30
-  #   ip: 192.168.30.4
-  #   gateway: 192.168.30.1
-  #   cores: 4
-  #   memory: 8192  # 8GB
-  #   disk_size: "+40G"  # Increase disk by 40GB (total 50GB)
-  #   storage: truenas-vms
-  #   description: "Docker Host VM"
+  # Example VM definitions (uncomment and customize as needed)
 
   # - name: nginx
   #   vmid: 102

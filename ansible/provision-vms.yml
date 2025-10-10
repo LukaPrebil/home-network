@@ -27,11 +27,11 @@
           - item.vlan_id is defined
           - item.ip is defined
           - item.gateway is defined
-          - item.vlan_id | string in ['10', '20', '30', '40', '50', '60', '99']
+          - (item.vlan_id is none) or (item.vlan_id | string in ['10', '20', '30', '40', '50', '60', '99'])
         fail_msg: |
           Invalid VM definition: {{ item }}
           Required fields: name, vlan_id, ip, gateway
-          Valid VLANs: 10, 20, 30, 40, 50, 60, 99
+          Valid VLANs: null (no VLAN), 10, 20, 30, 40, 50, 60, 99
       loop: "{{ vms_to_create }}"
       loop_control:
         label: "{{ item.name }}"
@@ -146,9 +146,20 @@
         cmd: >
           qm set {{ vm_vmid_map[item.name] }}
           --net0 virtio,bridge={{ item.network_bridge | default(vm_defaults.network_bridge) }},tag={{ item.vlan_id }},firewall=1
+      when: item.vlan_id is not none
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - VLAN {{ item.vlan_id }}"
+
+    - name: Configure network without VLAN tag (flat network)
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ vm_vmid_map[item.name] }}
+          --net0 virtio,bridge={{ item.network_bridge | default(vm_defaults.network_bridge) }},firewall=1
+      when: item.vlan_id is none
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - No VLAN (flat network)"
 
     - name: Configure static IP addresses
       ansible.builtin.shell:
@@ -221,7 +232,7 @@
           - "4. Run common role to provision ansible_user on each VM"
           - ""
           - "VM Details:"
-          - "{% for vm in vms_to_provision %}  - {{ vm.name }}: {{ vm.ip }} on {{ vlan_networks[vm.vlan_id | string] }}{% endfor %}"
+          - "{% for vm in vms_to_provision %}  - {{ vm.name }}: {{ vm.ip }} on {{ vlan_networks[vm.vlan_id | string] if vm.vlan_id is not none else 'flat network (no VLAN)' }}{% endfor %}"
           - "=============================================="
 
 - name: Wait for new VMs to be ready
