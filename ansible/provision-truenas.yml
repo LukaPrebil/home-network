@@ -1,0 +1,172 @@
+---
+# Playbook to provision TrueNAS Scale VM on Proxmox
+# This creates the VM and prepares it for manual installation via the web UI
+
+- name: Download TrueNAS Scale ISO
+  hosts: n5p
+  become: true
+  vars_files:
+    - secrets.yml
+  vars:
+    truenas_version: "25.04.2.4"
+    truenas_iso_filename: "TrueNAS-SCALE-{{ truenas_version }}.iso"
+    truenas_iso_url: "https://download.truenas.com/TrueNAS-SCALE-Fangtooth/{{ truenas_version }}/{{ truenas_iso_filename }}"
+    truenas_iso_path: "/var/lib/vz/template/iso/{{ truenas_iso_filename }}"
+  tasks:
+    - name: Check if TrueNAS ISO already exists
+      ansible.builtin.stat:
+        path: "{{ truenas_iso_path }}"
+      register: iso_stat
+
+    - name: Download TrueNAS Scale ISO
+      ansible.builtin.get_url:
+        url: "{{ truenas_iso_url }}"
+        dest: "{{ truenas_iso_path }}"
+        mode: '0644'
+        timeout: 600
+      when: not iso_stat.stat.exists
+      register: iso_download
+
+    - name: Display ISO download status
+      ansible.builtin.debug:
+        msg: "TrueNAS ISO {{ 'downloaded' if iso_download is changed else 'already exists' }} at {{ truenas_iso_path }}"
+
+- name: Create TrueNAS VM with NVMe passthrough
+  hosts: n5p
+  become: true
+  vars_files:
+    - secrets.yml
+  vars:
+    truenas_vmid: 100
+    truenas_name: "tn-storage"
+    truenas_version: "25.04.2.4"
+    truenas_iso_filename: "TrueNAS-SCALE-{{ truenas_version }}.iso"
+    truenas_memory: 20480  # 20GB RAM
+    truenas_cores: 4
+    truenas_boot_disk_size: 32  # GB
+    # NVMe devices to pass through (will be auto-detected)
+    expected_nvme_count: 3
+  tasks:
+    - name: Check if TrueNAS VM already exists
+      ansible.builtin.shell:
+        cmd: "qm status {{ truenas_vmid }}"
+      register: vm_exists
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if VM already exists
+      ansible.builtin.fail:
+        msg: "VM {{ truenas_vmid }} already exists. Delete it first with 'qm destroy {{ truenas_vmid }}' or choose a different VMID."
+      when: vm_exists.rc == 0
+
+    - name: Get PCI addresses for NVMe devices (excluding boot drive)
+      ansible.builtin.shell:
+        cmd: |
+          # Get NVMe devices - exclude MAXIO controller (boot drive)
+          lspci -nn | grep 'Non-Volatile memory' | grep -v 'MAXIO' | awk '{print $1}'
+      register: nvme_pci_addresses
+      changed_when: false
+
+    - name: Validate NVMe device count
+      ansible.builtin.assert:
+        that:
+          - nvme_pci_addresses.stdout_lines | length == expected_nvme_count
+        fail_msg: "Expected {{ expected_nvme_count }} NVMe devices but found {{ nvme_pci_addresses.stdout_lines | length }}"
+        success_msg: "Found {{ expected_nvme_count }} NVMe devices for passthrough"
+
+    - name: Display NVMe PCI addresses
+      ansible.builtin.debug:
+        msg: "Will pass through NVMe devices at PCI addresses: {{ nvme_pci_addresses.stdout_lines }}"
+
+    - name: Create TrueNAS VM
+      ansible.builtin.shell:
+        cmd: >
+          qm create {{ truenas_vmid }}
+          --name {{ truenas_name }}
+          --memory {{ truenas_memory }}
+          --cores {{ truenas_cores }}
+          --cpu host
+          --machine q35
+          --net0 virtio,bridge=vmbr0,firewall=1
+          --ostype l26
+          --scsihw virtio-scsi-single
+          --onboot 1
+          --tablet 0
+          --agent enabled=1
+      register: vm_create
+
+    - name: Add boot disk to VM (on local-lvm)
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ truenas_vmid }}
+          --scsi0 local-lvm:{{ truenas_boot_disk_size }},discard=on,iothread=1,ssd=1
+      when: vm_create is succeeded
+
+    - name: Attach TrueNAS ISO to VM
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ truenas_vmid }}
+          --ide2 local:iso/{{ truenas_iso_filename }},media=cdrom
+      when: vm_create is succeeded
+
+    - name: Set boot order (boot from CD first for installation)
+      ansible.builtin.shell:
+        cmd: qm set {{ truenas_vmid }} --boot 'order=ide2;scsi0'
+      when: vm_create is succeeded
+
+    - name: Pass through NVMe devices to VM
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ truenas_vmid }}
+          --hostpci{{ idx }} {{ item }},pcie=1
+      loop: "{{ nvme_pci_addresses.stdout_lines }}"
+      loop_control:
+        index_var: idx
+      when: nvme_pci_addresses.stdout_lines | length > 0
+
+    - name: Display VM configuration
+      ansible.builtin.shell:
+        cmd: "qm config {{ truenas_vmid }}"
+      register: vm_config
+      changed_when: false
+
+    - name: Show TrueNAS VM configuration
+      ansible.builtin.debug:
+        msg: "{{ vm_config.stdout_lines }}"
+
+    - name: Start TrueNAS VM
+      ansible.builtin.shell:
+        cmd: "qm start {{ truenas_vmid }}"
+
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "TrueNAS VM created successfully!"
+          - "=============================================="
+          - ""
+          - "VM ID: {{ truenas_vmid }}"
+          - "VM Name: {{ truenas_name }}"
+          - "Version: TrueNAS SCALE {{ truenas_version }} (Fangtooth)"
+          - ""
+          - "Network Configuration:"
+          - "  Current network: 192.168.1.0/24"
+          - "  Temporary IP: 192.168.1.130 (set during installation)"
+          - "  Final IP (after VLAN): 192.168.30.3"
+          - ""
+          - "Next steps:"
+          - "1. Access Proxmox web UI: https://192.168.1.128:8006"
+          - "2. Open console for VM {{ truenas_vmid }} ({{ truenas_name }})"
+          - "3. Complete TrueNAS installation:"
+          - "   - Choose 'Install/Upgrade'"
+          - "   - Select the 32GB boot disk (local-lvm)"
+          - "   - Set root password"
+          - "   - Configure network: IP 192.168.1.130, netmask 255.255.255.0, gateway 192.168.1.1"
+          - "4. After reboot, access TrueNAS web UI: http://192.168.1.130"
+          - "5. Run the configuration playbook: ansible-playbook configure-truenas.yml"
+          - ""
+          - "NVMe devices passed through ({{ nvme_pci_addresses.stdout_lines | length }}):"
+          - "{{ nvme_pci_addresses.stdout_lines }}"
+          - ""
+          - "These will appear as /dev/sda, /dev/sdb, /dev/sdc in TrueNAS"
+          - "=============================================="
