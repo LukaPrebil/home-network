@@ -30,6 +30,7 @@
     line: "{{ automation_user.name }} ALL=(ALL) NOPASSWD:ALL"
     create: true
     mode: '0440'
+  when: "'proxmox_hosts' not in group_names"
 
 - name: Create admin users
   ansible.builtin.user:
@@ -40,7 +41,9 @@
     create_home: true
     state: present
   loop: "{{ admin_users | default([]) }}"
-  when: admin_users is defined
+  when:
+    - admin_users is defined
+    - "'proxmox_hosts' not in group_names"
 
 - name: Set up SSH directory for admin users
   ansible.builtin.file:
@@ -50,7 +53,9 @@
     group: "{{ item.name }}"
     mode: '0700'
   loop: "{{ admin_users | default([]) }}"
-  when: admin_users is defined
+  when:
+    - admin_users is defined
+    - "'proxmox_hosts' not in group_names"
 
 - name: Add SSH authorized keys for admin users
   ansible.builtin.authorized_key:
@@ -58,4 +63,6 @@
     key: "{{ item.ssh_key }}"
     state: present
   loop: "{{ admin_users | default([]) }}"
-  when: admin_users is defined
+  when:
+    - admin_users is defined
+    - "'proxmox_hosts' not in group_names"
