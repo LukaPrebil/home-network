@@ -8,3 +8,6 @@ collections:
 
   - name: ansible.posix
     version: ">=1.5.0"
+
+  - name: arensb.truenas
+    version: ">=0.1.0"
