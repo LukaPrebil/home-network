@@ -1,0 +1,194 @@
+---
+# Playbook to configure TrueNAS using midclt (middleware client)
+# This uses the TrueNAS JSON-RPC API via midclt commands over SSH
+
+- name: Configure ZFS Storage Pool using midclt
+  hosts: tn-storage
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: Get disk device names for NVMe drives
+      ansible.builtin.shell:
+        cmd: midclt call disk.query | jq -r '.[] | select(.name | startswith("nvme")) | .devname'
+      register: nvme_devnames
+      changed_when: false
+
+    - name: Display NVMe disk device names
+      ansible.builtin.debug:
+        msg: "NVMe disk device names: {{ nvme_devnames.stdout_lines }}"
+
+    - name: Check if pool already exists
+      ansible.builtin.shell:
+        cmd: midclt call pool.query | jq -r '.[].name'
+      register: existing_pools
+      changed_when: false
+
+    - name: Create ZFS pool via midclt
+      ansible.builtin.shell:
+        cmd: |
+          midclt call -j pool.create '{
+            "name": "{{ zfs_pool_name }}",
+            "encryption": false,
+            "topology": {
+              "data": [{
+                "type": "{{ zfs_pool_type | upper }}",
+                "disks": {{ nvme_devnames.stdout_lines | to_json }}
+              }]
+            }
+          }'
+      register: pool_create_job
+      when: zfs_pool_name not in existing_pools.stdout_lines
+
+    - name: Display pool creation result
+      ansible.builtin.debug:
+        msg: "Pool '{{ zfs_pool_name }}' {{ 'created successfully' if pool_create_job is changed else 'already exists' }}"
+
+    - name: Verify pool was created
+      ansible.builtin.shell:
+        cmd: /usr/sbin/zpool status {{ zfs_pool_name }}
+      register: pool_status
+      changed_when: false
+
+    - name: Display pool status
+      ansible.builtin.debug:
+        msg: "{{ pool_status.stdout_lines }}"
+
+- name: Configure ZFS Datasets
+  hosts: tn-storage
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: Get existing datasets
+      ansible.builtin.shell:
+        cmd: midclt call pool.dataset.query | jq -r '.[].name'
+      register: existing_datasets
+      changed_when: false
+
+    - name: Create ZFS datasets
+      ansible.builtin.shell:
+        cmd: |
+          midclt call pool.dataset.create '{
+            "name": "{{ item.name }}",
+            "type": "FILESYSTEM",
+            "compression": "{{ item.compression | upper }}",
+            {% if item.quota != 'none' %}
+            "quota": {{ (item.quota | regex_replace('G', '') | int * 1024 * 1024 * 1024) }},
+            {% endif %}
+            {% if item.recordsize is defined %}
+            "recordsize": "{{ item.recordsize }}",
+            {% endif %}
+            "comments": "{{ item.description }}"
+          }'
+      loop: "{{ zfs_datasets }}"
+      when: item.name not in existing_datasets.stdout_lines
+      register: datasets_created
+
+    - name: Display created datasets
+      ansible.builtin.debug:
+        msg: "Dataset '{{ item.item.name }}' {{ 'created' if item is changed else 'already exists' }}"
+      loop: "{{ datasets_created.results }}"
+      when: datasets_created.results is defined
+
+    - name: List all datasets
+      ansible.builtin.shell:
+        cmd: /usr/sbin/zfs list
+      register: zfs_list
+      changed_when: false
+
+    - name: Display ZFS datasets
+      ansible.builtin.debug:
+        msg: "{{ zfs_list.stdout_lines }}"
+
+- name: Configure NFS Shares
+  hosts: tn-storage
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: Enable NFS service
+      ansible.builtin.shell:
+        cmd: 'midclt call service.update nfs ''{"enable": true}'''
+      register: nfs_enabled
+      changed_when: nfs_enabled.stdout != "null"
+
+    - name: Start NFS service
+      ansible.builtin.shell:
+        cmd: midclt call service.start nfs
+      register: nfs_started
+      failed_when: false
+      changed_when: nfs_started.stdout == "true"
+
+    - name: Get existing NFS shares
+      ansible.builtin.shell:
+        cmd: midclt call sharing.nfs.query | jq -r '.[].path'
+      register: existing_nfs_shares
+      changed_when: false
+
+    - name: Create NFS shares
+      ansible.builtin.shell:
+        cmd: |
+          midclt call sharing.nfs.create '{
+            "path": "{{ item.path }}",
+            "comment": "{{ item.name }}",
+            "networks": {{ item.allowed_networks | to_json }},
+            "maproot_user": "root",
+            "maproot_group": "root"
+          }'
+      loop: "{{ nfs_shares }}"
+      when: item.path not in existing_nfs_shares.stdout_lines
+      register: nfs_shares_created
+
+    - name: Display NFS configuration status
+      ansible.builtin.debug:
+        msg: "NFS service enabled and {{ nfs_shares_created.results | selectattr('changed', 'equalto', true) | list | length }} shares created"
+
+- name: Add TrueNAS storage to Proxmox
+  hosts: n5p
+  become: true
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: Check existing Proxmox storage
+      ansible.builtin.shell:
+        cmd: pvesm status | awk '{print $1}'
+      register: existing_storage
+      changed_when: false
+
+    - name: Add NFS storage for VM disks
+      ansible.builtin.shell:
+        cmd: >
+          pvesm add nfs truenas-vms
+          --server {{ hostvars['tn-storage'].ansible_host }}
+          --export /mnt/tank/proxmox-vms
+          --content images,rootdir
+      when: "'truenas-vms' not in existing_storage.stdout"
+      register: storage_vms_added
+
+    - name: Add NFS storage for templates
+      ansible.builtin.shell:
+        cmd: >
+          pvesm add nfs truenas-templates
+          --server {{ hostvars['tn-storage'].ansible_host }}
+          --export /mnt/tank/proxmox-templates
+          --content iso,vztmpl
+      when: "'truenas-templates' not in existing_storage.stdout"
+      register: storage_templates_added
+
+    - name: Verify Proxmox storage configuration
+      ansible.builtin.shell:
+        cmd: pvesm status
+      register: storage_status
+      changed_when: false
+
+    - name: Display storage configuration complete
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "TrueNAS storage configured successfully!"
+          - "=============================================="
+          - ""
+          - "ZFS Pool: {{ hostvars['tn-storage'].zfs_pool_name }}"
+          - "Storage available in Proxmox:"
+          - "{{ storage_status.stdout_lines }}"
+          - ""
+          - "Access TrueNAS: http://{{ hostvars['tn-storage'].ansible_host }}"
+          - "=============================================="
