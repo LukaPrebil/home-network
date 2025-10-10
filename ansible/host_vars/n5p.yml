@@ -8,7 +8,7 @@ target_ip: 192.168.30.2  # Final IP in VLAN 30
 # Hardware details
 cpu_cores: 8
 memory_gb: 16
-primary_interface: enp1s0  # Update based on actual interface name
+primary_interface: enp197s0
 
 # Additional user for management
 admin_users:
