@@ -163,7 +163,92 @@ This section contains the specific details required for the automated setup and 
 * **Filesystem Layout:** Persistent application data will be stored in `/srv/docker/[service_name]`. TrueNAS will manage two primary volumes: one for SSD storage and one for bulk HDD storage.
 * **Secrets Management:** All sensitive variables (API keys, passwords) will be encrypted and stored locally using **Ansible Vault**.
 
-## 7. Physical Rack Layout
+---
+
+## 7. Implementation Status
+
+### Current Network State
+
+**Temporary Configuration (During Build-Out):**
+- Network: `192.168.1.0/24` (existing home network)
+- N5 Pro IP: `192.168.1.128`
+- Router: Not yet deployed (using existing home router at `192.168.1.1`)
+- VLANs: Not yet active (waiting for Omada router deployment)
+
+**Note:** The network is currently in a transitional state. Once the Omada router is deployed, we will migrate to the VLAN architecture defined in Section 4.
+
+### Completed Tasks
+
+#### Hardware
+- ✅ YuanLey 4x2.5G PoE Switch deployed
+- ✅ MikroTik CSS326 Switch deployed
+- ✅ Omada EAP650 Access Points deployed (3x)
+
+#### Proxmox Host (n5p)
+- ✅ Proxmox VE installed
+- ✅ Network bridge (vmbr0) configured with VLAN awareness on interface enp197s0
+- ✅ VLAN kernel module (8021q) enabled
+- ✅ Storage configured (local for ISOs/backups, local-lvm for VM disks)
+- ✅ Ansible automation user created (`ansible_user`)
+- ✅ Admin user created (`luka`)
+- ✅ SSH hardening applied (key-only authentication, no password auth)
+- ✅ Timezone set to Europe/Ljubljana
+- ✅ Subscription nag removed
+
+#### Ansible Configuration
+- ✅ Directory structure created (`ansible/`)
+- ✅ Common role (users, SSH hardening, timezone)
+- ✅ Proxmox role (network bridges, VLAN support)
+- ✅ Inventory and variables configured
+- ✅ Secrets encrypted with Ansible Vault
+- ✅ Playbooks tested and working
+
+### In Progress
+
+- 🚧 VM provisioning playbooks (next step)
+- 🚧 Cloud-init templates for automated VM deployment
+
+### Not Started
+
+#### Hardware
+- ⏳ Omada ER707-M2 Router (not yet deployed)
+- ⏳ Raspberry Pi 4 (not yet configured)
+- ⏳ Raspberry Pi 2 (not yet configured)
+
+#### Virtual Machines
+- ⏳ TrueNAS Scale VM
+- ⏳ Home Assistant OS VM
+- ⏳ Docker Host VM
+- ⏳ Nginx Proxy Manager VM
+- ⏳ Immich VM
+- ⏳ Plex/Jellyfin VM
+
+#### Services
+- ⏳ AdGuard Home (DNS)
+- ⏳ Zigbee2MQTT
+- ⏳ Mosquitto MQTT
+- ⏳ Home Assistant setup
+- ⏳ Media services (Plex/Jellyfin)
+- ⏳ *Arr suite
+- ⏳ Immich
+
+#### Network Migration
+- ⏳ Deploy Omada router
+- ⏳ Configure VLANs on router
+- ⏳ Migrate Proxmox host to VLAN 30
+- ⏳ Configure firewall rules
+- ⏳ Set up inter-VLAN routing
+
+### Next Steps
+
+1. **Create VM Templates:** Set up cloud-init enabled templates for Ubuntu/Debian VMs
+2. **Build First VM:** Deploy the Docker Host VM as the first service platform
+3. **Deploy Core Services:** AdGuard Home, Home Assistant, basic monitoring
+4. **Plan Network Migration:** Prepare for transition to VLAN architecture when Omada router arrives
+
+---
+
+## 8. Physical Rack Layout
 
 This section details the final physical layout of the 7U wall-mounted network rack. The design prioritizes a clean front appearance, logical grouping of hardware, and good airflow. The primary server (Minisforum N5 Pro) is located on top of the cabinet to ensure unrestricted airflow and to remove its weight from the wall mount.
 
