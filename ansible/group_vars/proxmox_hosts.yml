@@ -1,9 +1,6 @@
 ---
 # Variables specific to Proxmox hosts
 
-# Proxmox doesn't have sudo by default, and we don't need it for most operations
-ansible_become: false
-
 # Proxmox API credentials (for VM management)
 proxmox_api_user: "root@pam"
 proxmox_api_password: "{{ vault_proxmox_api_password }}"

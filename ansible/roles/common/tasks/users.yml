@@ -30,7 +30,6 @@
     line: "{{ automation_user.name }} ALL=(ALL) NOPASSWD:ALL"
     create: true
     mode: '0440'
-  when: "'proxmox_hosts' not in group_names"
 
 - name: Create admin users
   ansible.builtin.user:

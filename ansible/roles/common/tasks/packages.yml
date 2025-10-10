@@ -5,17 +5,13 @@
   ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
-  when:
-    - ansible_os_family == "Debian"
-    - "'proxmox_hosts' not in group_names"
+  when: ansible_os_family == "Debian"
 
 - name: Install common packages
   ansible.builtin.apt:
     name: "{{ common_packages }}"
     state: present
-  when:
-    - ansible_os_family == "Debian"
-    - "'proxmox_hosts' not in group_names"
+  when: ansible_os_family == "Debian"
 
 - name: Check if zsh is installed
   ansible.builtin.command: which zsh
