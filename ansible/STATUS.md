@@ -90,34 +90,35 @@ All playbooks are fully automated and idempotent.
 
 ### Docker Host (containers)
 - **IP:** 192.168.1.140 (temporary, will move to 192.168.30.4)
-- **Status:** ✅ Provisioned and running
+- **Status:** ✅ Fully configured and operational
 - **VMID:** 101
 - **Resources:** 4 cores, 8GB RAM, 50GB disk
 - **Access:** `ssh ubuntu@192.168.1.140` or `ssh ansible_user@192.168.1.140`
-- **Role:** Docker role created and ready (`roles/docker/`)
-- **Note:** Docker installation pending due to intermittent DNS resolution issue
+- **Docker:** v28.5.1 with Compose v2.40.0
+- **Storage:** NFS mount to TrueNAS (100GB at /srv/docker)
+- **Ready for:** Container deployments (AdGuard, monitoring, media services)
 
 ### Docker Role
 - ✅ Role structure created (`roles/docker/`)
-- ✅ Installation tasks (Docker CE, Compose, prerequisites)
+- ✅ Docker CE v28.5.1 + Compose v2.40.0 installed
 - ✅ Configuration tasks (users, daemon config)
-- ✅ NFS mount tasks for TrueNAS volumes
+- ✅ NFS mount to TrueNAS docker-volumes (100GB)
 - ✅ Modern GPG key handling (no deprecated apt-key)
-- ⚠️  Known issue: Intermittent DNS resolution during GPG key download
+- ✅ Successfully tested and deployed
 
 ## Next Steps
 
-### Immediate: Complete Docker Host Setup
+### Immediate: Deploy Containerized Services
 
-1. **Resolve DNS Issue** ⏳
-   - Investigate systemd-resolved vs Python urllib DNS resolution
-   - Current workaround: Docker repository already configured
-   - Can install manually: `sudo apt install docker-ce docker-ce-cli containerd.io`
+1. **Deploy AdGuard Home** ⏳
+   - DNS filtering and DHCP server
+   - Will replace temporary public DNS servers
+   - Configure as primary DNS for network
 
-2. **Deploy Services on Docker Host** ⏳
-   - AdGuard Home (DNS/DHCP)
-   - Monitoring stack (Prometheus/Grafana)
-   - *Arr suite for media management
+2. **Deploy Monitoring Stack** ⏳
+   - Prometheus for metrics collection
+   - Grafana for visualization
+   - Node exporter for system metrics
 
 3. **Create VLAN Migration Playbook** ⏳
    - Needed when Omada router is deployed
