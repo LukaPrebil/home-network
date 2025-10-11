@@ -1,0 +1,63 @@
+---
+# Install ROCm 7.0.2 from AMD repositories for GPU acceleration
+
+- name: Remove old ROCm packages from Ubuntu repos
+  ansible.builtin.apt:
+    name:
+      - rocminfo
+      - libhsa-runtime64-1
+    state: absent
+    purge: yes
+
+- name: Download AMD GPU install package for ROCm 7.0.2
+  ansible.builtin.get_url:
+    url: https://repo.radeon.com/amdgpu-install/7.0.2/ubuntu/noble/amdgpu-install_7.0.2.70002-1_all.deb
+    dest: /tmp/amdgpu-install_7.0.2.70002-1_all.deb
+    mode: '0644'
+
+- name: Install AMD GPU package manager
+  ansible.builtin.apt:
+    deb: /tmp/amdgpu-install_7.0.2.70002-1_all.deb
+    state: present
+
+- name: Update apt cache after adding AMD repos
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install ROCm prerequisites
+  ansible.builtin.apt:
+    name:
+      - python3-setuptools
+      - python3-wheel
+    state: present
+
+- name: Install ROCm runtime and tools
+  ansible.builtin.apt:
+    name:
+      - rocm-hip-runtime
+      - rocminfo
+    state: present
+  # Note: Using rocm-hip-runtime instead of full 'rocm' package to save space
+  # This includes the HSA runtime and ROCm tools needed for inference
+
+- name: Clean up AMD GPU install package
+  ansible.builtin.file:
+    path: /tmp/amdgpu-install_7.0.2.70002-1_all.deb
+    state: absent
+
+- name: Test ROCm installation
+  ansible.builtin.shell:
+    cmd: rocminfo
+  register: rocminfo_output
+  changed_when: false
+  failed_when: false
+
+- name: Display ROCm information
+  ansible.builtin.debug:
+    msg: "{{ rocminfo_output.stdout_lines | select('search', 'Agent|Name:|gfx') | list }}"
+  when: rocminfo_output.rc == 0
+
+- name: Warn if ROCm test failed
+  ansible.builtin.debug:
+    msg: "WARNING: ROCm test failed. GPU may not be detected."
+  when: rocminfo_output.rc != 0
