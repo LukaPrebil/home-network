@@ -1,0 +1,188 @@
+---
+# Provision Proxmox LXC containers from declarative configuration
+# This playbook creates LXC containers based on definitions in group_vars/lxc.yml
+#
+# Usage:
+#   ansible-playbook provision-lxc.yml
+#
+# Features:
+#   - Idempotent: skips existing containers
+#   - Downloads LXC templates if not present
+#   - Configures networking (with optional VLAN tags)
+#   - Supports GPU passthrough for AMD iGPU
+#   - Sets up nested containers (Docker support)
+
+- name: Download LXC templates if needed
+  hosts: proxmox_hosts
+  gather_facts: false
+  become: true
+  vars_files:
+    - group_vars/lxc.yml
+
+  tasks:
+    - name: Check if Ubuntu 25.04 LXC template exists
+      ansible.builtin.stat:
+        path: "/var/lib/vz/template/cache/{{ lxc_template_ubuntu }}"
+      register: lxc_template_check
+
+    - name: Download Ubuntu 25.04 Proxmox LXC template
+      ansible.builtin.get_url:
+        url: "{{ lxc_template_url }}"
+        dest: "/var/lib/vz/template/cache/{{ lxc_template_ubuntu }}"
+        mode: '0644'
+      when: not lxc_template_check.stat.exists
+
+- name: Check existing LXC containers
+  hosts: proxmox_hosts
+  gather_facts: false
+  vars_files:
+    - group_vars/lxc.yml
+
+  tasks:
+    - name: Get list of existing containers
+      ansible.builtin.shell:
+        cmd: pct list | awk 'NR>1 {print $1}'
+      register: existing_containers
+      changed_when: false
+
+    - name: Create map of existing container VMIDs
+      ansible.builtin.set_fact:
+        existing_vmids: "{{ existing_containers.stdout_lines | map('int') | list }}"
+
+- name: Provision LXC containers
+  hosts: proxmox_hosts
+  gather_facts: true
+  vars_files:
+    - group_vars/lxc.yml
+    - group_vars/all.yml
+    - secrets.yml
+
+  tasks:
+    - name: Filter containers that need to be created
+      ansible.builtin.set_fact:
+        containers_to_create: "{{ lxc_containers | rejectattr('vmid', 'in', existing_vmids | default([])) | list }}"
+
+    - name: Display containers to be created
+      ansible.builtin.debug:
+        msg: "Will create {{ containers_to_create | length }} container(s): {{ containers_to_create | map(attribute='name') | join(', ') }}"
+
+    - name: Display skipped containers
+      ansible.builtin.debug:
+        msg: "Skipping existing container: {{ item.name }} (VMID {{ item.vmid }})"
+      loop: "{{ lxc_containers }}"
+      when: item.vmid in (existing_vmids | default([]))
+
+    - name: Create LXC containers
+      community.proxmox.proxmox:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ vault_proxmox_api_password }}"
+        node: "{{ item.node }}"
+        vmid: "{{ item.vmid }}"
+        hostname: "{{ item.name }}"
+        ostemplate: "{{ item.ostemplate }}"
+        password: "{{ vault_lxc_root_password }}"
+        pubkey: "{{ vault_ansible_ssh_public_key }}"
+        cores: "{{ item.cores | default(lxc_defaults.cores) }}"
+        memory: "{{ item.memory | default(lxc_defaults.memory) }}"
+        swap: "{{ item.swap | default(lxc_defaults.swap) }}"
+        disk: "{{ item.storage | default(lxc_defaults.storage) }}:{{ item.disk | default(lxc_defaults.disk) }}"
+        netif: "{{ _netif }}"
+        nameserver: "{{ dns_servers | join(' ') }}"
+        searchdomain: "{{ domain }}"
+        onboot: "{{ item.onboot | default(lxc_defaults.onboot) }}"
+        unprivileged: "{{ item.unprivileged | default(lxc_defaults.unprivileged) }}"
+        features: "{{ item.features | default([]) }}"
+        description: "{{ item.description | default('') }}"
+        timeout: 180
+        state: present
+      loop: "{{ containers_to_create }}"
+      vars:
+        _netif: >-
+          {%- if item.vlan_id is not none -%}
+          {{ {'net0': 'name=eth0,bridge=' + (item.network_bridge | default(lxc_defaults.network_bridge)) + ',ip=' + item.ip + '/' + (item.netmask | string) + ',gw=' + item.gateway + ',tag=' + (item.vlan_id | string) + ',firewall=1'} }}
+          {%- else -%}
+          {{ {'net0': 'name=eth0,bridge=' + (item.network_bridge | default(lxc_defaults.network_bridge)) + ',ip=' + item.ip + '/' + (item.netmask | string) + ',gw=' + item.gateway + ',firewall=1'} }}
+          {%- endif -%}
+      register: container_creation
+
+    - name: Wait for containers to be created
+      ansible.builtin.pause:
+        seconds: 5
+      when: containers_to_create | length > 0
+
+    - name: Start LXC containers
+      community.proxmox.proxmox:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ vault_proxmox_api_password }}"
+        vmid: "{{ item.vmid }}"
+        state: started
+      loop: "{{ containers_to_create }}"
+      when: containers_to_create | length > 0
+
+    - name: Configure GPU passthrough for containers (if enabled)
+      ansible.builtin.shell:
+        cmd: |
+          pct set {{ item.vmid }} -dev0 /dev/dri,gid=44
+      loop: "{{ containers_to_create }}"
+      when:
+        - containers_to_create | length > 0
+        - item.gpu_passthrough | default(false)
+      become: true
+
+- name: Add new containers to in-memory inventory
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/lxc.yml
+
+  tasks:
+    - name: Add newly created containers to inventory
+      ansible.builtin.add_host:
+        name: "{{ item.name }}"
+        groups: just_created_lxc
+        ansible_host: "{{ item.ip }}"
+        ansible_port: 22
+        ansible_user: root
+        ansible_ssh_private_key_file: ~/.ssh/homelab_ansible
+      loop: "{{ lxc_containers }}"
+      when: item.vmid in (hostvars[groups['proxmox_hosts'][0]]['containers_to_create'] | default([]) | map(attribute='vmid') | list)
+
+- name: Wait for containers to be ready
+  hosts: just_created_lxc
+  gather_facts: false
+
+  tasks:
+    - name: Wait for SSH to become available
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+        delay: 10
+
+    - name: Test SSH connection
+      ansible.builtin.ping:
+
+- name: Initial container configuration
+  hosts: just_created_lxc
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential packages
+      ansible.builtin.apt:
+        name:
+          - sudo
+          - curl
+          - wget
+          - vim
+          - htop
+        state: present
+
+    - name: Display container info
+      ansible.builtin.debug:
+        msg: "LXC container {{ inventory_hostname }} is ready at {{ ansible_host }}"

@@ -51,6 +51,12 @@ zfs_datasets:
     description: "System and data backups"
     compression: zstd  # Better compression for backups
 
+  - name: "{{ zfs_pool_name }}/immich-photos"
+    quota: none
+    description: "Immich photo library and metadata"
+    compression: lz4
+    recordsize: 1M  # Optimized for photo/video files
+
 # NFS Share Configuration
 nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/proxmox-vms"
@@ -105,3 +111,14 @@ nfs_shares:
       - rw
       - sync
       - no_subtree_check
+
+  - path: "/mnt/{{ zfs_pool_name }}/immich-photos"
+    name: immich-photos
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - async  # Better performance for photo library
+      - no_subtree_check
+      - no_root_squash  # Immich container needs root access
