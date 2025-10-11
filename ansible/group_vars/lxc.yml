@@ -27,9 +27,9 @@ lxc_containers:
       - nesting=1  # Required for Docker inside LXC
       - keyctl=1   # Required for systemd
     onboot: true  # Start on Proxmox boot
-    # GPU passthrough configuration (will be configured separately after initial setup)
-    gpu_passthrough: false  # Disabled for initial setup, will configure manually
-    gpu_device: /dev/dri  # AMD iGPU device
+    # GPU passthrough configuration for AMD Radeon 880M/890M iGPU
+    gpu_passthrough: true  # Enable GPU passthrough for hardware transcoding
+    gpu_device: /dev/dri  # AMD iGPU device (card0 + renderD128)
 
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:
