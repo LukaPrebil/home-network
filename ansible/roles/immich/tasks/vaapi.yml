@@ -1,0 +1,49 @@
+---
+# Install VA-API drivers and utilities for AMD GPU hardware transcoding
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install VA-API packages for AMD GPU
+  ansible.builtin.apt:
+    name: "{{ vaapi_packages }}"
+    state: present
+
+- name: Add root user to video group for GPU access
+  ansible.builtin.user:
+    name: root
+    groups: video
+    append: yes
+
+- name: Add root user to render group for GPU access
+  ansible.builtin.user:
+    name: root
+    groups: render
+    append: yes
+
+- name: Add root user to kvm group for ROCm/KFD access
+  ansible.builtin.user:
+    name: root
+    groups: kvm
+    append: yes
+  # Note: The kvm group (GID 993 in container) maps to render group on host
+  # This is needed for /dev/kfd access for ROCm
+
+- name: Test VA-API functionality
+  ansible.builtin.shell:
+    cmd: vainfo
+  register: vainfo_output
+  changed_when: false
+  failed_when: false
+
+- name: Display VA-API information
+  ansible.builtin.debug:
+    var: vainfo_output.stdout_lines
+  when: vainfo_output.rc == 0
+
+- name: Warn if VA-API test failed
+  ansible.builtin.debug:
+    msg: "WARNING: VA-API test failed. GPU acceleration may not work properly."
+  when: vainfo_output.rc != 0

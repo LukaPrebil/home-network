@@ -1,0 +1,43 @@
+---
+# Immich role default variables
+
+# Immich version (lock to v2.x for stability, allow minor/patch updates)
+immich_version: "v2"  # Will pull latest v2.x.x release
+
+# Immich directories
+immich_base_dir: "/opt/immich"
+immich_upload_dir: "/mnt/immich-photos"  # NFS mount point for photo library
+
+# NFS configuration for photo storage
+immich_nfs_server: "192.168.1.150"  # TrueNAS IP
+immich_nfs_share: "/mnt/tank/immich-photos"
+immich_nfs_mount_point: "{{ immich_upload_dir }}"
+immich_nfs_opts: "defaults,nofail,_netdev"
+
+# Docker Compose configuration
+immich_compose_file: "{{ immich_base_dir }}/docker-compose.yml"
+immich_env_file: "{{ immich_base_dir }}/.env"
+
+# Database configuration
+immich_db_name: "immich"
+immich_db_user: "immich"
+immich_db_hostname: "immich_postgres"
+
+# Redis configuration
+immich_redis_hostname: "immich_redis"
+
+# Immich configuration
+immich_log_level: "log"  # log, verbose, debug, warn, error
+
+# Hardware acceleration
+immich_enable_hw_accel: true
+immich_gpu_devices:
+  - /dev/dri/card0
+  - /dev/dri/renderD128
+
+# VA-API packages for AMD GPU hardware transcoding
+vaapi_packages:
+  - mesa-va-drivers  # AMD VA-API drivers
+  - libva-drm2       # VA-API DRM runtime
+  - vainfo           # VA-API info tool for testing
+  - radeontop        # AMD GPU monitoring tool

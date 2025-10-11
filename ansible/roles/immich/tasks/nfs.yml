@@ -1,0 +1,32 @@
+---
+# Configure NFS mount for Immich photo library
+
+- name: Install NFS client packages
+  ansible.builtin.apt:
+    name:
+      - nfs-common
+    state: present
+
+- name: Create Immich photo library mount point
+  ansible.builtin.file:
+    path: "{{ immich_nfs_mount_point }}"
+    state: directory
+    mode: '0755'
+
+- name: Mount TrueNAS NFS share for Immich photos
+  ansible.posix.mount:
+    path: "{{ immich_nfs_mount_point }}"
+    src: "{{ immich_nfs_server }}:{{ immich_nfs_share }}"
+    fstype: nfs
+    opts: "{{ immich_nfs_opts }}"
+    state: mounted
+
+- name: Verify NFS mount is accessible
+  ansible.builtin.stat:
+    path: "{{ immich_nfs_mount_point }}"
+  register: nfs_mount_check
+
+- name: Display NFS mount status
+  ansible.builtin.debug:
+    msg: "Immich photo library mounted at {{ immich_nfs_mount_point }}"
+  when: nfs_mount_check.stat.exists
