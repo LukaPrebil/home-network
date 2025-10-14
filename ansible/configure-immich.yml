@@ -1,0 +1,30 @@
+---
+# Configure and deploy Immich photo management system
+#
+# This playbook:
+# - Applies common role for base system configuration
+# - Applies docker role to install Docker and Docker Compose
+# - Applies immich role to deploy Immich with GPU acceleration
+#
+# Usage:
+#   ansible-playbook configure-immich.yml
+
+- name: Configure Immich LXC container
+  hosts: immich
+  become: true
+  vars_files:
+    - secrets.yml
+
+  roles:
+    - role: common
+      tags:
+        - common
+        - base
+
+    - role: docker
+      tags:
+        - docker
+
+    - role: immich
+      tags:
+        - immich

@@ -1,38 +1,56 @@
 ---
 # NFS mount configuration for Docker volumes
+#
+# For LXC containers: NFS is mounted on the Proxmox host and bind-mounted into the container
+# For VMs/bare metal: NFS is mounted directly
 
-- name: Install NFS client packages
+- name: Check if running in LXC container
+  ansible.builtin.stat:
+    path: /proc/1/environ
+  register: proc_environ
+
+- name: Detect LXC environment
+  ansible.builtin.shell: grep -q container=lxc /proc/1/environ
+  register: is_lxc
+  failed_when: false
+  changed_when: false
+  when: proc_environ.stat.exists
+
+- name: Install NFS client packages (not needed for LXC with bind mounts)
   ansible.builtin.apt:
     name:
       - nfs-common
     state: present
+  when: is_lxc.rc | default(1) != 0
 
-- name: Ensure Docker base directory exists (before mounting)
+- name: Ensure Docker base directory exists
   ansible.builtin.file:
     path: "{{ docker_nfs_mount_point }}"
     state: directory
     mode: '0755'
 
-- name: Check if NFS share is already mounted
+- name: Check if storage is already mounted
   ansible.builtin.command: mountpoint -q {{ docker_nfs_mount_point }}
   register: nfs_mounted
   failed_when: false
   changed_when: false
 
-- name: Mount TrueNAS NFS share for Docker volumes
+- name: Mount TrueNAS NFS share for Docker volumes (VMs/bare metal only)
   ansible.posix.mount:
     path: "{{ docker_nfs_mount_point }}"
     src: "{{ truenas_nfs_server }}:{{ truenas_docker_volumes_share }}"
     fstype: nfs
     opts: defaults,nofail,_netdev
     state: mounted
-  when: nfs_mounted.rc != 0
+  when:
+    - nfs_mounted.rc != 0
+    - is_lxc.rc | default(1) != 0  # Skip for LXC containers
 
-- name: Verify NFS mount
+- name: Verify storage is accessible
   ansible.builtin.command: df -h {{ docker_nfs_mount_point }}
   register: nfs_df
   changed_when: false
 
-- name: Display NFS mount info
+- name: Display storage mount info
   ansible.builtin.debug:
     msg: "{{ nfs_df.stdout_lines }}"

@@ -1,8 +1,8 @@
 ---
 # Immich role default variables
 
-# Immich version (lock to v2.x for stability, allow minor/patch updates)
-immich_version: "v2"  # Will pull latest v2.x.x release
+# Immich version (use specific version for ROCm compatibility)
+immich_version: "v2.0.1"  # Specific version required for -rocm tag availability
 
 # Immich directories
 immich_base_dir: "/opt/immich"
@@ -30,7 +30,9 @@ immich_redis_hostname: "immich_redis"
 immich_log_level: "log"  # log, verbose, debug, warn, error
 
 # Hardware acceleration
-immich_enable_hw_accel: true
+immich_enable_hw_accel: true  # Master switch for any GPU acceleration
+immich_enable_vaapi: true     # VA-API for video transcoding (works)
+immich_enable_rocm: false     # ROCm for ML inference (incompatible with gfx1150)
 immich_gpu_devices:
   - /dev/dri/card0
   - /dev/dri/renderD128

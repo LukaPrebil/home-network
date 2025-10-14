@@ -19,17 +19,21 @@ lxc_containers:
     cores: 4
     memory: 16384  # 16GB in MB
     swap: 4096  # 4GB swap
-    disk: 32  # 32GB root disk
+    disk: 64  # 64GB root disk (for large Docker images, especially ROCm ML)
     storage: truenas-vms
     description: "Immich Photo Management - self-hosted photos with ML features and GPU acceleration"
     unprivileged: true  # Use unprivileged container (more secure)
     features:
       - nesting=1  # Required for Docker inside LXC
       - keyctl=1   # Required for systemd
+      - fuse=1     # Required for FUSE filesystems
+      - mknod=1    # Required for NFS mounts
     onboot: true  # Start on Proxmox boot
     # GPU passthrough configuration for AMD Radeon 880M/890M iGPU
     gpu_passthrough: true  # Enable GPU passthrough for hardware transcoding
     gpu_device: /dev/dri  # AMD iGPU device (card0 + renderD128)
+    # NFS storage configuration
+    nfs_docker_volumes: true  # Bind mount Docker volumes from NFS
 
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:

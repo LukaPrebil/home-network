@@ -131,6 +131,41 @@
         - item.gpu_passthrough | default(false)
       become: true
 
+    - name: Add NFS mount capability to containers (if needed)
+      ansible.builtin.shell:
+        cmd: |
+          pct set {{ item.vmid }} -features nesting=1,keyctl=1,fuse=1,mknod=1
+      loop: "{{ containers_to_create }}"
+      when:
+        - containers_to_create | length > 0
+      become: true
+
+    - name: Ensure NFS mount point exists on Proxmox host for Docker volumes
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-docker
+        state: directory
+        mode: '0755'
+      become: true
+
+    - name: Mount TrueNAS Docker volumes NFS share on Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/truenas-docker
+        src: "{{ truenas_nfs_server }}:{{ truenas_docker_volumes_share }}"
+        fstype: nfs
+        opts: defaults,nofail,_netdev
+        state: mounted
+      become: true
+
+    - name: Configure bind mount for Docker volumes in containers
+      ansible.builtin.shell:
+        cmd: |
+          pct set {{ item.vmid }} -mp0 /mnt/pve/truenas-docker,mp=/srv/docker
+      loop: "{{ containers_to_create }}"
+      when:
+        - containers_to_create | length > 0
+        - item.nfs_docker_volumes | default(false)
+      become: true
+
 - name: Add new containers to in-memory inventory
   hosts: localhost
   gather_facts: false

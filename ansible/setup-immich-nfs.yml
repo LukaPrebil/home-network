@@ -1,0 +1,82 @@
+---
+# One-time setup to configure NFS bind mounts for existing immich container
+# This mounts NFS shares on Proxmox host and binds them into the container
+
+- name: Setup NFS mounts for immich container
+  hosts: n5p
+  become: true
+  vars_files:
+    - group_vars/all.yml
+    - roles/docker/defaults/main.yml
+    - roles/immich/defaults/main.yml
+
+  tasks:
+    - name: Ensure NFS mount point exists on Proxmox host for Docker volumes
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-docker
+        state: directory
+        mode: '0755'
+
+    - name: Ensure NFS mount point exists on Proxmox host for Immich photos
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-immich-photos
+        state: directory
+        mode: '0755'
+
+    - name: Check if Docker volumes NFS share is already mounted on host
+      ansible.builtin.command: mountpoint -q /mnt/pve/truenas-docker
+      register: docker_nfs_check
+      failed_when: false
+      changed_when: false
+
+    - name: Check if Immich photos NFS share is already mounted on host
+      ansible.builtin.command: mountpoint -q /mnt/pve/truenas-immich-photos
+      register: immich_nfs_check
+      failed_when: false
+      changed_when: false
+
+    - name: Mount TrueNAS Docker volumes NFS share on Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/truenas-docker
+        src: "{{ truenas_nfs_server }}:{{ truenas_docker_volumes_share }}"
+        fstype: nfs
+        opts: defaults,nofail,_netdev
+        state: mounted
+      when: docker_nfs_check.rc != 0
+
+    - name: Mount TrueNAS Immich photos NFS share on Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/truenas-immich-photos
+        src: "{{ immich_nfs_server }}:{{ immich_nfs_share }}"
+        fstype: nfs
+        opts: "{{ immich_nfs_opts }}"
+        state: mounted
+      when: immich_nfs_check.rc != 0
+
+    - name: Stop immich container to add bind mounts
+      ansible.builtin.shell:
+        cmd: /usr/sbin/pct stop 200
+      register: pct_stop
+      failed_when: false
+
+    - name: Wait for container to stop
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Configure bind mount for Docker volumes in immich container
+      ansible.builtin.shell:
+        cmd: |
+          /usr/sbin/pct set 200 -mp0 /mnt/pve/truenas-docker,mp=/srv/docker
+
+    - name: Configure bind mount for Immich photos in immich container
+      ansible.builtin.shell:
+        cmd: |
+          /usr/sbin/pct set 200 -mp1 /mnt/pve/truenas-immich-photos,mp=/mnt/immich-photos
+
+    - name: Start immich container
+      ansible.builtin.shell:
+        cmd: /usr/sbin/pct start 200
+
+    - name: Wait for container to start
+      ansible.builtin.pause:
+        seconds: 10

@@ -9,7 +9,7 @@ services:
   immich-server:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
-{% if immich_enable_hw_accel %}
+{% if immich_enable_vaapi %}
     extends:
       file: hwaccel.transcoding.yml
       service: vaapi
@@ -30,15 +30,15 @@ services:
 
   immich-machine-learning:
     container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}{% if immich_enable_hw_accel %}-rocm{% endif %}
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}{% if immich_enable_rocm %}-rocm{% endif %}
 
-{% if immich_enable_hw_accel %}
+{% if immich_enable_rocm %}
     extends:
       file: hwaccel.ml.yml
       service: rocm
 {% endif %}
     volumes:
-      - model-cache:/cache
+      - {{ immich_upload_dir }}/model-cache:/cache
     env_file:
       - .env
     restart: always
@@ -66,6 +66,3 @@ services:
       - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
     shm_size: 128mb
     restart: always
-
-volumes:
-  model-cache:
