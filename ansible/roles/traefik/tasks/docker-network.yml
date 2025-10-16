@@ -1,0 +1,8 @@
+---
+# Create Docker network for Traefik
+
+- name: Create Docker network for Traefik
+  community.docker.docker_network:
+    name: "{{ traefik_docker_network }}"
+    driver: bridge
+    state: present

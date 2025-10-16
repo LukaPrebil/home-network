@@ -1,0 +1,27 @@
+---
+# Main tasks file for Traefik role
+
+- name: Include directory setup tasks
+  ansible.builtin.include_tasks: directories.yml
+  tags:
+    - traefik
+    - setup
+
+- name: Include Docker network setup tasks
+  ansible.builtin.include_tasks: docker-network.yml
+  tags:
+    - traefik
+    - docker
+    - network
+
+- name: Include configuration tasks
+  ansible.builtin.include_tasks: config.yml
+  tags:
+    - traefik
+    - config
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - traefik
+    - deploy

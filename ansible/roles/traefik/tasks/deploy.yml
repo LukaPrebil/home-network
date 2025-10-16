@@ -1,0 +1,33 @@
+---
+# Deploy and manage Traefik with Docker Compose
+
+- name: Pull Traefik Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ traefik_base_dir }}"
+    pull: "always"
+  register: traefik_pull
+
+- name: Start Traefik service
+  community.docker.docker_compose_v2:
+    project_src: "{{ traefik_base_dir }}"
+    state: present
+  register: traefik_deploy
+
+- name: Wait for Traefik to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ traefik_dashboard_port }}/ping"
+    method: GET
+    status_code: 200
+  register: traefik_health
+  until: traefik_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+
+- name: Display Traefik deployment status
+  ansible.builtin.debug:
+    msg:
+      - "Traefik is now running!"
+      - "Dashboard: http://{{ ansible_host }}:{{ traefik_dashboard_port }}"
+      - "HTTP endpoint: http://{{ ansible_host }}:{{ traefik_http_port }}"
+      - "HTTPS endpoint: https://{{ ansible_host }}:{{ traefik_https_port }}"

@@ -1,0 +1,49 @@
+---
+# Docker Compose file for Traefik
+# Note: 'version' field is obsolete in Compose v2 and has been removed
+
+services:
+  traefik:
+    image: traefik:{{ traefik_version }}
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - {{ traefik_docker_network }}
+    ports:
+      - "{{ traefik_http_port }}:80"
+      - "{{ traefik_https_port }}:443"
+{% if traefik_dashboard_enabled %}
+      - "{{ traefik_dashboard_port }}:8080"
+{% endif %}
+    volumes:
+      # Traefik configuration
+      - {{ traefik_config_dir }}/traefik.yml:/etc/traefik/traefik.yml:ro
+      # Dynamic configuration directory
+      - {{ traefik_file_provider_directory }}:/etc/traefik/dynamic:ro
+{% if traefik_acme_enabled %}
+      # ACME certificates
+      - {{ traefik_acme_storage }}:/acme.json
+{% endif %}
+      # Docker socket (read-only)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+{% if traefik_acme_challenge_type | default('http') == 'dns' %}
+      - CF_DNS_API_TOKEN={{ traefik_cloudflare_dns_api_token }}
+{% endif %}
+{% if traefik_acme_enabled %}
+    labels:
+      # Dashboard router via Docker provider
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.{{ traefik_domain | default('example.com') }}`)"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.middlewares=security-headers@file"
+{% endif %}
+
+networks:
+  {{ traefik_docker_network }}:
+    external: true

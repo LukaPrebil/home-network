@@ -1,0 +1,19 @@
+---
+# Traefik LXC configuration
+
+# Network
+ansible_host: 192.168.1.142  # Temporary IP (will migrate to 192.168.60.2)
+ansible_user: root
+ansible_ssh_private_key_file: ~/.ssh/homelab_ansible
+
+# ACME/Let's Encrypt configuration
+traefik_acme_enabled: true
+traefik_acme_email: "luka.prebil.grintal@proton.me"  # Email for Let's Encrypt notifications
+traefik_acme_challenge_type: "dns"  # Use DNS-01 challenge instead of HTTP-01
+traefik_acme_use_wildcard: true  # Use wildcard certificate for all subdomains
+
+# Cloudflare DNS challenge configuration
+traefik_cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token }}"
+
+# Domain configuration
+traefik_domain: "lukapg.dev"  # Used in dynamic.yml.j2 for all subdomains

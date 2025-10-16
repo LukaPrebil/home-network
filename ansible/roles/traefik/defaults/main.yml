@@ -1,0 +1,42 @@
+---
+# Traefik role default variables
+
+# Traefik version
+traefik_version: "v3"
+
+# Traefik directories
+traefik_base_dir: "/opt/traefik"
+traefik_config_dir: "{{ traefik_base_dir }}/config"
+# traefik_acme_dir: "{{ traefik_base_dir }}/acme"  # Deprecated - no longer needed
+
+# Docker Compose configuration
+traefik_compose_file: "{{ traefik_base_dir }}/docker-compose.yml"
+
+# Traefik configuration
+traefik_log_level: "INFO"  # DEBUG, INFO, WARN, ERROR, FATAL, PANIC
+traefik_access_logs: true
+
+# Entry points
+traefik_http_port: 80
+traefik_https_port: 443
+traefik_dashboard_port: 8080
+
+# Dashboard configuration
+traefik_dashboard_enabled: true
+traefik_dashboard_insecure: true  # Safe for homelab on private network
+
+# ACME/Let's Encrypt configuration
+traefik_acme_enabled: false  # Enable in host_vars when ready for production
+traefik_acme_email: ""  # MUST be set in host_vars when acme_enabled is true
+traefik_acme_ca_server: "https://acme-v02.api.letsencrypt.org/directory"
+traefik_acme_storage: "{{ traefik_base_dir }}/acme.json"
+
+# Docker provider configuration
+traefik_docker_provider_enabled: true
+traefik_docker_exposed_by_default: false  # Require explicit labels
+traefik_docker_network: "traefik"
+
+# File provider for static configuration
+traefik_file_provider_enabled: true
+traefik_file_provider_directory: "{{ traefik_config_dir }}/dynamic"
+traefik_file_provider_watch: true

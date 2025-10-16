@@ -106,6 +106,19 @@ All playbooks are fully automated and idempotent.
 - ✅ Modern GPG key handling (no deprecated apt-key)
 - ✅ Successfully tested and deployed
 
+### Traefik Role
+- ✅ Role structure created (`roles/traefik/`)
+- ✅ Docker Compose deployment configuration
+- ✅ Static configuration (traefik.yml)
+- ✅ Dynamic configuration with security middlewares
+- ✅ Dashboard and API endpoints
+- ✅ Docker provider for automatic service discovery
+- ✅ File provider for static routes
+- ✅ Let's Encrypt/ACME with DNS-01 challenge (Cloudflare)
+- ✅ Wildcard certificate support (`*.lukapg.dev`)
+- ✅ Deployment playbook: `configure-traefik.yml`
+- ✅ **DEPLOYED TO PRODUCTION** (LXC on 192.168.1.142)
+
 ## Next Steps
 
 ### Immediate: Deploy Containerized Services
@@ -125,14 +138,47 @@ All playbooks are fully automated and idempotent.
    - Will reconfigure all VMs from flat network to VLANs
    - Update IPs from 192.168.1.x to 192.168.30.x range
 
+### ✅ Completed: Traefik Reverse Proxy (Production)
+
+**Status:** 🎉 **LIVE IN PRODUCTION**
+
+Traefik has been successfully deployed and is serving all external services:
+
+**Deployment Details:**
+- **Host:** Traefik LXC container (`192.168.1.142`)
+- **Access:** https://traefik.lukapg.dev (Dashboard)
+- **Certificate:** Wildcard Let's Encrypt cert for `*.lukapg.dev`
+- **Challenge Type:** DNS-01 via Cloudflare API
+- **Services Proxied:** 5 active routes
+
+**Active Services:**
+1. ✅ `ha.lukapg.dev` → Home Assistant (192.168.1.110:8123)
+2. ✅ `kuma.lukapg.dev` → Uptime Kuma (192.168.1.110:3001)
+3. ✅ `status.lukapg.dev` → Uptime Kuma alt (192.168.1.110:3001)
+4. ✅ `glances.lukapg.dev` → Glances monitoring (192.168.1.110:61208)
+5. ✅ `traefik.lukapg.dev` → Traefik Dashboard (192.168.1.142:8080)
+
+**Features Enabled:**
+- ✅ Cloudflare proxy compatible (DNS-01 challenge)
+- ✅ Automatic HTTP → HTTPS redirect
+- ✅ HSTS with 1-year max-age
+- ✅ HTTP/2 and modern cipher suites
+- ✅ Security headers (XSS protection, content type sniffing, etc.)
+- ✅ Automatic certificate renewal (60 days before expiry)
+- ✅ Rate limiting middleware
+- ✅ Proxy headers for backend services
+
+**Migration Complete:**
+- ✅ Replaced Nginx Proxy Manager (NPM) on rpi4
+- ✅ All services migrated successfully
+- ✅ NPM ready to be decommissioned
+
 ### Future Service VMs
 After Docker Host is ready:
 - AdGuard Home (DNS/DHCP)
-- Nginx Proxy Manager (reverse proxy)
 - Monitoring stack (Prometheus/Grafana)
 - Home Assistant OS
 - Media services (Plex/Jellyfin)
-- Immich (photo management)
 
 ## Storage Architecture
 

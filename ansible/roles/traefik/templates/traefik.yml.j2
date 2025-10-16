@@ -1,0 +1,97 @@
+---
+# Traefik static configuration
+# This file is managed by Ansible - do not edit manually
+
+# Global configuration
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+# API and Dashboard
+api:
+  dashboard: {{ traefik_dashboard_enabled | lower }}
+{% if traefik_dashboard_insecure %}
+  insecure: true  # WARNING: Only use in testing/development
+{% endif %}
+
+# Ping endpoint for health checks
+ping:
+  entryPoint: "traefik"
+
+# Entry Points
+entryPoints:
+  web:
+    address: ":{{ traefik_http_port }}"
+{% if traefik_acme_enabled %}
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+{% endif %}
+
+  websecure:
+    address: ":{{ traefik_https_port }}"
+{% if traefik_acme_enabled %}
+    http:
+      tls:
+        certResolver: letsencrypt
+{% if traefik_acme_use_wildcard | default(false) %}
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+{% endif %}
+{% endif %}
+
+  traefik:
+    address: ":{{ traefik_dashboard_port }}"
+
+# Providers
+providers:
+{% if traefik_docker_provider_enabled %}
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: {{ traefik_docker_exposed_by_default | lower }}
+    network: "{{ traefik_docker_network }}"
+    watch: true
+{% endif %}
+
+{% if traefik_file_provider_enabled %}
+  file:
+    directory: "/etc/traefik/dynamic"
+    watch: {{ traefik_file_provider_watch | lower }}
+{% endif %}
+
+{% if traefik_acme_enabled %}
+# Certificate Resolvers (Let's Encrypt)
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: "{{ traefik_acme_email }}"
+      storage: "/acme.json"
+      caServer: "{{ traefik_acme_ca_server }}"
+{% if traefik_acme_challenge_type | default('http') == 'dns' %}
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: 30
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"
+{% else %}
+      httpChallenge:
+        entryPoint: web
+{% endif %}
+{% endif %}
+
+# Logging
+log:
+  level: "{{ traefik_log_level }}"
+  format: "common"
+
+{% if traefik_access_logs %}
+# Access Logs
+accessLog:
+  format: "common"
+  bufferingSize: 100
+{% endif %}

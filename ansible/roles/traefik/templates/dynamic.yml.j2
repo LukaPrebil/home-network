@@ -1,0 +1,186 @@
+---
+# Traefik dynamic configuration
+# This file is managed by Ansible - do not edit manually
+# Add custom middlewares, routers, and services here
+
+http:
+  # Middlewares
+  middlewares:
+    # Security headers
+    security-headers:
+      headers:
+        customResponseHeaders:
+          X-Robots-Tag: "noindex,nofollow,nosnippet,noarchive,notranslate,noimageindex"
+        sslProxyHeaders:
+          X-Forwarded-Proto: https
+        referrerPolicy: "strict-origin-when-cross-origin"
+        contentTypeNosniff: true
+        browserXssFilter: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsSeconds: 31536000
+        stsPreload: true
+        # frameDeny removed - breaks some applications like Home Assistant
+
+    # Headers for proxied applications (Home Assistant, Uptime Kuma, etc.)
+    proxy-headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        sslProxyHeaders:
+          X-Forwarded-Proto: https
+        # Traefik automatically adds:
+        # - X-Forwarded-For
+        # - X-Forwarded-Host
+        # - X-Real-IP
+
+    # Rate limiting
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: 1m
+
+    # IP whitelist for internal services (optional)
+    # internal-whitelist:
+    #   ipWhiteList:
+    #     sourceRange:
+    #       - "192.168.0.0/16"
+    #       - "10.0.0.0/8"
+
+    # Redirect to HTTPS
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  # Routers - HTTPS only (HTTP will auto-redirect)
+  routers:
+{% if traefik_acme_enabled | default(false) %}
+    # Home Assistant
+    ha-secure:
+      rule: "Host(`ha.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: homeassistant
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+        - security-headers
+
+    # Uptime Kuma (kuma subdomain)
+    kuma-secure:
+      rule: "Host(`kuma.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: uptimekuma
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+        - security-headers
+
+    # Uptime Kuma (status subdomain - same backend)
+    status-secure:
+      rule: "Host(`status.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: uptimekuma
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+        - security-headers
+
+    # Glances
+    glances-secure:
+      rule: "Host(`glances.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: glances
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - security-headers
+
+    # Immich Photo Management
+    immich-secure:
+      rule: "Host(`photos.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: immich
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+        - security-headers
+
+{% endif %}
+
+  # Services - backend targets
+  services:
+{% if traefik_acme_enabled | default(false) %}
+    homeassistant:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.110:8123"
+        passHostHeader: true
+
+    uptimekuma:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.110:3001"
+        passHostHeader: true
+
+    glances:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.110:61208"
+        passHostHeader: true
+
+    immich:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.141:2283"
+        passHostHeader: true
+{% endif %}
+
+# TLS configuration
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+      # Modern cipher suites (HTTP/2 & HTTP/3 compatible)
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+      # ALPN protocols (enables HTTP/2)
+      alpnProtocols:
+        - h2
+        - http/1.1

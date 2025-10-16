@@ -1,0 +1,37 @@
+---
+# Create required directories for Traefik
+
+- name: Create Traefik base directory
+  ansible.builtin.file:
+    path: "{{ traefik_base_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create Traefik config directory
+  ansible.builtin.file:
+    path: "{{ traefik_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create Traefik dynamic config directory
+  ansible.builtin.file:
+    path: "{{ traefik_file_provider_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create ACME storage file with correct permissions
+  ansible.builtin.file:
+    path: "{{ traefik_acme_storage }}"
+    state: touch
+    owner: root
+    group: root
+    mode: '0600'
+    modification_time: preserve
+    access_time: preserve
+  when: traefik_acme_enabled

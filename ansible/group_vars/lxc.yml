@@ -35,6 +35,31 @@ lxc_containers:
     # NFS storage configuration
     nfs_docker_volumes: true  # Bind mount Docker volumes from NFS
 
+  - name: traefik
+    vmid: 201
+    node: n5p
+    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.142  # Temporary IP (will migrate to 192.168.60.2 when VLANs are active)
+    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.60.1)
+    netmask: 24
+    cores: 2
+    memory: 2048  # 2GB in MB
+    swap: 512  # 512MB swap
+    disk: 16  # 16GB root disk (lightweight reverse proxy)
+    storage: truenas-vms
+    description: "Traefik Reverse Proxy - automatic HTTPS and service discovery"
+    unprivileged: true  # Use unprivileged container (more secure)
+    features:
+      - nesting=1  # Required for Docker inside LXC
+      - keyctl=1   # Required for systemd
+      - fuse=1     # Required for FUSE filesystems
+    onboot: true  # Start on Proxmox boot
+    # GPU passthrough not needed for reverse proxy
+    gpu_passthrough: false
+    # NFS storage not needed for reverse proxy (stores config locally)
+    nfs_docker_volumes: false
+
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:
   cores: 2

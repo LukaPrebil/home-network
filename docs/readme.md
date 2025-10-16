@@ -54,7 +54,7 @@ graph TD
         end
         
         subgraph "Servers & Services"
-            nas["<br>🗄️<br><b>Minisforum N5 Pro</b><br>Host OS: Proxmox<br><b>VMs on VLANs 30 & 60</b><br><br><u>Services:</u><br>- TrueNAS Scale (VLAN 30)<br>- Home Assistant OS VM (VLAN 30)<br>- Immich VM (VLAN 30)<br>- Plex/Jellyfin VM (VLAN 30)<br>- NPM VM (VLAN 60)<br>- AdGuard #1 (VLAN 30)"]
+            nas["<br>🗄️<br><b>Minisforum N5 Pro</b><br>Host OS: Proxmox<br><b>VMs on VLANs 30 & 60</b><br><br><u>Services:</u><br>- TrueNAS Scale (VLAN 30)<br>- Home Assistant OS VM (VLAN 30)<br>- Immich LXC (VLAN 30)<br>- Plex/Jellyfin VM (VLAN 30)<br>- Traefik LXC (VLAN 60)<br>- AdGuard #1 (VLAN 30)"]
             rpi4["<br>🍓<br><b>Raspberry Pi 4</b><br><b>VLAN 30: Servers</b><br><br><u>Services:</u><br>- Zigbee2MQTT<br>- Bluetooth Proxy"]
             rpi2["<br>🍓<br><b>Raspberry Pi 2</b><br><b>VLAN 30: Servers</b><br><br><u>Services:</u><br>- Mosquitto MQTT<br>- AdGuard #2 (Redundant)"]
         end
@@ -113,7 +113,7 @@ graph TD
     * **Home Assistant OS VM:** A dedicated VM for the core smart home controller. See details below.
     * **TrueNAS Scale VM:** Manages ZFS storage pools and provides network shares.
     * **Docker Host VM:** Hosts containerized services like AdGuard Home, the \*Arr suite, etc.
-    * **NPM VM:** An isolated VM for the Nginx Proxy Manager in the public-facing VLAN.
+    * **Traefik LXC:** An isolated LXC container for the Traefik reverse proxy in the public-facing VLAN.
     * **Dedicated VMs/LXCs:** For resource-intensive applications like Immich and Plex/Jellyfin.
 
 ### Home Assistant VM (on N5 Pro)
@@ -149,10 +149,11 @@ This section contains the specific details required for the automated setup and 
 | **Minisforum N5 Pro** | `n5p` | 30 (Servers) | `192.168.30.2` |
 | **TrueNAS VM** | `tn-storage` | 30 (Servers) | `192.168.30.3` |
 | **Docker Host VM** | `containers` | 30 (Servers) | `192.168.30.4` |
-| **NPM VM** | `nginx` | 60 (Public) | `192.168.60.2` |
+| **Traefik LXC** | `traefik` | 60 (Public) | `192.168.60.2` |
 | **Raspberry Pi 4** | `rpi4` | 30 (Servers) | `192.168.30.5` |
 | **Raspberry Pi 2** | `rpi2` | 30 (Servers) | `192.168.30.6` |
 | **Home Assistant VM** | `haos` | 30 (Servers) | `192.168.30.7` |
+| **Immich LXC** | `immich` | 30 (Servers) | `192.168.30.8` |
 | **Desktop PC** | `desktop-pc` | 20 (Trusted) | `192.168.20.2` |
 
 ### Automation Configuration
@@ -247,11 +248,11 @@ This section contains the specific details required for the automated setup and 
 - ⏳ Raspberry Pi 2 (not yet configured)
 
 #### Virtual Machines
-- ⏳ TrueNAS Scale VM
+- ✅ TrueNAS Scale VM (192.168.1.150)
 - ⏳ Home Assistant OS VM
-- ⏳ Docker Host VM
-- ⏳ Nginx Proxy Manager VM
-- ⏳ Immich VM
+- ✅ Docker Host VM (192.168.1.140)
+- ✅ Traefik LXC (192.168.1.142) - **PRODUCTION**
+- ✅ Immich LXC (192.168.1.141)
 - ⏳ Plex/Jellyfin VM
 
 #### Services
@@ -261,7 +262,8 @@ This section contains the specific details required for the automated setup and 
 - ⏳ Home Assistant setup
 - ⏳ Media services (Plex/Jellyfin)
 - ⏳ *Arr suite
-- ⏳ Immich
+- ✅ Immich (photo management with GPU acceleration)
+- ✅ **Traefik Reverse Proxy** (serving 5 public services with Let's Encrypt)
 
 #### Network Migration
 - ⏳ Deploy Omada router

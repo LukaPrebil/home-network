@@ -1,0 +1,29 @@
+---
+# Deploy Traefik configuration files
+
+- name: Deploy Traefik static configuration
+  ansible.builtin.template:
+    src: traefik.yml.j2
+    dest: "{{ traefik_config_dir }}/traefik.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Traefik
+
+- name: Deploy Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ traefik_compose_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Traefik
+
+- name: Deploy dynamic configuration (middlewares, routers, etc.)
+  ansible.builtin.template:
+    src: dynamic.yml.j2
+    dest: "{{ traefik_file_provider_directory }}/dynamic.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload Traefik

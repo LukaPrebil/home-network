@@ -4,11 +4,17 @@
 # Network configuration
 domain: home.local
 dns_servers:
-  - 193.110.81.0  # DNS0 public DNS (primary)
-  - 185.253.5.0   # DNS0 public DNS (secondary)
+  - 8.8.8.8        # Google DNS (primary)
+  - 8.8.4.4        # Google DNS (secondary)
+  - 193.110.81.0   # DNS0 public DNS (fallback)
+  - 185.253.5.0    # DNS0 public DNS (fallback)
   # Future: Will add AdGuard Home servers when deployed
   # - 192.168.30.6  # rpi2 - AdGuard Home (Primary)
   # - 192.168.30.2  # n5p - AdGuard Home (Secondary)
+
+# TrueNAS NFS configuration
+truenas_nfs_server: "192.168.1.150"  # Temporary IP (will migrate to 192.168.30.3)
+truenas_docker_volumes_share: "/mnt/tank/docker-volumes"
 
 # Timezone
 timezone: Europe/Ljubljana

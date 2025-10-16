@@ -59,3 +59,12 @@
     name: docker
     state: started
     enabled: yes
+
+- name: Install Python Docker SDK and dependencies for Ansible modules
+  ansible.builtin.apt:
+    name:
+      - python3-pip
+      - python3-docker  # Docker SDK for Python (from Ubuntu repos)
+      - python3-requests  # Required by community.docker modules
+    state: present
+    update_cache: yes

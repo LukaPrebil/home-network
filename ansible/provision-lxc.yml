@@ -32,11 +32,13 @@
         mode: '0644'
       when: not lxc_template_check.stat.exists
 
-- name: Check existing LXC containers
+- name: Check existing LXC containers and provision new ones
   hosts: proxmox_hosts
-  gather_facts: false
+  gather_facts: true
   vars_files:
     - group_vars/lxc.yml
+    - group_vars/all.yml
+    - secrets.yml
 
   tasks:
     - name: Get list of existing containers
@@ -49,15 +51,6 @@
       ansible.builtin.set_fact:
         existing_vmids: "{{ existing_containers.stdout_lines | map('int') | list }}"
 
-- name: Provision LXC containers
-  hosts: proxmox_hosts
-  gather_facts: true
-  vars_files:
-    - group_vars/lxc.yml
-    - group_vars/all.yml
-    - secrets.yml
-
-  tasks:
     - name: Filter containers that need to be created
       ansible.builtin.set_fact:
         containers_to_create: "{{ lxc_containers | rejectattr('vmid', 'in', existing_vmids | default([])) | list }}"
@@ -140,12 +133,17 @@
         - containers_to_create | length > 0
       become: true
 
+    - name: Check if any containers need NFS Docker volumes
+      ansible.builtin.set_fact:
+        need_nfs_mount: "{{ containers_to_create | selectattr('nfs_docker_volumes', 'defined') | selectattr('nfs_docker_volumes', 'equalto', true) | list | length > 0 }}"
+
     - name: Ensure NFS mount point exists on Proxmox host for Docker volumes
       ansible.builtin.file:
         path: /mnt/pve/truenas-docker
         state: directory
         mode: '0755'
       become: true
+      when: need_nfs_mount | default(false)
 
     - name: Mount TrueNAS Docker volumes NFS share on Proxmox host
       ansible.posix.mount:
@@ -155,6 +153,7 @@
         opts: defaults,nofail,_netdev
         state: mounted
       become: true
+      when: need_nfs_mount | default(false)
 
     - name: Configure bind mount for Docker volumes in containers
       ansible.builtin.shell:
