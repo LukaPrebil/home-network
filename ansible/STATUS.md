@@ -1,6 +1,6 @@
 # Ansible Automation Status
 
-Last Updated: 2025-10-10
+Last Updated: 2025-10-16
 
 ## Current State
 
@@ -119,6 +119,16 @@ All playbooks are fully automated and idempotent.
 - ✅ Deployment playbook: `configure-traefik.yml`
 - ✅ **DEPLOYED TO PRODUCTION** (LXC on 192.168.1.142)
 
+### Container Migration Roles
+- ✅ `uptime-kuma` - Role for Uptime Kuma monitoring service
+- ✅ `ddns-updater` - Role for dynamic DNS updates (Cloudflare)
+- ✅ `octoeverywhere` - Role for 3D printer remote access (Elegoo Neptune)
+- ✅ Migration playbook: `migrate-containers.yml`
+- ✅ Validation playbooks: `validate-uptime-kuma.yml`, `validate-ddns-updater.yml`, `validate-octoeverywhere.yml`
+- ✅ Two-stage migration: rpi4 → local backup → containers VM
+- ✅ Local backups stored in `backups/` directory for disaster recovery
+- ✅ **ALL SERVICES MIGRATED TO CONTAINERS VM**
+
 ## Next Steps
 
 ### Immediate: Deploy Containerized Services
@@ -153,10 +163,11 @@ Traefik has been successfully deployed and is serving all external services:
 
 **Active Services:**
 1. ✅ `ha.lukapg.dev` → Home Assistant (192.168.1.110:8123)
-2. ✅ `kuma.lukapg.dev` → Uptime Kuma (192.168.1.110:3001)
-3. ✅ `status.lukapg.dev` → Uptime Kuma alt (192.168.1.110:3001)
+2. ✅ `kuma.lukapg.dev` → Uptime Kuma (192.168.1.140:3001) **[MIGRATED]**
+3. ✅ `status.lukapg.dev` → Uptime Kuma alt (192.168.1.140:3001) **[MIGRATED]**
 4. ✅ `glances.lukapg.dev` → Glances monitoring (192.168.1.110:61208)
-5. ✅ `traefik.lukapg.dev` → Traefik Dashboard (192.168.1.142:8080)
+5. ✅ `photos.lukapg.dev` → Immich photo management (192.168.1.141:2283)
+6. ✅ `traefik.lukapg.dev` → Traefik Dashboard (192.168.1.142:8080)
 
 **Features Enabled:**
 - ✅ Cloudflare proxy compatible (DNS-01 challenge)
@@ -172,6 +183,44 @@ Traefik has been successfully deployed and is serving all external services:
 - ✅ Replaced Nginx Proxy Manager (NPM) on rpi4
 - ✅ All services migrated successfully
 - ✅ NPM ready to be decommissioned
+
+### ✅ Completed: Container Migration from rpi4 (Production)
+
+**Status:** 🎉 **ALL SERVICES MIGRATED**
+
+Three containerized services have been successfully migrated from rpi4 to containers VM:
+
+**Migrated Services:**
+1. ✅ **Uptime Kuma** (monitoring)
+   - Source: rpi4 (192.168.1.110:3001)
+   - Destination: containers VM (192.168.1.140:3001)
+   - Data: 243MB database + configuration migrated
+   - Traefik backend updated
+   - Live: https://kuma.lukapg.dev, https://status.lukapg.dev
+
+2. ✅ **ddns-updater** (DNS updates)
+   - Source: rpi4 (192.168.1.110:8000)
+   - Destination: containers VM (192.168.1.140:8000)
+   - Data: Cloudflare configuration + DNS records
+   - Running and updating DNS records
+
+3. ✅ **OctoEverywhere** (3D printer access)
+   - Source: rpi4 (octoeverywhere-elegoo-connect)
+   - Destination: containers VM (192.168.1.140)
+   - Data: Elegoo Neptune companion configuration
+   - Connected to printer at 192.168.1.100
+
+**Migration Architecture:**
+- Two-stage migration pattern: rpi4 → local backup → containers VM
+- Local backups in `backups/` directory for disaster recovery
+- Idempotent roles: can redeploy from backups without touching rpi4
+- Ansible roles: `uptime-kuma`, `ddns-updater`, `octoeverywhere`
+- Playbooks: `migrate-containers.yml`, `validate-*.yml`
+
+**rpi4 Cleanup:**
+- ✅ Migrated containers stopped and removed from rpi4
+- ✅ Original data preserved on rpi4 as additional backup
+- Remaining on rpi4: Home Assistant, Mosquitto, Glances, Omada Controller
 
 ### Future Service VMs
 After Docker Host is ready:

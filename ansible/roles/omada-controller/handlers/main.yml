@@ -1,0 +1,8 @@
+---
+# Handlers for Omada Controller role
+
+- name: Restart Omada Controller
+  ansible.builtin.systemd:
+    name: omada
+    state: restarted
+  listen: "Restart Omada Controller"

@@ -60,6 +60,28 @@ lxc_containers:
     # NFS storage not needed for reverse proxy (stores config locally)
     nfs_docker_volumes: false
 
+  - name: omada
+    vmid: 202
+    node: n5p
+    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.143  # Temporary IP (will migrate to 192.168.50.2 when VLANs are active)
+    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.50.1)
+    netmask: 24
+    cores: 2
+    memory: 4096  # 4GB in MB (Omada + MongoDB requires more memory)
+    swap: 1024  # 1GB swap
+    disk: 24  # 24GB root disk (controller data + MongoDB)
+    storage: truenas-vms
+    description: "TP-Link Omada SDN Controller - network management"
+    unprivileged: true  # Use unprivileged container (more secure)
+    features:
+      - keyctl=1   # Required for systemd
+    onboot: true  # Start on Proxmox boot
+    # No Docker needed (native .deb installation)
+    gpu_passthrough: false
+    nfs_docker_volumes: false
+
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:
   cores: 2

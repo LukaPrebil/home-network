@@ -1,5 +1,16 @@
 # Container Migration Plan: rpi4 → containers VM + LXC
 
+## Status: ✅ PHASE 1 COMPLETE (2025-10-16)
+
+**Completed:** All containerized services successfully migrated to containers VM
+- ✅ Uptime Kuma (live in production via Traefik)
+- ✅ ddns-updater (running, updating DNS records)
+- ✅ OctoEverywhere (connected to printer)
+
+**Deferred:** Omada Controller migration to dedicated LXC (will research native installation later)
+
+**Cleanup:** Migrated containers stopped and removed from rpi4
+
 ## Overview
 
 Migrate Docker containers from Raspberry Pi 4 to the more powerful containers VM and dedicated LXCs on Minisforum N5 Pro. This migration improves performance, resource allocation, and maintainability.
@@ -8,11 +19,11 @@ Migrate Docker containers from Raspberry Pi 4 to the more powerful containers VM
 
 | Service | Source | Destination | Method | Status |
 |---------|--------|-------------|--------|--------|
-| **Uptime Kuma** | rpi4 (Docker) | containers VM (Docker) | Ansible + rsync data | Pending |
-| **ddns-updater** | rpi4 (Docker) | containers VM (Docker) | Ansible + rsync data | Pending |
-| **OctoEverywhere** | rpi4 (Docker) | containers VM (Docker) | Ansible + rsync data | Pending |
-| **Omada Controller** | rpi4 (Docker) | Dedicated LXC (Native) | LXC provisioning + backup restore | Pending |
-| **NPM** | rpi4 (Docker) | ❌ Retire | Replaced by Traefik | Pending |
+| **Uptime Kuma** | rpi4 (Docker) | containers VM (Docker) | Ansible + rsync data | ✅ **COMPLETE** |
+| **ddns-updater** | rpi4 (Docker) | containers VM (Docker) | Ansible + rsync data | ✅ **COMPLETE** |
+| **OctoEverywhere** | rpi4 (Docker) | containers VM (Docker) | Ansible + rsync data | ✅ **COMPLETE** |
+| **Omada Controller** | rpi4 (Docker) | Dedicated LXC (Native) | LXC provisioning + backup restore | Deferred |
+| **NPM** | rpi4 (Docker) | ❌ Retire | Replaced by Traefik | ✅ **RETIRED** |
 | **Home Assistant** | rpi4 (Docker) | Dedicated HAOS VM | Separate project | Future |
 | **Mosquitto** | rpi4 (Docker) | rpi2 | Separate project | Future |
 | **Glances** | rpi4 (Docker) | Stay on rpi4 | Monitor rpi4 hardware | No action |
@@ -70,18 +81,18 @@ rpi4 (192.168.1.110) - KEPT
 - 🔲 Document backup/restore process
 
 #### 1.2 Create Ansible Infrastructure
-- 🔲 Create role: `ansible/roles/uptime-kuma/`
-- 🔲 Create role: `ansible/roles/ddns-updater/`
-- 🔲 Create role: `ansible/roles/octoeverywhere/`
-- 🔲 Create role: `ansible/roles/omada-controller/` (for LXC)
-- 🔲 Add Omada LXC to `group_vars/lxc.yml`
-- 🔲 Create `host_vars/omada-controller.yml` (Avahi/mDNS config)
+- ✅ Create role: `ansible/roles/uptime-kuma/`
+- ✅ Create role: `ansible/roles/ddns-updater/`
+- ✅ Create role: `ansible/roles/octoeverywhere/`
+- 🔲 Create role: `ansible/roles/omada-controller/` (for LXC) - **DEFERRED**
+- 🔲 Add Omada LXC to `group_vars/lxc.yml` - **DEFERRED**
+- 🔲 Create `host_vars/omada-controller.yml` (Avahi/mDNS config) - **DEFERRED**
 
 #### 1.3 Backup Current State
-- 🔲 Create Omada Controller backup via web UI
-- 🔲 Document current ddns-updater configuration
-- 🔲 Verify Uptime Kuma monitors are accessible
-- 🔲 Document OctoEverywhere printer connection
+- 🔲 Create Omada Controller backup via web UI - **DEFERRED**
+- ✅ Document current ddns-updater configuration
+- ✅ Verify Uptime Kuma monitors are accessible
+- ✅ Document OctoEverywhere printer connection
 
 ### Phase 2: Deploy Services (Stopped State)
 

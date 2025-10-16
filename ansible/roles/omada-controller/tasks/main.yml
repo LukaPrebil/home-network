@@ -1,0 +1,19 @@
+---
+# Main tasks for Omada Controller role
+
+- name: Include prerequisite installation tasks
+  ansible.builtin.import_tasks: prerequisites.yml
+  tags: [omada, prerequisites]
+
+- name: Include Omada Controller installation tasks
+  ansible.builtin.import_tasks: install.yml
+  tags: [omada, install]
+
+- name: Include backup restore tasks (if enabled)
+  ansible.builtin.import_tasks: restore-backup.yml
+  when: omada_restore_backup | bool
+  tags: [omada, restore]
+
+- name: Include service management tasks
+  ansible.builtin.import_tasks: service.yml
+  tags: [omada, service]

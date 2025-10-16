@@ -1,0 +1,71 @@
+---
+# Restore Omada Controller backup
+
+- name: Check if backup directory exists
+  ansible.builtin.stat:
+    path: "{{ omada_backup_source_dir }}"
+  delegate_to: localhost
+  become: false
+  register: backup_dir_check
+
+- name: Fail if backup directory doesn't exist
+  ansible.builtin.fail:
+    msg: "Backup directory not found: {{ omada_backup_source_dir }}"
+  when: not backup_dir_check.stat.exists
+
+- name: Find backup files in backup directory
+  ansible.builtin.find:
+    paths: "{{ omada_backup_source_dir }}"
+    patterns: "*.cfg"
+  delegate_to: localhost
+  become: false
+  register: backup_files
+
+- name: Fail if no backup files found
+  ansible.builtin.fail:
+    msg: "No .cfg backup files found in {{ omada_backup_source_dir }}"
+  when: backup_files.matched == 0
+
+- name: Get most recent backup file
+  ansible.builtin.set_fact:
+    omada_backup_file: "{{ (backup_files.files | sort(attribute='mtime', reverse=true) | first).path }}"
+
+- name: Display backup file to be restored
+  ansible.builtin.debug:
+    msg: "Will restore backup from: {{ omada_backup_file }}"
+
+- name: Stop Omada Controller before restore
+  ansible.builtin.systemd:
+    name: omada
+    state: stopped
+
+- name: Create restore directory on target
+  ansible.builtin.file:
+    path: /tmp/omada-restore
+    state: directory
+    mode: '0755'
+
+- name: Copy backup file to target
+  ansible.builtin.copy:
+    src: "{{ omada_backup_file }}"
+    dest: "/tmp/omada-restore/backup.cfg"
+    mode: '0644'
+
+- name: Restore backup using Omada CLI
+  ansible.builtin.shell:
+    cmd: "{{ omada_install_dir }}/bin/control.sh import /tmp/omada-restore/backup.cfg"
+  register: restore_result
+
+- name: Display restore result
+  ansible.builtin.debug:
+    var: restore_result.stdout_lines
+
+- name: Clean up restore files
+  ansible.builtin.file:
+    path: /tmp/omada-restore
+    state: absent
+
+- name: Start Omada Controller after restore
+  ansible.builtin.systemd:
+    name: omada
+    state: started

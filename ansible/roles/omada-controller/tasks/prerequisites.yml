@@ -1,0 +1,20 @@
+---
+# Install prerequisites for Omada Controller
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - wget
+      - curl
+      - openjdk-17-jre-headless  # Java 17 required for Omada 5.x
+      - jsvc  # Java service wrapper
+      - gnupg
+      - ca-certificates
+    state: present
+
+# Note: Omada Controller comes with bundled MongoDB, no need to install separately

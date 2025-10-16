@@ -1,0 +1,22 @@
+---
+# Configure Omada Controller LXC
+#
+# This playbook installs and configures TP-Link Omada SDN Controller on the omada LXC.
+#
+# Usage:
+#   ansible-playbook configure-omada.yml
+#   ansible-playbook configure-omada.yml -e omada_restore_backup=true  # Restore from backup
+
+- name: Configure Omada Controller
+  hosts: omada
+  become: yes
+  gather_facts: yes
+  vars_files:
+    - secrets.yml
+
+  roles:
+    - role: common
+      tags: [common]
+
+    - role: omada-controller
+      tags: [omada]

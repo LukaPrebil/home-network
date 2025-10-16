@@ -1,0 +1,29 @@
+---
+# Omada Controller role defaults
+
+# Omada Controller version
+omada_controller_version: "5.15.24.19"
+omada_controller_deb_url: "https://static.tp-link.com/upload/software/2025/202508/20250802/omada_v5.15.24.19_linux_x64_20250724152622.deb"
+
+# Installation paths
+omada_install_dir: "/opt/tplink/EAPController"
+omada_data_dir: "/opt/tplink/EAPController/data"
+omada_work_dir: "/opt/tplink/EAPController/work"
+omada_logs_dir: "/opt/tplink/EAPController/logs"
+
+# Service configuration
+omada_service_state: started
+omada_service_enabled: true
+
+# Network configuration
+omada_http_port: 8088
+omada_https_port: 8043
+omada_portal_http_port: 8088
+omada_portal_https_port: 8843
+
+# MongoDB configuration (bundled with Omada)
+omada_mongodb_port: 27217
+
+# Migration/backup configuration
+omada_restore_backup: false
+omada_backup_source_dir: "{{ playbook_dir }}/../backups/omada"
