@@ -20,7 +20,7 @@
     - name: Start ddns-updater service
       community.docker.docker_compose_v2:
         project_src: "{{ ddns_updater_base_dir }}"
-        state: started
+        state: present
       register: service_start
 
     - name: Wait for ddns-updater to be ready
@@ -38,6 +38,7 @@
         timeout: 10
       register: web_test
       delegate_to: localhost
+      become: false
 
     - name: Test ddns-updater health endpoint
       ansible.builtin.uri:
@@ -47,6 +48,7 @@
         timeout: 10
       register: health_test
       delegate_to: localhost
+      become: false
       ignore_errors: yes
 
     - name: Display validation results

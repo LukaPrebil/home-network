@@ -20,7 +20,7 @@
     - name: Start Uptime Kuma service
       community.docker.docker_compose_v2:
         project_src: "{{ uptime_kuma_base_dir }}"
-        state: started
+        state: present
       register: service_start
 
     - name: Wait for Uptime Kuma to be ready
@@ -38,6 +38,7 @@
         timeout: 10
       register: web_test
       delegate_to: localhost
+      become: false
 
     - name: Display validation results
       ansible.builtin.debug:

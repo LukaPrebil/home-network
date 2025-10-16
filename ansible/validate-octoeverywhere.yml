@@ -21,7 +21,7 @@
     - name: Start OctoEverywhere service
       community.docker.docker_compose_v2:
         project_src: "{{ octoeverywhere_base_dir }}"
-        state: started
+        state: present
       register: service_start
 
     - name: Wait for OctoEverywhere container to be running
