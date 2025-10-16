@@ -8,6 +8,7 @@
     state: directory
     mode: '0755'
   delegate_to: localhost
+  become: false
   run_once: true
   when: ddns_updater_migrate_data | bool
 
@@ -16,6 +17,7 @@
     path: "{{ playbook_dir }}/../backups/ddns-updater/config.json"
   register: local_backup
   delegate_to: localhost
+  become: false
   run_once: true
   when: ddns_updater_migrate_data | bool
 
@@ -33,7 +35,7 @@
 
 - name: Sync ddns-updater data from rpi4 to local backup
   ansible.posix.synchronize:
-    src: "{{ ddns_updater_source_data_dir }}/"
+    src: "{{ hostvars[ddns_updater_source_host].ansible_user }}@{{ hostvars[ddns_updater_source_host].ansible_host }}:{{ ddns_updater_source_data_dir }}/"
     dest: "{{ playbook_dir }}/../backups/ddns-updater/"
     mode: pull
     recursive: yes
@@ -42,7 +44,8 @@
     rsync_opts:
       - "--exclude=*.log"
       - "--exclude=.DS_Store"
-  delegate_to: "{{ ddns_updater_source_host }}"
+  delegate_to: localhost
+  become: false
   when:
     - ddns_updater_migrate_data | bool
     - not local_backup.stat.exists
@@ -53,7 +56,7 @@
     project_src: "/home/luka/ha"
     services:
       - ddns-updater
-    state: started
+    state: present
   delegate_to: "{{ ddns_updater_source_host }}"
   when:
     - ddns_updater_migrate_data | bool

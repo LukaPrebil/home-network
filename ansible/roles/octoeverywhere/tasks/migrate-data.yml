@@ -8,6 +8,7 @@
     state: directory
     mode: '0755'
   delegate_to: localhost
+  become: false
   run_once: true
   when: octoeverywhere_migrate_data | bool
 
@@ -16,6 +17,7 @@
     path: "{{ playbook_dir }}/../backups/octoeverywhere/octoeverywhere.conf"
   register: local_backup
   delegate_to: localhost
+  become: false
   run_once: true
   when: octoeverywhere_migrate_data | bool
 
@@ -33,7 +35,7 @@
 
 - name: Sync OctoEverywhere data from rpi4 to local backup
   ansible.posix.synchronize:
-    src: "{{ octoeverywhere_source_data_dir }}/"
+    src: "{{ hostvars[octoeverywhere_source_host].ansible_user }}@{{ hostvars[octoeverywhere_source_host].ansible_host }}:{{ octoeverywhere_source_data_dir }}/"
     dest: "{{ playbook_dir }}/../backups/octoeverywhere/"
     mode: pull
     recursive: yes
@@ -43,7 +45,8 @@
       - "--exclude=logs"
       - "--exclude=*.log"
       - "--exclude=.DS_Store"
-  delegate_to: "{{ octoeverywhere_source_host }}"
+  delegate_to: localhost
+  become: false
   when:
     - octoeverywhere_migrate_data | bool
     - not local_backup.stat.exists
@@ -54,7 +57,7 @@
     project_src: "/home/luka/ha"
     services:
       - octoeverywhere-elegoo-connect
-    state: started
+    state: present
   delegate_to: "{{ octoeverywhere_source_host }}"
   when:
     - octoeverywhere_migrate_data | bool

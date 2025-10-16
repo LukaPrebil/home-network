@@ -8,6 +8,7 @@
     state: directory
     mode: '0755'
   delegate_to: localhost
+  become: false
   run_once: true
   when: uptime_kuma_migrate_data | bool
 
@@ -16,6 +17,7 @@
     path: "{{ playbook_dir }}/../backups/uptime-kuma/kuma.db"
   register: local_backup
   delegate_to: localhost
+  become: false
   run_once: true
   when: uptime_kuma_migrate_data | bool
 
@@ -33,7 +35,7 @@
 
 - name: Sync Uptime Kuma data from rpi4 to local backup
   ansible.posix.synchronize:
-    src: "{{ uptime_kuma_source_data_dir }}/"
+    src: "{{ hostvars[uptime_kuma_source_host].ansible_user }}@{{ hostvars[uptime_kuma_source_host].ansible_host }}:{{ uptime_kuma_source_data_dir }}/"
     dest: "{{ playbook_dir }}/../backups/uptime-kuma/"
     mode: pull
     recursive: yes
@@ -42,7 +44,8 @@
     rsync_opts:
       - "--exclude=*.log"
       - "--exclude=.DS_Store"
-  delegate_to: "{{ uptime_kuma_source_host }}"
+  delegate_to: localhost
+  become: false
   when:
     - uptime_kuma_migrate_data | bool
     - not local_backup.stat.exists
@@ -53,7 +56,7 @@
     project_src: "/home/luka/ha"
     services:
       - uptime-kuma
-    state: started
+    state: present
   delegate_to: "{{ uptime_kuma_source_host }}"
   when:
     - uptime_kuma_migrate_data | bool

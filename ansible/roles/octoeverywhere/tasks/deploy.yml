@@ -19,7 +19,7 @@
 - name: Start OctoEverywhere service
   community.docker.docker_compose_v2:
     project_src: "{{ octoeverywhere_base_dir }}"
-    state: "{{ octoeverywhere_service_state }}"
+    state: present
   register: octoeverywhere_deploy
   when: octoeverywhere_service_state != 'stopped'
 

@@ -24,7 +24,7 @@
 - name: Start Uptime Kuma service
   community.docker.docker_compose_v2:
     project_src: "{{ uptime_kuma_base_dir }}"
-    state: "{{ uptime_kuma_service_state }}"
+    state: present
   register: uptime_kuma_deploy
   when: uptime_kuma_service_state != 'stopped'
 

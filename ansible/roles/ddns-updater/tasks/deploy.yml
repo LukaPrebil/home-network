@@ -19,7 +19,7 @@
 - name: Start ddns-updater service
   community.docker.docker_compose_v2:
     project_src: "{{ ddns_updater_base_dir }}"
-    state: "{{ ddns_updater_service_state }}"
+    state: present
   register: ddns_updater_deploy
   when: ddns_updater_service_state != 'stopped'
 
