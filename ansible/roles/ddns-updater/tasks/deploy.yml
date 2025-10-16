@@ -1,0 +1,41 @@
+---
+# Deploy and manage ddns-updater with Docker Compose
+
+- name: Deploy Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ ddns_updater_base_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart ddns-updater
+
+- name: Pull ddns-updater Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ ddns_updater_base_dir }}"
+    pull: "always"
+  register: ddns_updater_pull
+
+- name: Start ddns-updater service
+  community.docker.docker_compose_v2:
+    project_src: "{{ ddns_updater_base_dir }}"
+    state: "{{ ddns_updater_service_state }}"
+  register: ddns_updater_deploy
+  when: ddns_updater_service_state != 'stopped'
+
+- name: Wait for ddns-updater to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ddns_updater_port }}"
+    timeout: 60
+    delay: 5
+  when: ddns_updater_service_state == 'started'
+
+- name: Display ddns-updater deployment status
+  ansible.builtin.debug:
+    msg:
+      - "ddns-updater deployment complete!"
+      - "State: {{ ddns_updater_service_state }}"
+      - "Access ddns-updater at: http://{{ ansible_host }}:{{ ddns_updater_port }}"
+      - "Health endpoint: http://{{ ansible_host }}:{{ ddns_updater_port }}/health"
+  when: ddns_updater_service_state == 'started'
