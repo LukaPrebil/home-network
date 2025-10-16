@@ -1,20 +1,40 @@
 ---
-# Migrate Uptime Kuma data from rpi4
+# Migrate Uptime Kuma data from rpi4 (two-stage: rpi4 → local → containers VM)
 
-- name: Stop Uptime Kuma on source host (rpi4)
+# Stage 1: Sync from rpi4 to local Ansible control node (one-time)
+- name: Create local backup directory for Uptime Kuma data
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/../backups/uptime-kuma"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  run_once: true
+  when: uptime_kuma_migrate_data | bool
+
+- name: Check if local backup already exists
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/../backups/uptime-kuma/kuma.db"
+  register: local_backup
+  delegate_to: localhost
+  run_once: true
+  when: uptime_kuma_migrate_data | bool
+
+- name: Stop Uptime Kuma on rpi4 for initial sync
   community.docker.docker_compose_v2:
     project_src: "/home/luka/ha"
     services:
       - uptime-kuma
     state: stopped
   delegate_to: "{{ uptime_kuma_source_host }}"
-  register: source_stop
-  when: uptime_kuma_migrate_data | bool
+  when:
+    - uptime_kuma_migrate_data | bool
+    - not local_backup.stat.exists
+  run_once: true
 
-- name: Sync Uptime Kuma data from rpi4
+- name: Sync Uptime Kuma data from rpi4 to local backup
   ansible.posix.synchronize:
     src: "{{ uptime_kuma_source_data_dir }}/"
-    dest: "{{ uptime_kuma_data_dir }}/"
+    dest: "{{ playbook_dir }}/../backups/uptime-kuma/"
     mode: pull
     recursive: yes
     delete: no
@@ -23,6 +43,38 @@
       - "--exclude=*.log"
       - "--exclude=.DS_Store"
   delegate_to: "{{ uptime_kuma_source_host }}"
+  when:
+    - uptime_kuma_migrate_data | bool
+    - not local_backup.stat.exists
+  run_once: true
+
+- name: Restart Uptime Kuma on rpi4 after initial sync
+  community.docker.docker_compose_v2:
+    project_src: "/home/luka/ha"
+    services:
+      - uptime-kuma
+    state: started
+  delegate_to: "{{ uptime_kuma_source_host }}"
+  when:
+    - uptime_kuma_migrate_data | bool
+    - not local_backup.stat.exists
+  run_once: true
+
+- name: Display Stage 1 status
+  ansible.builtin.debug:
+    msg: "{{ 'Stage 1: Data synced from rpi4 to local backup' if not local_backup.stat.exists else 'Stage 1: Skipped - local backup already exists' }}"
+  when: uptime_kuma_migrate_data | bool
+  run_once: true
+
+# Stage 2: Push from local backup to containers VM (idempotent)
+- name: Sync Uptime Kuma data from local backup to containers VM
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../backups/uptime-kuma/"
+    dest: "{{ uptime_kuma_data_dir }}/"
+    mode: push
+    recursive: yes
+    delete: no
+    checksum: yes
   when: uptime_kuma_migrate_data | bool
 
 - name: Fix ownership of migrated data
@@ -33,20 +85,11 @@
     recurse: yes
   when: uptime_kuma_migrate_data | bool
 
-- name: Restart Uptime Kuma on source host (rpi4) - keep as backup
-  community.docker.docker_compose_v2:
-    project_src: "/home/luka/ha"
-    services:
-      - uptime-kuma
-    state: started
-  delegate_to: "{{ uptime_kuma_source_host }}"
-  when: uptime_kuma_migrate_data | bool
-
-- name: Display data migration status
+- name: Display migration complete status
   ansible.builtin.debug:
     msg:
-      - "Uptime Kuma data migrated from {{ uptime_kuma_source_host }}"
-      - "Source: {{ uptime_kuma_source_data_dir }}"
+      - "Uptime Kuma data migration complete!"
+      - "Local backup: {{ playbook_dir }}/../backups/uptime-kuma/"
       - "Destination: {{ uptime_kuma_data_dir }}"
-      - "Old instance restarted on {{ uptime_kuma_source_host }} (running as backup)"
+      - "Source rpi4 instance still running (not affected)"
   when: uptime_kuma_migrate_data | bool
