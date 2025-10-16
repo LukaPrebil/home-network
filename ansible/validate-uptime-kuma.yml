@@ -1,0 +1,67 @@
+---
+# Validate Uptime Kuma migration
+#
+# This playbook starts Uptime Kuma on containers VM and validates it's working
+# before switching Traefik backends.
+#
+# Usage:
+#   ansible-playbook validate-uptime-kuma.yml
+
+- name: Validate Uptime Kuma on containers VM
+  hosts: containers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    uptime_kuma_base_dir: "/srv/docker/uptime-kuma"
+    uptime_kuma_port: 3001
+
+  tasks:
+    - name: Start Uptime Kuma service
+      community.docker.docker_compose_v2:
+        project_src: "{{ uptime_kuma_base_dir }}"
+        state: started
+      register: service_start
+
+    - name: Wait for Uptime Kuma to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ uptime_kuma_port }}"
+        timeout: 60
+        delay: 5
+
+    - name: Test Uptime Kuma web UI
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ uptime_kuma_port }}"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: web_test
+      delegate_to: localhost
+
+    - name: Display validation results
+      ansible.builtin.debug:
+        msg:
+          - "✅ Uptime Kuma validation PASSED"
+          - ""
+          - "Service is running on {{ ansible_host }}:{{ uptime_kuma_port }}"
+          - "Web UI responded with HTTP {{ web_test.status }}"
+          - ""
+          - "Next steps:"
+          - "  1. Access http://{{ ansible_host }}:{{ uptime_kuma_port }} in your browser"
+          - "  2. Verify monitors are present and working"
+          - "  3. Compare with old instance: http://192.168.1.110:3001"
+          - "  4. If everything looks good, proceed with Traefik backend update"
+          - ""
+          - "Old instance on rpi4 still running as backup"
+
+  post_tasks:
+    - name: Validation summary
+      ansible.builtin.set_fact:
+        validation_status: "PASSED"
+      when: web_test.status == 200
+
+    - name: Fail if validation did not pass
+      ansible.builtin.fail:
+        msg: "Uptime Kuma validation FAILED - do not proceed"
+      when: web_test.status != 200

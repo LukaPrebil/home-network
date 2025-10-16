@@ -1,0 +1,78 @@
+---
+# Validate ddns-updater migration
+#
+# This playbook starts ddns-updater on containers VM and validates it's working
+# before switching production traffic.
+#
+# Usage:
+#   ansible-playbook validate-ddns-updater.yml
+
+- name: Validate ddns-updater on containers VM
+  hosts: containers
+  become: yes
+  gather_facts: yes
+
+  vars:
+    ddns_updater_base_dir: "/srv/docker/ddns-updater"
+    ddns_updater_port: 8000
+
+  tasks:
+    - name: Start ddns-updater service
+      community.docker.docker_compose_v2:
+        project_src: "{{ ddns_updater_base_dir }}"
+        state: started
+      register: service_start
+
+    - name: Wait for ddns-updater to be ready
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: "{{ ddns_updater_port }}"
+        timeout: 60
+        delay: 5
+
+    - name: Test ddns-updater web UI
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ ddns_updater_port }}"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: web_test
+      delegate_to: localhost
+
+    - name: Test ddns-updater health endpoint
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ ddns_updater_port }}/health"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: health_test
+      delegate_to: localhost
+      ignore_errors: yes
+
+    - name: Display validation results
+      ansible.builtin.debug:
+        msg:
+          - "✅ ddns-updater validation PASSED"
+          - ""
+          - "Service is running on {{ ansible_host }}:{{ ddns_updater_port }}"
+          - "Web UI responded with HTTP {{ web_test.status }}"
+          - "Health check: {{ 'OK' if health_test.status == 200 else 'N/A' }}"
+          - ""
+          - "Next steps:"
+          - "  1. Access http://{{ ansible_host }}:{{ ddns_updater_port }} in your browser"
+          - "  2. Verify DNS records are being updated"
+          - "  3. Compare with old instance: http://192.168.1.110:8000"
+          - "  4. Monitor for a few minutes to ensure updates work"
+          - ""
+          - "Old instance on rpi4 still running as backup"
+
+  post_tasks:
+    - name: Validation summary
+      ansible.builtin.set_fact:
+        validation_status: "PASSED"
+      when: web_test.status == 200
+
+    - name: Fail if validation did not pass
+      ansible.builtin.fail:
+        msg: "ddns-updater validation FAILED - do not proceed"
+      when: web_test.status != 200

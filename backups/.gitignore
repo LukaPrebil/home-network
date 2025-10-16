@@ -1,0 +1,23 @@
+# Exclude large database files from git
+# Keep config files but ignore databases and logs
+
+# Uptime Kuma - exclude database files (large)
+uptime-kuma/kuma.db
+uptime-kuma/kuma.db-shm
+uptime-kuma/kuma.db-wal
+uptime-kuma/*.log
+
+# Include config files and smaller data
+!uptime-kuma/docker-tls/
+!uptime-kuma/screenshots/
+!uptime-kuma/upload/
+
+# ddns-updater - keep all (configs are small)
+!ddns-updater/**
+
+# OctoEverywhere - keep all (configs are small)
+!octoeverywhere/**
+
+# Exclude all logs
+**/*.log
+**/logs/
