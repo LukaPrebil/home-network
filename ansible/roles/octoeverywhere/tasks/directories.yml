@@ -1,0 +1,18 @@
+---
+# Create required directories for OctoEverywhere
+
+- name: Create OctoEverywhere base directory
+  ansible.builtin.file:
+    path: "{{ octoeverywhere_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create OctoEverywhere data directory
+  ansible.builtin.file:
+    path: "{{ octoeverywhere_data_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

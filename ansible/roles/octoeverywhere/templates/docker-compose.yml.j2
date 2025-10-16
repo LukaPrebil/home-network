@@ -1,0 +1,13 @@
+---
+# Docker Compose file for OctoEverywhere
+
+services:
+  octoeverywhere:
+    image: {{ octoeverywhere_image }}
+    container_name: {{ octoeverywhere_container_name }}
+    restart: unless-stopped
+    volumes:
+      - {{ octoeverywhere_data_dir }}:/data
+    environment:
+      - COMPANION_MODE={{ octoeverywhere_companion_mode }}
+      - PRINTER_IP={{ octoeverywhere_printer_ip }}

@@ -1,0 +1,43 @@
+---
+# Deploy and manage OctoEverywhere with Docker Compose
+
+- name: Deploy Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ octoeverywhere_base_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart OctoEverywhere
+
+- name: Pull OctoEverywhere Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ octoeverywhere_base_dir }}"
+    pull: "always"
+  register: octoeverywhere_pull
+
+- name: Start OctoEverywhere service
+  community.docker.docker_compose_v2:
+    project_src: "{{ octoeverywhere_base_dir }}"
+    state: "{{ octoeverywhere_service_state }}"
+  register: octoeverywhere_deploy
+  when: octoeverywhere_service_state != 'stopped'
+
+- name: Wait for OctoEverywhere container to be running
+  community.docker.docker_container_info:
+    name: "{{ octoeverywhere_container_name }}"
+  register: octoeverywhere_info
+  until: octoeverywhere_info.container.State.Status == "running"
+  retries: 12
+  delay: 5
+  when: octoeverywhere_service_state == 'started'
+
+- name: Display OctoEverywhere deployment status
+  ansible.builtin.debug:
+    msg:
+      - "OctoEverywhere deployment complete!"
+      - "State: {{ octoeverywhere_service_state }}"
+      - "Companion mode: {{ octoeverywhere_companion_mode }}"
+      - "Printer IP: {{ octoeverywhere_printer_ip }}"
+      - "Check OctoEverywhere cloud portal for connection status"
+  when: octoeverywhere_service_state == 'started'

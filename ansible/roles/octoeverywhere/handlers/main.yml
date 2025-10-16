@@ -1,0 +1,8 @@
+---
+# Handlers for OctoEverywhere role
+
+- name: Restart OctoEverywhere
+  community.docker.docker_compose_v2:
+    project_src: "{{ octoeverywhere_base_dir }}"
+    state: restarted
+  listen: "Restart OctoEverywhere"
