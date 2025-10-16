@@ -1,0 +1,22 @@
+---
+# Uptime Kuma default configuration
+
+# Base directory for Uptime Kuma
+uptime_kuma_base_dir: "/srv/docker/uptime-kuma"
+uptime_kuma_data_dir: "{{ uptime_kuma_base_dir }}/data"
+
+# Docker image
+uptime_kuma_image: "louislam/uptime-kuma:latest"
+uptime_kuma_container_name: "uptime-kuma"
+
+# Network configuration
+uptime_kuma_port: 3001
+uptime_kuma_docker_network: "traefik"  # Connect to Traefik network for reverse proxy
+
+# Service state (can be overridden during migration)
+uptime_kuma_service_state: "started"  # Options: started, stopped, present
+
+# Data migration configuration
+uptime_kuma_migrate_data: false  # Set to true to sync data from rpi4
+uptime_kuma_source_host: "rpi4"  # Source host for data migration
+uptime_kuma_source_data_dir: "/home/luka/ha/kuma_data"  # Source directory on rpi4

@@ -1,0 +1,52 @@
+---
+# Migrate Uptime Kuma data from rpi4
+
+- name: Stop Uptime Kuma on source host (rpi4)
+  community.docker.docker_compose_v2:
+    project_src: "/home/luka/ha"
+    services:
+      - uptime-kuma
+    state: stopped
+  delegate_to: "{{ uptime_kuma_source_host }}"
+  register: source_stop
+  when: uptime_kuma_migrate_data | bool
+
+- name: Sync Uptime Kuma data from rpi4
+  ansible.posix.synchronize:
+    src: "{{ uptime_kuma_source_data_dir }}/"
+    dest: "{{ uptime_kuma_data_dir }}/"
+    mode: pull
+    recursive: yes
+    delete: no
+    checksum: yes
+    rsync_opts:
+      - "--exclude=*.log"
+      - "--exclude=.DS_Store"
+  delegate_to: "{{ uptime_kuma_source_host }}"
+  when: uptime_kuma_migrate_data | bool
+
+- name: Fix ownership of migrated data
+  ansible.builtin.file:
+    path: "{{ uptime_kuma_data_dir }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+  when: uptime_kuma_migrate_data | bool
+
+- name: Restart Uptime Kuma on source host (rpi4) - keep as backup
+  community.docker.docker_compose_v2:
+    project_src: "/home/luka/ha"
+    services:
+      - uptime-kuma
+    state: started
+  delegate_to: "{{ uptime_kuma_source_host }}"
+  when: uptime_kuma_migrate_data | bool
+
+- name: Display data migration status
+  ansible.builtin.debug:
+    msg:
+      - "Uptime Kuma data migrated from {{ uptime_kuma_source_host }}"
+      - "Source: {{ uptime_kuma_source_data_dir }}"
+      - "Destination: {{ uptime_kuma_data_dir }}"
+      - "Old instance restarted on {{ uptime_kuma_source_host }} (running as backup)"
+  when: uptime_kuma_migrate_data | bool

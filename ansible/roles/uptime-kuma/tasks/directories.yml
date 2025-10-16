@@ -1,0 +1,18 @@
+---
+# Create required directories for Uptime Kuma
+
+- name: Create Uptime Kuma base directory
+  ansible.builtin.file:
+    path: "{{ uptime_kuma_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create Uptime Kuma data directory
+  ansible.builtin.file:
+    path: "{{ uptime_kuma_data_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

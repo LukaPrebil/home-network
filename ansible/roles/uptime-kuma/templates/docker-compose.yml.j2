@@ -1,0 +1,19 @@
+---
+# Docker Compose file for Uptime Kuma
+
+services:
+  uptime-kuma:
+    image: {{ uptime_kuma_image }}
+    container_name: {{ uptime_kuma_container_name }}
+    restart: unless-stopped
+    volumes:
+      - {{ uptime_kuma_data_dir }}:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # For Docker monitoring
+    ports:
+      - "{{ uptime_kuma_port }}:3001"
+    networks:
+      - {{ uptime_kuma_docker_network }}
+
+networks:
+  {{ uptime_kuma_docker_network }}:
+    external: true
