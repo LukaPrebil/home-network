@@ -1,6 +1,6 @@
 # Ansible Automation Status
 
-Last Updated: 2025-10-16
+Last Updated: 2025-10-17
 
 ## Current State
 
@@ -220,7 +220,47 @@ Three containerized services have been successfully migrated from rpi4 to contai
 **rpi4 Cleanup:**
 - ✅ Migrated containers stopped and removed from rpi4
 - ✅ Original data preserved on rpi4 as additional backup
-- Remaining on rpi4: Home Assistant, Mosquitto, Glances, Omada Controller
+- Remaining on rpi4: Home Assistant, Mosquitto, Glances
+
+### ✅ Completed: Omada Controller LXC (Production)
+
+**Status:** 🎉 **RUNNING AND CONFIGURED**
+
+TP-Link Omada SDN Controller successfully deployed on dedicated LXC:
+
+**Infrastructure:**
+- LXC Container: omada (VMID 202, IP 192.168.1.143)
+- Resources: 2 cores, 4GB RAM, 24GB disk
+- Unprivileged container on truenas-vms storage
+- Auto-start enabled (onboot: true)
+
+**Software Stack:**
+- Omada Controller: v5.15.24.19 (native .deb installation)
+- MongoDB: v7.0.25 (Jammy/22.04 packages for Ubuntu 25.04 compatibility)
+- Java: OpenJDK 17
+- Service: tpeap (active and running)
+
+**Access:**
+- Web UI (HTTPS): https://192.168.1.143:8043
+- Web UI (HTTP): http://192.168.1.143:8088
+- SSH: `ssh root@192.168.1.143` or `ssh omada`
+
+**Configuration:**
+- ✅ Backup restored successfully via UI
+- ✅ All network devices reconnected
+- ✅ Site configuration preserved
+- ✅ User accounts and settings intact
+
+**Ansible Automation:**
+- Role: `roles/omada-controller/`
+- Playbook: `configure-omada.yml`
+- Features: Prerequisites, installation, backup/restore support
+- MongoDB: Auto-installs from Jammy repository
+
+**Next Steps:**
+- Add to Traefik reverse proxy (optional)
+- Configure SSL certificate (optional, already has self-signed)
+- Document network integration
 
 ### Future Service VMs
 After Docker Host is ready:
