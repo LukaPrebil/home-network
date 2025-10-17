@@ -17,4 +17,46 @@
       - ca-certificates
     state: present
 
-# Note: Omada Controller comes with bundled MongoDB, no need to install separately
+# MongoDB setup for Ubuntu 25.04 (using Jammy/22.04 packages)
+- name: Check if MongoDB repository is already configured
+  ansible.builtin.stat:
+    path: /etc/apt/sources.list.d/mongodb-org-7.0.list
+  register: mongodb_repo_check
+
+- name: Create directory for MongoDB GPG key
+  ansible.builtin.file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: '0755'
+  when: not mongodb_repo_check.stat.exists
+
+- name: Download and add MongoDB GPG key
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    creates: /usr/share/keyrings/mongodb-server-7.0.gpg
+  when: not mongodb_repo_check.stat.exists
+
+- name: Add MongoDB repository (using Jammy packages for Ubuntu 25.04)
+  ansible.builtin.lineinfile:
+    path: /etc/apt/sources.list.d/mongodb-org-7.0.list
+    line: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"
+    create: yes
+    mode: '0644'
+  when: not mongodb_repo_check.stat.exists
+
+- name: Update apt cache after adding MongoDB repository
+  ansible.builtin.apt:
+    update_cache: yes
+  when: not mongodb_repo_check.stat.exists
+
+- name: Install MongoDB
+  ansible.builtin.apt:
+    name:
+      - mongodb-org
+    state: present
+
+- name: Start and enable MongoDB service
+  ansible.builtin.systemd:
+    name: mongod
+    state: started
+    enabled: yes
