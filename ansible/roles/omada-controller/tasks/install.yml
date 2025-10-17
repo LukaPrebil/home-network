@@ -20,12 +20,11 @@
     mode: '0644'
   when: not omada_installed.stat.exists
 
-- name: Install Omada Controller from .deb package (ignore MongoDB dependency)
-  ansible.builtin.command:
-    cmd: "dpkg -i --force-depends /tmp/omada-installer/omada_{{ omada_controller_version }}.deb"
+- name: Install Omada Controller from .deb package
+  ansible.builtin.apt:
+    deb: "/tmp/omada-installer/omada_{{ omada_controller_version }}.deb"
+    state: present
   when: not omada_installed.stat.exists
-  register: dpkg_install
-  changed_when: dpkg_install.rc == 0
   notify: Restart Omada Controller
 
 - name: Clean up temporary installer files
