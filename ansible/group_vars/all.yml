@@ -4,10 +4,10 @@
 # Network configuration
 domain: home.local
 dns_servers:
-  - 8.8.8.8        # Google DNS (primary)
-  - 8.8.4.4        # Google DNS (secondary)
-  - 193.110.81.0   # DNS0 public DNS (fallback)
-  - 185.253.5.0    # DNS0 public DNS (fallback)
+  - 1.1.1.1        # Cloudflare DNS (primary)
+  - 1.0.0.1        # Cloudflare DNS (secondary)
+  - 2606:4700:4700::1111
+  - 2606:4700:4700::1001
   # Future: Will add AdGuard Home servers when deployed
   # - 192.168.30.6  # rpi2 - AdGuard Home (Primary)
   # - 192.168.30.2  # n5p - AdGuard Home (Secondary)
