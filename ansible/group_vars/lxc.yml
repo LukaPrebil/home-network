@@ -98,7 +98,10 @@ lxc_containers:
     description: "AdGuard Home - DNS filtering and ad blocking (Primary)"
     unprivileged: true  # Use unprivileged container (more secure)
     features:
+      - nesting=1  # Required for systemd 257+ in unprivileged containers
       - keyctl=1   # Required for systemd
+      - fuse=1     # Required for FUSE filesystems
+      - mknod=1    # Required for device access
     onboot: true  # Start on Proxmox boot - critical service
     # No Docker needed (native binary installation)
     gpu_passthrough: false

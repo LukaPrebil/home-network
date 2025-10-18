@@ -9,6 +9,30 @@
     state: present
     update_cache: yes
 
+- name: Stop systemd-resolved (conflicts with AdGuard on port 53)
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: stopped
+
+- name: Mask systemd-resolved to prevent it from starting
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    masked: true
+
+- name: Remove systemd-resolved resolv.conf symlink
+  ansible.builtin.file:
+    path: /etc/resolv.conf
+    state: absent
+
+- name: Create static resolv.conf for AdGuard
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    content: |
+      # Static DNS configuration for AdGuard Home
+      nameserver 1.1.1.1
+      nameserver 1.0.0.1
+    mode: '0644'
+
 - name: Create AdGuard directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -54,6 +78,21 @@
     - "/tmp/adguardhome.tar.gz"
     - "/tmp/AdGuardHome"
   when: not adguard_binary.stat.exists
+
+- name: Install apache2-utils for htpasswd
+  ansible.builtin.apt:
+    name: apache2-utils
+    state: present
+    update_cache: yes
+  when: vault_adguard_username is defined and vault_adguard_password is defined
+
+- name: Generate bcrypt hash for AdGuard password using htpasswd
+  ansible.builtin.shell:
+    cmd: "htpasswd -nbB -C 10 '{{ vault_adguard_username }}' '{{ vault_adguard_password }}' | cut -d: -f2"
+  register: adguard_password_hash
+  changed_when: false
+  no_log: true
+  when: vault_adguard_username is defined and vault_adguard_password is defined
 
 - name: Create AdGuard Home configuration
   ansible.builtin.template:

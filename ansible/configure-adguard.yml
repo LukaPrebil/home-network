@@ -19,6 +19,8 @@
   hosts: adguard_hosts
   become: true
   gather_facts: true
+  vars_files:
+    - secrets.yml
 
   tasks:
     - name: Display deployment information
