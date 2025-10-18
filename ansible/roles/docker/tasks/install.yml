@@ -12,6 +12,11 @@
     state: present
     update_cache: yes
 
+- name: Set Docker repository URL based on OS
+  ansible.builtin.set_fact:
+    docker_repo_url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}"
+    docker_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
 - name: Create directory for Docker GPG key
   ansible.builtin.file:
     path: /etc/apt/keyrings
@@ -20,7 +25,7 @@
 
 - name: Download Docker GPG key
   ansible.builtin.get_url:
-    url: "{{ docker_apt_key_url }}"
+    url: "{{ docker_repo_url }}/gpg"
     dest: /tmp/docker.gpg
     mode: '0644'
 
@@ -38,7 +43,7 @@
 
 - name: Add Docker repository
   ansible.builtin.apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    repo: "deb [arch={{ docker_arch }} signed-by=/etc/apt/keyrings/docker.gpg] {{ docker_repo_url }} {{ ansible_distribution_release }} stable"
     filename: docker
     state: present
 

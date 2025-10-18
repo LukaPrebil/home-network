@@ -48,6 +48,8 @@
   hosts: rpi4
   become: true
   gather_facts: true
+  vars_files:
+    - secrets.yml
   roles:
     - common
 
@@ -85,7 +87,7 @@
         mode: '0755'
         owner: root
         group: root
-      loop: "{{ rpi4_services:}}"
+      loop: "{{ rpi4_services }}"
 
     - name: Display completion message
       ansible.builtin.debug:

@@ -1,0 +1,11 @@
+---
+# Host-specific variables for rpi4 (Raspberry Pi 4)
+#
+# Hardware: Raspberry Pi 4 Model B
+# Role: Secondary DNS server and IoT services
+# IP: 192.168.1.110
+
+# AdGuard Home configuration for rpi4 (Secondary DNS)
+adguard_deployment_method: "docker"  # Use Docker instead of native binary
+adguard_data_dir: "/srv/docker/adguard/data"
+adguard_config_dir: "/srv/docker/adguard/config"

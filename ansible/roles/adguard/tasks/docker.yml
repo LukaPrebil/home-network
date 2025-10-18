@@ -1,6 +1,21 @@
 ---
 # AdGuard Home Docker deployment (for rpi4 and other Docker hosts)
 
+- name: Install apache2-utils for htpasswd
+  ansible.builtin.apt:
+    name: apache2-utils
+    state: present
+    update_cache: yes
+  when: vault_adguard_username is defined and vault_adguard_password is defined
+
+- name: Generate bcrypt hash for AdGuard password using htpasswd
+  ansible.builtin.shell:
+    cmd: "htpasswd -nbB -C 10 '{{ vault_adguard_username }}' '{{ vault_adguard_password }}' | cut -d: -f2"
+  register: adguard_password_hash
+  changed_when: false
+  no_log: true
+  when: vault_adguard_username is defined and vault_adguard_password is defined
+
 - name: Create AdGuard Docker directory
   ansible.builtin.file:
     path: "{{ adguard_docker_dir }}/{{ item }}"
@@ -21,11 +36,6 @@
     src: AdGuardHome.yaml.j2
     dest: "{{ adguard_docker_dir }}/conf/AdGuardHome.yaml"
     mode: '0644'
-
-- name: Create Docker network
-  community.docker.docker_network:
-    name: "{{ adguard_docker_network }}"
-    state: present
 
 - name: Start AdGuard Home container
   community.docker.docker_compose_v2:
