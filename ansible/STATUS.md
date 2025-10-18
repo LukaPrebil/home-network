@@ -1,6 +1,6 @@
 # Ansible Automation Status
 
-Last Updated: 2025-10-17
+Last Updated: 2025-10-18
 
 ## Current State
 
@@ -66,9 +66,14 @@ Last Updated: 2025-10-17
 ### VM Provisioning
 - ✅ `create-cloudinit-template.yml` - Creates Ubuntu 25.04 cloud-init template
 - ✅ `provision-vms.yml` - Provisions VMs from template (declarative, idempotent)
+- ✅ `provision-lxc.yml` - Provisions LXC containers (declarative, idempotent)
+- ✅ `provision-haos.yml` - Provisions Home Assistant OS VM with UEFI boot
 
 ### VM Configuration
 - ✅ `configure-containers.yml` - Configures Docker Host with common + docker roles
+- ✅ `configure-traefik.yml` - Deploys Traefik reverse proxy
+- ✅ `configure-omada.yml` - Deploys Omada SDN Controller
+- ✅ `migrate-containers.yml` - Migrates services from rpi4 to containers VM
 
 All playbooks are fully automated and idempotent.
 
@@ -162,10 +167,10 @@ Traefik has been successfully deployed and is serving all external services:
 - **Services Proxied:** 5 active routes
 
 **Active Services:**
-1. ✅ `ha.lukapg.dev` → Home Assistant (192.168.1.110:8123)
+1. ✅ `ha.lukapg.dev` → Home Assistant (192.168.1.144:8123) **[HAOS VM]**
 2. ✅ `kuma.lukapg.dev` → Uptime Kuma (192.168.1.140:3001) **[MIGRATED]**
 3. ✅ `status.lukapg.dev` → Uptime Kuma alt (192.168.1.140:3001) **[MIGRATED]**
-4. ✅ `glances.lukapg.dev` → Glances monitoring (192.168.1.110:61208)
+4. ✅ `glances.lukapg.dev` → Glances monitoring (rpi4 - decommissioned)
 5. ✅ `photos.lukapg.dev` → Immich photo management (192.168.1.141:2283)
 6. ✅ `traefik.lukapg.dev` → Traefik Dashboard (192.168.1.142:8080)
 
@@ -262,11 +267,54 @@ TP-Link Omada SDN Controller successfully deployed on dedicated LXC:
 - Configure SSL certificate (optional, already has self-signed)
 - Document network integration
 
+### ✅ Completed: Home Assistant OS VM (Production)
+
+**Status:** 🎉 **RUNNING IN PRODUCTION**
+
+Home Assistant has been successfully migrated from rpi4 to a dedicated HAOS VM:
+
+**Infrastructure:**
+- VM: haos (VMID 102, IP 192.168.1.144)
+- Resources: 4 cores, 8GB RAM, 64GB disk on truenas-vms
+- UEFI boot with EFI disk (required for HAOS)
+- Auto-start enabled (onboot: true)
+
+**Software:**
+- Home Assistant OS: v16.2
+- Core: Restored from backup with all integrations intact
+- ZHA: USB Zigbee coordinator passed through from Proxmox host
+- MQTT: Connected to broker at 192.168.1.110 (will migrate when rpi services move)
+
+**Access:**
+- Web UI: http://192.168.1.144:8123
+- Public: https://ha.lukapg.dev (via Traefik)
+- SSH: Via "SSH & Web Terminal" add-on (optional)
+
+**Traefik Integration:**
+- ✅ Backend updated to point to 192.168.1.144:8123
+- ✅ Reverse proxy working with Let's Encrypt certificate
+- ✅ Mobile apps updated to new URL
+
+**Ansible Automation:**
+- Playbook: `provision-haos.yml`
+- Configuration: `group_vars/haos.yml`
+- Features: Automated image download, UEFI boot setup, network configuration guide
+- Documentation: `docs/homeassistant_migration.md`
+
+**Migration Complete:**
+- ✅ All ZHA Zigbee devices working (USB stick passed through)
+- ✅ All automations and integrations restored
+- ✅ Old container on rpi4 removed
+- ✅ 24+ hours of stable operation
+
+**rpi4 Status:**
+- ✅ All Docker containers stopped and removed
+- ✅ System decommissioned - no services running
+- ✅ Available for repurposing or retirement
+
 ### Future Service VMs
-After Docker Host is ready:
 - AdGuard Home (DNS/DHCP)
 - Monitoring stack (Prometheus/Grafana)
-- Home Assistant OS
 - Media services (Plex/Jellyfin)
 
 ## Storage Architecture

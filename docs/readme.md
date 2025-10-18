@@ -244,26 +244,28 @@ This section contains the specific details required for the automated setup and 
 
 #### Hardware
 - ⏳ Omada ER707-M2 Router (not yet deployed)
-- ⏳ Raspberry Pi 4 (not yet configured)
+- ✅ Raspberry Pi 4 (decommissioned - all services migrated)
 - ⏳ Raspberry Pi 2 (not yet configured)
 
 #### Virtual Machines
 - ✅ TrueNAS Scale VM (192.168.1.150)
-- ⏳ Home Assistant OS VM
+- ✅ Home Assistant OS VM (192.168.1.144) - **PRODUCTION**
 - ✅ Docker Host VM (192.168.1.140)
 - ✅ Traefik LXC (192.168.1.142) - **PRODUCTION**
 - ✅ Immich LXC (192.168.1.141)
+- ✅ Omada Controller LXC (192.168.1.143) - **PRODUCTION**
 - ⏳ Plex/Jellyfin VM
 
 #### Services
 - ⏳ AdGuard Home (DNS)
-- ⏳ Zigbee2MQTT
-- ⏳ Mosquitto MQTT
-- ⏳ Home Assistant setup
+- ⏳ Zigbee2MQTT (future migration from ZHA)
+- ⏳ Mosquitto MQTT (needs migration from rpi4)
+- ✅ Home Assistant (HAOS VM with ZHA Zigbee integration)
 - ⏳ Media services (Plex/Jellyfin)
 - ⏳ *Arr suite
 - ✅ Immich (photo management with GPU acceleration)
 - ✅ **Traefik Reverse Proxy** (serving 5 public services with Let's Encrypt)
+- ✅ **Omada SDN Controller** (managing network infrastructure)
 
 #### Network Migration
 - ⏳ Deploy Omada router
@@ -274,10 +276,11 @@ This section contains the specific details required for the automated setup and 
 
 ### Next Steps
 
-1. **Create VM Templates:** Set up cloud-init enabled templates for Ubuntu/Debian VMs
-2. **Build First VM:** Deploy the Docker Host VM as the first service platform
-3. **Deploy Core Services:** AdGuard Home, Home Assistant, basic monitoring
+1. **Deploy AdGuard Home:** DNS filtering and local DNS resolution
+2. **Monitoring Stack:** Prometheus + Grafana for infrastructure monitoring
+3. **Media Services:** Plex/Jellyfin VM with *Arr suite
 4. **Plan Network Migration:** Prepare for transition to VLAN architecture when Omada router arrives
+5. **Mosquitto Migration:** Move MQTT broker from rpi4 to permanent location (rpi2 or containers VM)
 
 ---
 
