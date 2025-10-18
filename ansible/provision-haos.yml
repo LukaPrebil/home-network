@@ -1,0 +1,303 @@
+---
+# Playbook to provision Home Assistant OS VM on Proxmox
+# Configuration is defined in group_vars/haos.yml
+#
+# Usage:
+#   ansible-playbook provision-haos.yml
+#
+# This playbook:
+# 1. Downloads the HAOS qcow2 image (if not already present)
+# 2. Creates a VM and imports the disk image
+# 3. Configures network settings
+# 4. Starts the VM
+
+- name: Download Home Assistant OS image
+  hosts: n5p
+  become: true
+  vars_files:
+    - group_vars/haos.yml
+  tasks:
+    - name: Set image paths
+      ansible.builtin.set_fact:
+        image_path: "/var/lib/vz/template/cache/{{ haos_vm.image_filename }}"
+        compressed_path: "/var/lib/vz/template/cache/{{ haos_vm.image_filename }}.xz"
+
+    - name: Check if HAOS image already exists
+      ansible.builtin.stat:
+        path: "{{ image_path }}"
+      register: image_stat
+
+    - name: Download Home Assistant OS image (compressed)
+      ansible.builtin.get_url:
+        url: "{{ haos_vm.image_url }}"
+        dest: "{{ compressed_path }}"
+        mode: '0644'
+        timeout: 600
+      when: not image_stat.stat.exists
+      register: image_download
+
+    - name: Extract HAOS image
+      ansible.builtin.shell:
+        cmd: "xz -d -k {{ compressed_path }}"
+      when: image_download is changed
+
+    - name: Verify extracted image exists
+      ansible.builtin.stat:
+        path: "{{ image_path }}"
+      register: extracted_image
+
+    - name: Fail if image does not exist
+      ansible.builtin.fail:
+        msg: "HAOS image not found at {{ image_path }}"
+      when: not extracted_image.stat.exists
+
+    - name: Display image status
+      ansible.builtin.debug:
+        msg: "HAOS image {{ 'downloaded and extracted' if image_download is changed else 'already exists' }} at {{ image_path }}"
+
+- name: Create Home Assistant OS VM
+  hosts: n5p
+  become: true
+  vars_files:
+    - group_vars/haos.yml
+  tasks:
+    - name: Set image path
+      ansible.builtin.set_fact:
+        image_path: "/var/lib/vz/template/cache/{{ haos_vm.image_filename }}"
+
+    - name: Check if HAOS VM already exists
+      ansible.builtin.shell:
+        cmd: "qm status {{ haos_vm.vmid }}"
+      register: vm_exists
+      failed_when: false
+      changed_when: false
+
+    - name: Display skip message if VM exists
+      ansible.builtin.debug:
+        msg: "VM {{ haos_vm.vmid }} ({{ haos_vm.name }}) already exists. Skipping creation."
+      when: vm_exists.rc == 0
+
+    - name: End play if VM already exists
+      ansible.builtin.meta: end_host
+      when: vm_exists.rc == 0
+
+    - name: Create Home Assistant OS VM
+      ansible.builtin.shell:
+        cmd: >
+          qm create {{ haos_vm.vmid }}
+          --name {{ haos_vm.name }}
+          --memory {{ haos_vm.memory }}
+          --cores {{ haos_vm.cores }}
+          --cpu {{ haos_vm.cpu }}
+          --machine {{ haos_vm.machine }}
+          --bios ovmf
+          --net0 virtio,bridge={{ haos_vm.network_bridge }},firewall=1
+          --ostype l26
+          --scsihw virtio-scsi-single
+          --onboot {{ 1 if haos_vm.onboot else 0 }}
+          --tablet 0
+          --agent enabled=1
+          --description "{{ haos_vm.description }}"
+      register: vm_create
+
+    - name: Add EFI disk (required for UEFI boot)
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ haos_vm.vmid }}
+          --efidisk0 {{ haos_vm.storage }}:1,efitype=4m,pre-enrolled-keys=0
+      when: vm_create is succeeded
+
+    - name: Import HAOS disk image to VM storage
+      ansible.builtin.shell:
+        cmd: >
+          qm importdisk {{ haos_vm.vmid }} {{ image_path }} {{ haos_vm.storage }} --format qcow2
+      when: vm_create is succeeded
+      register: disk_import
+
+    - name: Attach imported disk to VM
+      ansible.builtin.shell:
+        cmd: >
+          qm set {{ haos_vm.vmid }}
+          --scsi0 {{ haos_vm.storage }}:{{ haos_vm.vmid }}/vm-{{ haos_vm.vmid }}-disk-0.qcow2,discard=on,iothread=1,ssd=1
+      when: disk_import is succeeded
+
+    - name: Resize disk to desired size
+      ansible.builtin.shell:
+        cmd: "qm resize {{ haos_vm.vmid }} scsi0 {{ haos_vm.disk_size }}"
+      when: disk_import is succeeded
+
+    - name: Set boot order
+      ansible.builtin.shell:
+        cmd: qm set {{ haos_vm.vmid }} --boot 'order=scsi0'
+      when: vm_create is succeeded
+
+    - name: Display VM configuration
+      ansible.builtin.shell:
+        cmd: "qm config {{ haos_vm.vmid }}"
+      register: vm_config
+      changed_when: false
+
+    - name: Show HAOS VM configuration
+      ansible.builtin.debug:
+        msg: "{{ vm_config.stdout_lines }}"
+
+    - name: Start HAOS VM
+      ansible.builtin.shell:
+        cmd: "qm start {{ haos_vm.vmid }}"
+
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Home Assistant OS VM created successfully!"
+          - "=============================================="
+          - ""
+          - "VM Details:"
+          - "  VM ID: {{ haos_vm.vmid }}"
+          - "  Name: {{ haos_vm.name }}"
+          - "  Version: Home Assistant OS {{ haos_vm.version }}"
+          - ""
+          - "Network Configuration (Target):"
+          - "  Target IP: {{ haos_vm.ip }}"
+          - "  Gateway: {{ haos_vm.gateway }}"
+          - "  Network: 192.168.1.0/{{ haos_vm.netmask }} (temporary flat network)"
+          - ""
+          - "Resources:"
+          - "  CPU Cores: {{ haos_vm.cores }}"
+          - "  Memory: {{ haos_vm.memory }}MB ({{ haos_vm.memory // 1024 }}GB)"
+          - "  Disk: {{ haos_vm.disk_size }} on {{ haos_vm.storage }}"
+          - ""
+          - "IMPORTANT: HAOS will boot and get an IP via DHCP first."
+          - "You need to configure the static IP manually via the console."
+          - ""
+          - "The VM is starting now. Please wait ~2-3 minutes for HAOS to boot,"
+          - "then follow the network configuration steps below."
+          - "=============================================="
+
+- name: Display network configuration instructions
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - group_vars/haos.yml
+  tasks:
+    - name: Manual network configuration required
+      ansible.builtin.pause:
+        prompt: |
+
+          ════════════════════════════════════════════════════════════════════════
+            MANUAL STEP: Configure HAOS Static IP Address
+          ════════════════════════════════════════════════════════════════════════
+
+          The VM is booting now. Wait 2-3 minutes, then configure the network:
+
+          STEP 1: Access Proxmox Web Console
+          ────────────────────────────────────────────────────────────────────
+            • Open: https://192.168.1.128:8006
+            • Navigate to: VM 102 (haos) → Console
+            • Wait for HAOS welcome screen (shows current DHCP IP)
+
+          STEP 2: Configure Static IP
+          ────────────────────────────────────────────────────────────────────
+            Login: root (no password)
+
+            First, check interface name:
+              ha network info
+
+            Then configure static IP (replace 'end0' with actual interface):
+              ha network update end0 --ipv4-method static --ipv4-address {{ haos_vm.ip }}/{{ haos_vm.netmask }} --ipv4-gateway {{ haos_vm.gateway }} --ipv4-nameserver 1.1.1.1
+
+          STEP 3: Verify Access
+          ────────────────────────────────────────────────────────────────────
+            After ~2 minutes: http://{{ haos_vm.ip }}:8123
+
+          Press ENTER when Home Assistant web UI is accessible...
+
+    - name: Display migration instructions
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Home Assistant is now accessible!"
+          - "=============================================="
+          - ""
+          - "Open your browser and navigate to:"
+          - "  http://{{ haos_vm.ip }}:8123"
+          - ""
+          - "You should see the Home Assistant onboarding screen."
+          - ""
+          - "MIGRATION STEPS:"
+          - "================================"
+          - ""
+          - "Step 1: Stop the old Home Assistant container on rpi4"
+          - "-------------------------------------------------------"
+          - "  ssh luka@192.168.1.110"
+          - "  cd ~/docker  # or wherever your docker-compose.yml is"
+          - "  docker compose stop homeassistant"
+          - ""
+          - "Step 2: Restore from backup on new HAOS instance"
+          - "--------------------------------------------------"
+          - "  1. Download the latest backup from Google Drive"
+          - "  2. On the HAOS web UI (http://{{ haos_vm.ip }}:8123)"
+          - "  3. Select 'Restore from backup'"
+          - "  4. Upload your backup .tar file"
+          - "  5. Wait for restore to complete (VM will reboot)"
+          - ""
+          - "Step 3: Configure USB Zigbee coordinator passthrough"
+          - "-----------------------------------------------------"
+          - "  The USB Zigbee stick needs to be passed through from Proxmox to the HAOS VM."
+          - ""
+          - "  On your local machine, SSH to Proxmox:"
+          - "    ssh ansible_user@192.168.1.128"
+          - ""
+          - "  Find the USB device:"
+          - "    lsusb"
+          - "    # Look for your Zigbee coordinator"
+          - "    # Example output: Bus 001 Device 003: ID 1a86:55d4 QinHeng Electronics"
+          - ""
+          - "  Pass it through to the VM (use the vendor:product IDs from lsusb):"
+          - "    sudo qm set {{ haos_vm.vmid }} --usb0 host=VENDOR_ID:PRODUCT_ID"
+          - "    # Example: sudo qm set {{ haos_vm.vmid }} --usb0 host=1a86:55d4"
+          - ""
+          - "  Reboot the HAOS VM to apply USB passthrough:"
+          - "    sudo qm reboot {{ haos_vm.vmid }}"
+          - ""
+          - "  After reboot, the Zigbee stick will appear in Home Assistant at /dev/ttyUSB0"
+          - "  Your ZHA integration should automatically reconnect to it."
+          - ""
+          - "Step 4: Verify integrations"
+          - "----------------------------"
+          - "  1. Log in to Home Assistant at http://{{ haos_vm.ip }}:8123"
+          - "  2. Go to Settings > Devices & Services"
+          - "  3. Verify all integrations are working:"
+          - "     - ZHA (Zigbee Home Automation) - check USB device is connected"
+          - "     - MQTT - should be pointing to 192.168.1.110 (rpi4)"
+          - "  4. Test controlling some Zigbee devices"
+          - ""
+          - "Step 5: Update mobile apps and clients"
+          - "---------------------------------------"
+          - "  Update the Home Assistant mobile app on your phone:"
+          - "    - Remove old connection (192.168.1.110:8123)"
+          - "    - Add new connection ({{ haos_vm.ip }}:8123)"
+          - ""
+          - "Step 6: Clean up old container (after 24h of stable operation)"
+          - "---------------------------------------------------------------"
+          - "  On rpi4:"
+          - "    cd ~/docker"
+          - "    # Edit docker-compose.yml and remove the homeassistant service"
+          - "    docker compose down -v  # This deletes the old HA data"
+          - ""
+          - "Step 7: Update Ansible inventory"
+          - "---------------------------------"
+          - "  Add the new HAOS VM to ansible/inventory/hosts.yml:"
+          - "    haos:"
+          - "      ansible_host: {{ haos_vm.ip }}"
+          - "      ansible_port: 22"
+          - "      ansible_user: root"
+          - "      ansible_ssh_private_key_file: ~/.ssh/homelab_ansible"
+          - ""
+          - "NOTES:"
+          - "------"
+          - "- HAOS does not use standard SSH by default"
+          - "- You can enable SSH via the 'SSH & Web Terminal' add-on in HAOS"
+          - "- For now, manage HAOS through the web UI and Proxmox console"
+          - "=============================================="
+      when: ha_ready is succeeded

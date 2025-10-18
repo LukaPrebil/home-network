@@ -1,0 +1,40 @@
+---
+# Home Assistant OS VM configuration
+# This VM uses a pre-built qcow2 image, not a cloud-init template
+
+haos_vm:
+  vmid: 102
+  name: "haos"
+  node: "n5p"
+
+  # Home Assistant OS version
+  version: "16.2"
+  image_filename: "haos_ova-16.2.qcow2"
+  image_url: "https://github.com/home-assistant/operating-system/releases/download/16.2/haos_ova-16.2.qcow2.xz"
+
+  # Network configuration (temporary flat network)
+  vlan_id: null  # No VLAN until router is deployed (flat network for now)
+  ip: 192.168.1.144  # Temporary IP (will migrate to 192.168.30.7 when VLANs are active)
+  gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+  netmask: 24
+  network_bridge: vmbr0
+
+  # Resources
+  cores: 4
+  memory: 8192  # 8GB in MB
+  disk_size: "64G"
+  storage: truenas-vms  # Store on TrueNAS NFS share
+
+  # VM settings
+  machine: q35
+  cpu: host
+  onboot: true
+
+  description: "Home Assistant OS - Smart home automation platform"
+
+  # Important notes:
+  # - HAOS requires UEFI (OVMF) boot, not legacy BIOS
+  # - EFI disk will be created automatically by the provisioning playbook
+  # - Network must be configured manually via HAOS console after first boot (no cloud-init support)
+  # - USB passthrough for Zigbee coordinator must be configured manually after VM creation
+  #   Example: qm set 102 --usb0 host=1a86:55d4 (adjust vendor:product for your device)

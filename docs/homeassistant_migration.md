@@ -18,10 +18,10 @@ The most critical asset is a recent, complete, and valid Home Assistant backup.
 
 ### 1.2 Confirm External Service IPs
 
-The backup stores the IP addresses of external services like your MQTT broker. Ensure these are pointing to their final, correct static IPs.
+The backup stores the IP addresses of external services like your MQTT broker. Ensure these are pointing to their current IPs.
 
 * **Action:** In your current Home Assistant instance, navigate to **Settings > Devices & Services > MQTT**.
-* **Verification:** Confirm that the broker is configured to connect to the static IP of the Raspberry Pi 2 (`rpi2`), which is `192.168.30.6`. If not, update it and take a fresh backup.
+* **Verification:** Confirm that the broker is configured to connect to the Raspberry Pi 4 at `192.168.1.110` (where Mosquitto is currently running). This configuration will be restored from the backup.
 
 ---
 ## 2. Migration Procedure
@@ -30,29 +30,79 @@ This is the active cut-over process. It should be performed when you have about 
 
 ### 2.1 Provision the HAOS Virtual Machine
 
-First, create the new home for Home Assistant on the Proxmox server.
+First, create the new home for Home Assistant on the Proxmox server using the automated Ansible playbook.
 
 * **Host:** `n5p`
-* **Action:** Create a new virtual machine using the [Proxmox VE Helper Scripts](https://tteck.github.io/Proxmox/) for Home Assistant OS.
+* **Action:** Run the Ansible playbook to provision the HAOS VM:
+  ```bash
+  cd ansible
+  ansible-playbook provision-haos.yml --ask-vault-pass
+  ```
 * **Configuration:**
     * **Hostname:** `haos`
-    * **Static IP:** `192.168.30.7` (VLAN 30)
-    * Assign sufficient resources (e.g., 2+ cores, 4GB+ RAM, 32GB+ disk).
+    * **Temporary IP:** `192.168.1.144` (flat network)
+    * **Final IP:** `192.168.30.7` (VLAN 30, after network migration)
+    * **Resources:** 4 cores, 8GB RAM, 64GB disk on TrueNAS storage
+    * **Version:** Home Assistant OS 16.2
+
+The playbook will:
+1. Download the HAOS qcow2 image (if not already cached)
+2. Create the VM with appropriate settings
+3. Import and resize the disk
+4. Start the VM and wait for it to be ready
+5. Display detailed migration instructions
 
 ### 2.2 Shutdown the Old Container
 
 To prevent conflicts, the old Home Assistant container must be stopped before starting the new one.
 
-* **Action:** SSH into the old Docker host. Navigate to the directory containing your `docker-compose.yml` file.
-* **Command:** Execute `docker compose stop homeassistant`.
+* **Action:** SSH into the Raspberry Pi 4 where Home Assistant is currently running.
+* **Commands:**
+  ```bash
+  ssh luka@192.168.1.110
+  cd ~/docker  # or wherever your docker-compose.yml is located
+  docker compose stop homeassistant
+  ```
 
 ### 2.3 Restore from Backup
 
 Bring the new instance online with your existing configuration.
 
-* **Action:** In a web browser, navigate to the new HAOS instance at `http://192.168.30.7:8123`.
+* **Action:** In a web browser, navigate to the new HAOS instance at `http://192.168.1.144:8123`.
 * **Onboarding:** You will be greeted with the onboarding screen. Select the option to **"Restore from backup"**.
-* **Upload:** Upload the verified `.tar` backup file from your computer. The system will process the file, restore your configuration, and reboot.
+* **Upload:** Upload the verified `.tar` backup file from your computer (downloaded from Google Drive). The system will process the file, restore your configuration, and reboot.
+
+### 2.4 Configure USB Zigbee Coordinator Passthrough
+
+After the restore is complete, you need to pass through the USB Zigbee coordinator stick from the Proxmox host to the HAOS VM.
+
+* **Action:** SSH to the Proxmox host:
+  ```bash
+  ssh ansible_user@192.168.1.128
+  ```
+
+* **Find the USB device:**
+  ```bash
+  lsusb
+  ```
+  Look for your Zigbee coordinator in the output. Example:
+  ```
+  Bus 001 Device 003: ID 1a86:55d4 QinHeng Electronics USB Single Serial
+  ```
+  Note the `vendor:product` ID (e.g., `1a86:55d4`).
+
+* **Pass through the USB device to the HAOS VM:**
+  ```bash
+  sudo qm set 102 --usb0 host=VENDOR_ID:PRODUCT_ID
+  # Example: sudo qm set 102 --usb0 host=1a86:55d4
+  ```
+
+* **Reboot the HAOS VM:**
+  ```bash
+  sudo qm reboot 102
+  ```
+
+* **Verification:** After the VM reboots, the USB Zigbee stick will appear in Home Assistant at `/dev/ttyUSB0`. Your ZHA (Zigbee Home Automation) integration should automatically reconnect to it.
 
 ---
 ## 3. Post-Migration Validation
@@ -61,13 +111,16 @@ After the HAOS VM reboots, verify that the migration was successful and clean up
 
 ### 3.1 Verify Integrations
 
-* **Action:** Log in to your new Home Assistant instance.
-* **Verification:** Navigate to **Settings > Devices & Services**. Check that all key integrations have loaded without errors, especially MQTT. Ensure you can see and control your Zigbee devices, confirming the connection to Zigbee2MQTT is active.
+* **Action:** Log in to your new Home Assistant instance at `http://192.168.1.144:8123`.
+* **Verification:** Navigate to **Settings > Devices & Services**. Check that all key integrations have loaded without errors:
+  * **MQTT:** Should be connected to `192.168.1.110` (rpi4)
+  * **ZHA (Zigbee Home Automation):** Should show the USB coordinator at `/dev/ttyUSB0` and all your Zigbee devices
+  * Test controlling some devices to confirm everything works
 
 ### 3.2 Update Network Clients
 
 * **Action:** Any device or application that connects to Home Assistant by IP address must be updated.
-* **Verification:** Update the Home Assistant mobile app on your phone and any other clients to point to the new IP address: `192.168.30.7`.
+* **Verification:** Update the Home Assistant mobile app on your phone and any other clients to point to the new IP address: `192.168.1.144` (temporary, will change to `192.168.30.7` after VLAN migration).
 
 ### 3.3 Decommission Old Container
 
