@@ -1,0 +1,116 @@
+---
+# Playbook to configure AdGuard Home DNS server
+#
+# Usage:
+#   ansible-playbook configure-adguard.yml --ask-vault-pass
+#
+# This playbook:
+# 1. Installs AdGuard Home on the target host
+# 2. Configures upstream DNS (DoH/DoT to Cloudflare)
+# 3. Sets up filtering and security features
+# 4. Starts the AdGuard Home service
+#
+# Prerequisites:
+# - Target host must be in inventory (adguard_hosts group)
+# - Host must be accessible via SSH
+# - For LXC: Run provision-lxc.yml first to create the container
+
+- name: Configure AdGuard Home
+  hosts: adguard_hosts
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Display deployment information
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Deploying AdGuard Home DNS Server"
+          - "=============================================="
+          - ""
+          - "Target Host: {{ inventory_hostname }}"
+          - "IP Address: {{ ansible_host }}"
+          - "Role: {{ 'Primary' if inventory_hostname == 'adguard' else 'Secondary' }}"
+          - ""
+          - "Configuration:"
+          - "  - Upstream: DoH to Cloudflare (primary)"
+          - "  - Fallback: DoT to Cloudflare"
+          - "  - DNS Port: 53"
+          - "  - Web UI Port: 3000"
+          - "  - DHCP: Disabled (router handles DHCP)"
+          - ""
+          - "Starting deployment..."
+          - "=============================================="
+
+    - name: Apply AdGuard Home role
+      ansible.builtin.include_role:
+        name: adguard
+
+- name: Post-deployment instructions
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Display next steps
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "AdGuard Home Deployment Complete!"
+          - "=============================================="
+          - ""
+          - "Next Steps:"
+          - ""
+          - "1. Complete Initial Setup"
+          - "   ────────────────────────────────────────"
+          - "   Primary:   http://192.168.1.145:3000"
+          - "   Secondary: http://192.168.1.110:3000 (after rpi4 deployment)"
+          - ""
+          - "   Follow the setup wizard to:"
+          - "   - Create admin credentials"
+          - "   - Configure admin interface port (leave as 3000)"
+          - "   - Set DNS port (leave as 53)"
+          - ""
+          - "2. Test DNS Resolution"
+          - "   ────────────────────────────────────────"
+          - "   From your computer:"
+          - "     nslookup google.com 192.168.1.145"
+          - "     nslookup doubleclick.net 192.168.1.145  # Should be blocked"
+          - ""
+          - "3. Configure Your Router"
+          - "   ────────────────────────────────────────"
+          - "   Update DHCP DNS settings to:"
+          - "     Primary DNS:   192.168.1.145 (AdGuard Primary)"
+          - "     Secondary DNS: 192.168.1.110 (AdGuard Secondary - deploy first)"
+          - ""
+          - "   Or for immediate testing, manually set DNS on one device:"
+          - "   - Open Network Settings"
+          - "   - Set DNS Server to: 192.168.1.145"
+          - "   - Test by visiting websites"
+          - ""
+          - "4. Verify Encrypted Upstream DNS"
+          - "   ────────────────────────────────────────"
+          - "   In AdGuard Web UI:"
+          - "   - Go to Settings → DNS Settings"
+          - "   - Check 'Upstream DNS servers' shows:"
+          - "     https://dns.cloudflare.com/dns-query"
+          - "     tls://1.1.1.1"
+          - "     tls://1.0.0.1"
+          - ""
+          - "5. Enable Additional Blocklists (Optional)"
+          - "   ────────────────────────────────────────"
+          - "   - Go to Filters → DNS blocklists"
+          - "   - Add custom lists as needed"
+          - "   - Recommended: OISD Blocklist (https://oisd.nl)"
+          - ""
+          - "6. Deploy Secondary AdGuard (rpi4)"
+          - "   ────────────────────────────────────────"
+          - "   After updating rpi4 OS:"
+          - "     ansible-playbook configure-adguard-rpi4.yml"
+          - ""
+          - "Security Notes:"
+          - "  - All DNS queries to upstream encrypted (DoH/DoT)"
+          - "  - ISP cannot see your DNS queries"
+          - "  - Ads and trackers blocked at network level"
+          - "  - Safe Browsing enabled (malware protection)"
+          - ""
+          - "=============================================="

@@ -1,0 +1,63 @@
+---
+# AdGuard Home role defaults
+
+# Installation
+adguard_version: "v0.107.67"  # Latest stable release
+adguard_install_dir: "/opt/adguardhome"
+adguard_work_dir: "/var/lib/adguardhome"
+adguard_config_dir: "/etc/adguardhome"
+
+# Network configuration
+adguard_bind_host: "0.0.0.0"
+adguard_bind_port: 3000  # Web UI port
+adguard_dns_port: 53  # DNS port
+
+# Upstream DNS servers (encrypted)
+# Primary: DoH to Cloudflare for maximum privacy
+# Fallback: DoT to Cloudflare if HTTPS fails
+adguard_upstream_dns:
+  - "https://dns.cloudflare.com/dns-query"  # Cloudflare DoH (primary)
+  - "tls://1.1.1.1"  # Cloudflare DoT (fallback)
+  - "tls://1.0.0.1"  # Cloudflare DoT (fallback)
+
+# Bootstrap DNS (plain DNS used to resolve DoH/DoT hostnames)
+adguard_bootstrap_dns:
+  - "1.1.1.1"
+  - "1.0.0.1"
+
+# Fallback DNS (plain DNS, used if all encrypted methods fail)
+adguard_fallback_dns:
+  - "1.1.1.1"
+  - "1.0.0.1"
+
+# AdGuard configuration
+adguard_querylog_enabled: true
+adguard_querylog_interval: "2160h"  # 90 days
+adguard_statistics_interval: "2160h"  # 90 days
+
+# Filtering
+adguard_filtering_enabled: true
+adguard_safebrowsing_enabled: true
+adguard_parental_enabled: false
+adguard_safesearch_enabled: false
+
+# DHCP (disabled - router handles DHCP)
+adguard_dhcp_enabled: false
+
+# Rate limiting
+adguard_ratelimit: 20  # requests per second per client
+
+# Service management
+adguard_service_enabled: true
+adguard_service_state: started
+
+# Deployment method: 'native' or 'docker'
+adguard_deployment_method: "native"
+
+# Docker-specific configuration (when deployment_method is 'docker')
+adguard_docker_dir: "/srv/docker/adguard"
+adguard_docker_image: "adguard/adguardhome"
+adguard_docker_image_tag: "{{ adguard_version }}"
+adguard_docker_container_name: "adguard"
+adguard_docker_network: "adguard"
+adguard_docker_hostname: "adguard"

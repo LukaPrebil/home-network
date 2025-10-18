@@ -1,0 +1,8 @@
+---
+# AdGuard Home handlers
+
+- name: Restart AdGuard Home
+  ansible.builtin.systemd:
+    name: AdGuardHome
+    state: restarted
+    daemon_reload: yes

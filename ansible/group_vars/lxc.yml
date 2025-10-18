@@ -82,6 +82,28 @@ lxc_containers:
     gpu_passthrough: false
     nfs_docker_volumes: false
 
+  - name: adguard
+    vmid: 203
+    node: n5p
+    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.145  # Temporary IP (will migrate to 192.168.30.9 when VLANs are active)
+    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    netmask: 24
+    cores: 2
+    memory: 1024  # 1GB in MB (DNS service is lightweight)
+    swap: 512  # 512MB swap
+    disk: 8  # 8GB root disk (minimal storage needed)
+    storage: truenas-vms
+    description: "AdGuard Home - DNS filtering and ad blocking (Primary)"
+    unprivileged: true  # Use unprivileged container (more secure)
+    features:
+      - keyctl=1   # Required for systemd
+    onboot: true  # Start on Proxmox boot - critical service
+    # No Docker needed (native binary installation)
+    gpu_passthrough: false
+    nfs_docker_volumes: false
+
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:
   cores: 2

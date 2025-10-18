@@ -1,0 +1,38 @@
+---
+# AdGuard Home main task file
+# Routes to appropriate deployment method (native or docker)
+
+- name: Display deployment method
+  ansible.builtin.debug:
+    msg: "Deploying AdGuard Home using {{ adguard_deployment_method }} method"
+
+- name: Include native installation tasks
+  ansible.builtin.include_tasks: native.yml
+  when: adguard_deployment_method == "native"
+
+- name: Include Docker deployment tasks
+  ansible.builtin.include_tasks: docker.yml
+  when: adguard_deployment_method == "docker"
+
+- name: Display AdGuard Home access information
+  ansible.builtin.debug:
+    msg:
+      - "=============================================="
+      - "AdGuard Home installed successfully!"
+      - "=============================================="
+      - ""
+      - "Deployment method: {{ adguard_deployment_method }}"
+      - "Web UI: http://{{ ansible_host }}:{{ adguard_bind_port }}"
+      - "DNS Server: {{ ansible_host }}:{{ adguard_dns_port }}"
+      - ""
+      - "Initial setup:"
+      - "1. Open the web UI in your browser"
+      - "2. Follow the setup wizard"
+      - "3. Create admin credentials"
+      - "4. Configure DNS settings on your router:"
+      - "   Primary DNS: {{ ansible_host }}"
+      - "   Secondary DNS: (other AdGuard instance)"
+      - ""
+      - "Test DNS resolution:"
+      - "  nslookup google.com {{ ansible_host }}"
+      - "=============================================="

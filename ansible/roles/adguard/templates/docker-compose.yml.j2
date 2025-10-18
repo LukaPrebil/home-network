@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  {{ adguard_docker_container_name }}:
+    image: {{ adguard_docker_image }}:{{ adguard_docker_image_tag }}
+    container_name: {{ adguard_docker_container_name }}
+    restart: unless-stopped
+    hostname: {{ adguard_docker_hostname }}
+    ports:
+      - "{{ adguard_dns_port }}:53/tcp"      # DNS
+      - "{{ adguard_dns_port }}:53/udp"      # DNS
+      - "{{ adguard_bind_port }}:3000/tcp"   # Web UI (initial setup)
+      - "80:80/tcp"                          # Web UI (after setup)
+      - "443:443/tcp"                        # Web UI HTTPS (after setup)
+      - "853:853/tcp"                        # DNS-over-TLS
+    volumes:
+      - ./work:/opt/adguardhome/work
+      - ./conf:/opt/adguardhome/conf
+    environment:
+      - TZ=Europe/Ljubljana
+    networks:
+      - {{ adguard_docker_network }}
+
+networks:
+  {{ adguard_docker_network }}:
+    name: {{ adguard_docker_network }}

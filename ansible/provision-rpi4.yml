@@ -1,0 +1,117 @@
+---
+# Playbook to provision Raspberry Pi 4 as a service host
+#
+# Usage:
+#   ansible-playbook provision-rpi4.yml
+#
+# Prerequisites:
+# - Fresh Raspberry Pi OS installed on rpi4
+# - SSH access configured
+# - rpi4 added to inventory
+#
+# This playbook:
+# 1. Applies common role (users, SSH hardening, timezone)
+# 2. Installs Docker and Docker Compose
+# 3. Prepares directory structure for services
+# 4. Does NOT start services (use configure-rpi4-services.yml for that)
+
+- name: Provision Raspberry Pi 4 platform
+  hosts: rpi4
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Display provisioning information
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Provisioning Raspberry Pi 4"
+          - "=============================================="
+          - ""
+          - "Target: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Architecture: {{ ansible_architecture }}"
+          - ""
+          - "This will:"
+          - "  1. Configure users and SSH hardening"
+          - "  2. Install Docker and Docker Compose"
+          - "  3. Set up directory structure"
+          - "  4. Configure system settings"
+          - ""
+          - "Services will be deployed separately with:"
+          - "  ansible-playbook configure-rpi4-services.yml"
+          - ""
+          - "Starting provisioning..."
+          - "=============================================="
+
+- name: Apply common role
+  hosts: rpi4
+  become: true
+  gather_facts: true
+  roles:
+    - common
+
+- name: Install Docker
+  hosts: rpi4
+  become: true
+  gather_facts: true
+  roles:
+    - docker
+
+- name: Prepare service directories
+  hosts: rpi4
+  become: true
+  gather_facts: true
+
+  vars:
+    rpi4_services_dir: "/srv/docker"
+    rpi4_services:
+      - adguard
+      - mosquitto
+
+  tasks:
+    - name: Create base services directory
+      ansible.builtin.file:
+        path: "{{ rpi4_services_dir }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create individual service directories
+      ansible.builtin.file:
+        path: "{{ rpi4_services_dir }}/{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      loop: "{{ rpi4_services:}}"
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg:
+          - "=============================================="
+          - "Raspberry Pi 4 Provisioning Complete!"
+          - "=============================================="
+          - ""
+          - "Platform Setup:"
+          - "  ✅ Common configuration applied"
+          - "  ✅ Users and SSH configured"
+          - "  ✅ Docker installed"
+          - "  ✅ Service directories created"
+          - ""
+          - "Service directories:"
+          - "{% for service in rpi4_services %}  - {{ rpi4_services_dir }}/{{ service }}{% endfor %}"
+          - ""
+          - "Next Steps:"
+          - "1. Deploy services:"
+          - "   ansible-playbook configure-rpi4-services.yml"
+          - ""
+          - "2. Verify Docker:"
+          - "   ssh {{ ansible_user }}@{{ ansible_host }} docker ps"
+          - ""
+          - "Planned Services:"
+          - "  - AdGuard Home (Secondary DNS)"
+          - "  - Mosquitto MQTT (Broker)"
+          - "  - (Add more services as needed)"
+          - "=============================================="
