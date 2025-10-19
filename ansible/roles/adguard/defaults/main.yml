@@ -14,25 +14,23 @@ adguard_dns_port: 53  # DNS port
 
 # Upstream DNS servers (encrypted)
 # Primary: DoH to Cloudflare for maximum privacy
-# Fallback: DoT to Cloudflare if HTTPS fails
 adguard_upstream_dns:
   - "https://dns.cloudflare.com/dns-query"  # Cloudflare DoH (primary)
-  - "tls://1.1.1.1"  # Cloudflare DoT (fallback)
-  - "tls://1.0.0.1"  # Cloudflare DoT (fallback)
 
 # Bootstrap DNS (plain DNS used to resolve DoH/DoT hostnames)
 adguard_bootstrap_dns:
   - "1.1.1.1"
   - "1.0.0.1"
 
-# Fallback DNS (plain DNS, used if all encrypted methods fail)
+# Fallback DNS (encrypted DoT, used if DoH fails)
 adguard_fallback_dns:
-  - "1.1.1.1"
-  - "1.0.0.1"
+  - "tls://1.1.1.1"  # Cloudflare DoT
+  - "tls://1.0.0.1"  # Cloudflare DoT
 
 # AdGuard configuration
 adguard_querylog_enabled: true
 adguard_querylog_interval: "2160h"  # 90 days
+adguard_querylog_anonymize_client_ip: true  # Anonymize client IPs in query logs
 adguard_statistics_interval: "2160h"  # 90 days
 
 # Filtering
@@ -61,3 +59,50 @@ adguard_docker_image_tag: "{{ adguard_version }}"
 adguard_docker_container_name: "adguard"
 adguard_docker_network: "adguard"
 adguard_docker_hostname: "adguard"
+
+# DNS Rewrites - Local hostname to IP mappings
+# These provide convenient hostnames for all devices on the network
+adguard_dns_rewrites:
+  # Infrastructure
+  - domain: "n5p.lan"
+    answer: "192.168.1.128"
+  - domain: "gateway.lan"
+    answer: "192.168.1.1"
+
+  # Storage & VMs
+  - domain: "truenas.lan"
+    answer: "192.168.1.150"
+  - domain: "tn-storage.lan"
+    answer: "192.168.1.150"
+  - domain: "containers.lan"
+    answer: "192.168.1.140"
+
+  # Services
+  - domain: "haos.lan"
+    answer: "192.168.1.144"
+  - domain: "homeassistant.lan"
+    answer: "192.168.1.144"
+  - domain: "immich.lan"
+    answer: "192.168.1.141"
+  - domain: "photos.lan"
+    answer: "192.168.1.141"
+  - domain: "traefik.lan"
+    answer: "192.168.1.142"
+  - domain: "omada.lan"
+    answer: "192.168.1.143"
+
+  # DNS Servers
+  - domain: "adguard.lan"
+    answer: "192.168.1.145"
+  - domain: "adguard-primary.lan"
+    answer: "192.168.1.145"
+  - domain: "adguard-secondary.lan"
+    answer: "192.168.1.110"
+  - domain: "dns1.lan"
+    answer: "192.168.1.145"
+  - domain: "dns2.lan"
+    answer: "192.168.1.110"
+
+  # Raspberry Pis
+  - domain: "rpi4.lan"
+    answer: "192.168.1.110"

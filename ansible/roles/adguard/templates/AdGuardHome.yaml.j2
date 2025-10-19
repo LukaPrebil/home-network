@@ -24,6 +24,9 @@ dns:
     - {{ adguard_bind_host }}
   port: {{ adguard_dns_port }}
 
+  # Anonymize client IPs in query logs for privacy
+  anonymize_client_ip: {{ adguard_querylog_anonymize_client_ip | lower }}
+
   # Upstream DNS servers (encrypted for privacy)
   upstream_dns:
 {% for upstream in adguard_upstream_dns %}
@@ -76,9 +79,6 @@ dns:
   # Local PTR resolving
   use_private_ptr_resolvers: true
   local_ptr_upstreams: []
-
-  # Rewrites
-  rewrites: []
 
   # Blocked services
   blocked_services:
@@ -183,6 +183,13 @@ filtering:
     yandex: true
     youtube: true
 
+  # DNS Rewrites - Local hostname to IP mappings
+  rewrites:
+{% for rewrite in adguard_dns_rewrites %}
+    - domain: {{ rewrite.domain }}
+      answer: {{ rewrite.answer }}
+{% endfor %}
+
 clients:
   runtime_sources:
     whois: true
@@ -206,4 +213,4 @@ os:
   user: ""
   rlimit_nofile: 0
 
-schema_version: 29
+schema_version: 30

@@ -31,6 +31,18 @@
     dest: "{{ adguard_docker_dir }}/docker-compose.yml"
     mode: '0644'
 
+- name: Check if AdGuard container is running
+  community.docker.docker_container_info:
+    name: "{{ adguard_docker_container_name }}"
+  register: adguard_container_info
+  ignore_errors: true
+
+- name: Stop AdGuard Home container if running (to update config)
+  community.docker.docker_compose_v2:
+    project_src: "{{ adguard_docker_dir }}"
+    state: stopped
+  when: adguard_container_info.exists | default(false)
+
 - name: Create AdGuard configuration file
   ansible.builtin.template:
     src: AdGuardHome.yaml.j2
