@@ -1,0 +1,9 @@
+# DNS configuration managed by Ansible
+# DO NOT EDIT MANUALLY - Changes will be overwritten
+# Generated on {{ ansible_date_time.iso8601 }}
+
+{% for nameserver in dns_servers %}
+nameserver {{ nameserver }}
+{% endfor %}
+
+search {{ domain }}

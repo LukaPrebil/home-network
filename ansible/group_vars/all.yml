@@ -4,13 +4,11 @@
 # Network configuration
 domain: home.local
 dns_servers:
-  - 1.1.1.1        # Cloudflare DNS (primary)
-  - 1.0.0.1        # Cloudflare DNS (secondary)
-  - 2606:4700:4700::1111
-  - 2606:4700:4700::1001
-  # Future: Will add AdGuard Home servers when deployed
-  # - 192.168.30.6  # rpi2 - AdGuard Home (Primary)
-  # - 192.168.30.2  # n5p - AdGuard Home (Secondary)
+  - 192.168.1.145  # AdGuard Home (Primary - LXC on n5p)
+  - 192.168.1.110  # AdGuard Home (Secondary - Docker on rpi4)
+  # Fallback to Cloudflare if both AdGuard servers are down
+  - 1.1.1.1        # Cloudflare DNS (fallback)
+  - 1.0.0.1        # Cloudflare DNS (fallback)
 
 # TrueNAS NFS configuration
 truenas_nfs_server: "192.168.1.150"  # Temporary IP (will migrate to 192.168.30.3)

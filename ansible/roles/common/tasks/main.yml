@@ -17,3 +17,7 @@
 - name: Import timezone configuration tasks
   ansible.builtin.import_tasks: timezone.yml
   tags: timezone
+
+- name: Import DNS configuration tasks
+  ansible.builtin.import_tasks: dns.yml
+  tags: dns

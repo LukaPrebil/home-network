@@ -1,0 +1,25 @@
+---
+# DNS configuration tasks
+# Configures system DNS resolvers to use AdGuard Home
+
+- name: Check if resolv.conf is a symlink
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+  register: resolv_conf_stat
+  when: ansible_os_family == "Debian"
+
+- name: Remove resolv.conf symlink if present
+  ansible.builtin.file:
+    path: /etc/resolv.conf
+    state: absent
+  when:
+    - ansible_os_family == "Debian"
+    - resolv_conf_stat.stat.islnk is defined
+    - resolv_conf_stat.stat.islnk
+
+- name: Create resolv.conf with AdGuard DNS servers
+  ansible.builtin.template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+    mode: '0644'
+  when: ansible_os_family == "Debian"
