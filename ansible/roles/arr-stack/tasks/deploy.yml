@@ -1,0 +1,35 @@
+---
+# Deploy Arr Stack
+
+- name: Deploy arr-stack docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ arr_compose_file }}"
+    mode: '0644'
+  notify: Restart Arr Stack
+  tags:
+    - arr-stack
+    - deploy
+
+- name: Start Arr Stack services
+  community.docker.docker_compose_v2:
+    project_src: "{{ arr_compose_dir }}"
+    state: present
+  register: arr_deploy
+  tags:
+    - arr-stack
+    - deploy
+
+- name: Display Arr Stack deployment status
+  ansible.builtin.debug:
+    msg: |
+      Arr Stack services {{ 'deployed' if arr_deploy.changed else 'already running' }}:
+      - Prowlarr: http://{{ ansible_host }}:{{ prowlarr_port }}
+      - Sonarr: http://{{ ansible_host }}:{{ sonarr_port }}
+      - Radarr: http://{{ ansible_host }}:{{ radarr_port }}
+      - Bazarr: http://{{ ansible_host }}:{{ bazarr_port }}
+      - qBittorrent: http://{{ ansible_host }}:{{ qbittorrent_port_web }}
+      - Overseerr: http://{{ ansible_host }}:{{ overseerr_port }}
+  tags:
+    - arr-stack
+    - deploy

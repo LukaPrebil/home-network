@@ -122,3 +122,27 @@ nfs_shares:
       - async  # Better performance for photo library
       - no_subtree_check
       - no_root_squash  # Immich container needs root access
+
+  # Separate pool for Plex and arr stack application configs
+  - path: "/mnt/plex-apps"
+    name: plex-apps
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - sync
+      - no_subtree_check
+      - no_root_squash  # Docker containers need root access
+
+  # Separate pool for Plex media library (movies, TV shows, downloads)
+  - path: "/mnt/plex-bulk"
+    name: plex-bulk
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - async  # Better performance for media streaming
+      - no_subtree_check
+      - no_root_squash  # Plex and arr containers need root access

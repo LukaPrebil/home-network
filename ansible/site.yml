@@ -42,3 +42,21 @@
   roles:
     - docker
     - monitoring-stack
+
+- name: Deploy Plex Media Server
+  hosts: plex_hosts
+  become: true
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - plex
+
+- name: Deploy Arr Stack (Sonarr, Radarr, Prowlarr, etc.)
+  hosts: arr_stack_hosts
+  become: true
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - arr-stack

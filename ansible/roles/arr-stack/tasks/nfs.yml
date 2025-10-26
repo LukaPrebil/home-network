@@ -1,0 +1,56 @@
+---
+# Mount plex-bulk NFS share for arr stack
+
+- name: Install NFS client packages
+  ansible.builtin.apt:
+    name:
+      - nfs-common
+    state: present
+  tags:
+    - arr-stack
+    - setup
+
+- name: Ensure plex-bulk mount point exists
+  ansible.builtin.file:
+    path: "{{ arr_media_dir }}"
+    state: directory
+    mode: '0755'
+  tags:
+    - arr-stack
+    - setup
+
+- name: Check if plex-bulk is already mounted
+  ansible.builtin.command: mountpoint -q {{ arr_media_dir }}
+  register: plex_bulk_mounted
+  failed_when: false
+  changed_when: false
+  tags:
+    - arr-stack
+    - setup
+
+- name: Mount TrueNAS plex-bulk NFS share
+  ansible.posix.mount:
+    path: "{{ arr_media_dir }}"
+    src: "{{ truenas_nfs_server }}:{{ truenas_plex_bulk_share }}"
+    fstype: nfs
+    opts: defaults,nofail,_netdev
+    state: mounted
+  when: plex_bulk_mounted.rc != 0
+  tags:
+    - arr-stack
+    - setup
+
+- name: Verify plex-bulk storage is accessible
+  ansible.builtin.command: df -h {{ arr_media_dir }}
+  register: plex_bulk_df
+  changed_when: false
+  tags:
+    - arr-stack
+    - setup
+
+- name: Display plex-bulk mount info
+  ansible.builtin.debug:
+    msg: "{{ plex_bulk_df.stdout_lines }}"
+  tags:
+    - arr-stack
+    - setup

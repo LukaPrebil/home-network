@@ -1,0 +1,20 @@
+---
+# Arr Stack deployment tasks
+
+- name: Include NFS mount tasks
+  ansible.builtin.include_tasks: nfs.yml
+  tags:
+    - arr-stack
+    - setup
+
+- name: Include directory setup tasks
+  ansible.builtin.include_tasks: directories.yml
+  tags:
+    - arr-stack
+    - setup
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - arr-stack
+    - deploy

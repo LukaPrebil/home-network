@@ -1,0 +1,108 @@
+---
+# Docker Compose file for Arr Stack
+# Managed by Ansible - do not edit manually
+
+services:
+  prowlarr:
+    image: linuxserver/prowlarr:{{ prowlarr_version }}
+    container_name: prowlarr
+    restart: unless-stopped
+    networks:
+      - {{ arr_docker_network }}
+    ports:
+      - "{{ prowlarr_port }}:9696"
+    volumes:
+      - {{ prowlarr_config_dir }}:/config
+    environment:
+      - TZ={{ arr_timezone }}
+      - PUID={{ arr_puid }}
+      - PGID={{ arr_pgid }}
+
+  sonarr:
+    image: linuxserver/sonarr:{{ sonarr_version }}
+    container_name: sonarr
+    restart: unless-stopped
+    networks:
+      - {{ arr_docker_network }}
+    ports:
+      - "{{ sonarr_port }}:8989"
+    volumes:
+      - {{ sonarr_config_dir }}:/config
+      - {{ media_tv_dir }}:/tv
+      - {{ media_downloads_dir }}:/downloads
+    environment:
+      - TZ={{ arr_timezone }}
+      - PUID={{ arr_puid }}
+      - PGID={{ arr_pgid }}
+
+  radarr:
+    image: linuxserver/radarr:{{ radarr_version }}
+    container_name: radarr
+    restart: unless-stopped
+    networks:
+      - {{ arr_docker_network }}
+    ports:
+      - "{{ radarr_port }}:7878"
+    volumes:
+      - {{ radarr_config_dir }}:/config
+      - {{ media_movies_dir }}:/movies
+      - {{ media_downloads_dir }}:/downloads
+    environment:
+      - TZ={{ arr_timezone }}
+      - PUID={{ arr_puid }}
+      - PGID={{ arr_pgid }}
+
+  bazarr:
+    image: linuxserver/bazarr:{{ bazarr_version }}
+    container_name: bazarr
+    restart: unless-stopped
+    networks:
+      - {{ arr_docker_network }}
+    ports:
+      - "{{ bazarr_port }}:6767"
+    volumes:
+      - {{ bazarr_config_dir }}:/config
+      - {{ media_movies_dir }}:/movies
+      - {{ media_tv_dir }}:/tv
+    environment:
+      - TZ={{ arr_timezone }}
+      - PUID={{ arr_puid }}
+      - PGID={{ arr_pgid }}
+
+  qbittorrent:
+    image: linuxserver/qbittorrent:{{ qbittorrent_version }}
+    container_name: qbittorrent
+    restart: unless-stopped
+    networks:
+      - {{ arr_docker_network }}
+    ports:
+      - "{{ qbittorrent_port_web }}:8080"  # Web UI
+      - "{{ qbittorrent_port_bt }}:6881/tcp"  # BitTorrent
+      - "{{ qbittorrent_port_bt }}:6881/udp"  # BitTorrent
+    volumes:
+      - {{ qbittorrent_config_dir }}:/config
+      - {{ media_downloads_dir }}:/downloads
+    environment:
+      - TZ={{ arr_timezone }}
+      - PUID={{ arr_puid }}
+      - PGID={{ arr_pgid }}
+      - WEBUI_PORT=8080
+
+  overseerr:
+    image: linuxserver/overseerr:{{ overseerr_version }}
+    container_name: overseerr
+    restart: unless-stopped
+    networks:
+      - {{ arr_docker_network }}
+    ports:
+      - "{{ overseerr_port }}:5055"
+    volumes:
+      - {{ overseerr_config_dir }}:/config
+    environment:
+      - TZ={{ arr_timezone }}
+      - PUID={{ arr_puid }}
+      - PGID={{ arr_pgid }}
+
+networks:
+  {{ arr_docker_network }}:
+    driver: bridge

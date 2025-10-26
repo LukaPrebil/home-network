@@ -1,0 +1,42 @@
+---
+# Create directories for Arr Stack
+
+- name: Create arr-stack compose directory
+  ansible.builtin.file:
+    path: "{{ arr_compose_dir }}"
+    state: directory
+    mode: '0755'
+  tags:
+    - arr-stack
+    - setup
+
+- name: Create arr stack config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ prowlarr_config_dir }}"
+    - "{{ sonarr_config_dir }}"
+    - "{{ radarr_config_dir }}"
+    - "{{ bazarr_config_dir }}"
+    - "{{ qbittorrent_config_dir }}"
+    - "{{ overseerr_config_dir }}"
+  tags:
+    - arr-stack
+    - setup
+
+- name: Ensure media library directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ media_movies_dir }}"
+    - "{{ media_tv_dir }}"
+    - "{{ media_downloads_dir }}"
+    - "{{ media_downloads_dir }}/movies"
+    - "{{ media_downloads_dir }}/tv"
+  tags:
+    - arr-stack
+    - setup

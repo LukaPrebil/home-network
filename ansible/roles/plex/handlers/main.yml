@@ -1,0 +1,7 @@
+---
+# Plex Media Server handlers
+
+- name: Restart Plex
+  community.docker.docker_compose_v2:
+    project_src: "{{ plex_compose_dir }}"
+    state: restarted

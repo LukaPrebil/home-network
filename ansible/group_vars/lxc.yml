@@ -133,6 +133,36 @@ lxc_containers:
     # NFS storage for metrics and logs data
     nfs_docker_volumes: true
 
+  - name: plex
+    vmid: 205
+    node: n5p
+    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.147  # Temporary IP (will migrate to 192.168.30.11 when VLANs are active)
+    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    netmask: 24
+    cores: 4
+    memory: 8192  # 8GB in MB (Plex transcoding can be memory-intensive)
+    swap: 2048  # 2GB swap
+    disk: 32  # 32GB root disk (Plex metadata cache)
+    storage: truenas-vms
+    description: "Plex Media Server - streaming with AMD GPU hardware transcoding"
+    unprivileged: true  # Use unprivileged container (more secure)
+    features:
+      - nesting=1  # Required for Docker inside LXC
+      - keyctl=1   # Required for systemd
+      - fuse=1     # Required for FUSE filesystems
+      - mknod=1    # Required for NFS mounts
+    onboot: true  # Start on Proxmox boot
+    # GPU passthrough for hardware transcoding (AMD 890M)
+    gpu_passthrough: true
+    gpu_device: /dev/dri  # AMD iGPU device (card0 + renderD128)
+    # Plex uses custom NFS mounts (not standard docker-volumes)
+    nfs_docker_volumes: false
+    # Custom NFS mounts for Plex
+    nfs_plex_apps: true   # Mount plex-apps pool for config
+    nfs_plex_bulk: true   # Mount plex-bulk pool for media
+
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:
   cores: 2

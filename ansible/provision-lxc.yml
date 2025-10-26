@@ -165,6 +165,67 @@
         - item.nfs_docker_volumes | default(false)
       become: true
 
+    - name: Check if any containers need Plex NFS mounts
+      ansible.builtin.set_fact:
+        need_plex_apps_mount: "{{ containers_to_create | selectattr('nfs_plex_apps', 'defined') | selectattr('nfs_plex_apps', 'equalto', true) | list | length > 0 }}"
+        need_plex_bulk_mount: "{{ containers_to_create | selectattr('nfs_plex_bulk', 'defined') | selectattr('nfs_plex_bulk', 'equalto', true) | list | length > 0 }}"
+
+    - name: Ensure NFS mount point exists on Proxmox host for plex-apps
+      ansible.builtin.file:
+        path: /mnt/pve/plex-apps
+        state: directory
+        mode: '0755'
+      become: true
+      when: need_plex_apps_mount | default(false)
+
+    - name: Mount TrueNAS plex-apps NFS share on Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/plex-apps
+        src: "{{ truenas_nfs_server }}:{{ truenas_plex_apps_share }}"
+        fstype: nfs
+        opts: defaults,nofail,_netdev
+        state: mounted
+      become: true
+      when: need_plex_apps_mount | default(false)
+
+    - name: Ensure NFS mount point exists on Proxmox host for plex-bulk
+      ansible.builtin.file:
+        path: /mnt/pve/plex-bulk
+        state: directory
+        mode: '0755'
+      become: true
+      when: need_plex_bulk_mount | default(false)
+
+    - name: Mount TrueNAS plex-bulk NFS share on Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/plex-bulk
+        src: "{{ truenas_nfs_server }}:{{ truenas_plex_bulk_share }}"
+        fstype: nfs
+        opts: defaults,nofail,_netdev
+        state: mounted
+      become: true
+      when: need_plex_bulk_mount | default(false)
+
+    - name: Configure bind mount for plex-apps in containers
+      ansible.builtin.shell:
+        cmd: |
+          pct set {{ item.vmid }} -mp0 /mnt/pve/plex-apps,mp=/mnt/plex-apps
+      loop: "{{ containers_to_create }}"
+      when:
+        - containers_to_create | length > 0
+        - item.nfs_plex_apps | default(false)
+      become: true
+
+    - name: Configure bind mount for plex-bulk in containers
+      ansible.builtin.shell:
+        cmd: |
+          pct set {{ item.vmid }} -mp1 /mnt/pve/plex-bulk,mp=/mnt/plex-bulk
+      loop: "{{ containers_to_create }}"
+      when:
+        - containers_to_create | length > 0
+        - item.nfs_plex_bulk | default(false)
+      become: true
+
 - name: Add new containers to in-memory inventory
   hosts: localhost
   gather_facts: false

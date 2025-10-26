@@ -1,0 +1,52 @@
+---
+# Arr Stack role default variables
+
+# Component versions (using linuxserver.io images)
+prowlarr_version: "latest"
+sonarr_version: "latest"
+radarr_version: "latest"
+bazarr_version: "latest"
+qbittorrent_version: "latest"
+overseerr_version: "latest"
+
+# Base directories
+arr_base_dir: "/srv/docker"  # NFS mount for configs (docker-volumes on TrueNAS)
+arr_media_dir: "/mnt/plex-bulk"  # NFS mount for media (plex-bulk pool on TrueNAS)
+
+# Config directories
+prowlarr_config_dir: "{{ arr_base_dir }}/prowlarr"
+sonarr_config_dir: "{{ arr_base_dir }}/sonarr"
+radarr_config_dir: "{{ arr_base_dir }}/radarr"
+bazarr_config_dir: "{{ arr_base_dir }}/bazarr"
+qbittorrent_config_dir: "{{ arr_base_dir }}/qbittorrent"
+overseerr_config_dir: "{{ arr_base_dir }}/overseerr"
+
+# Docker Compose configuration
+arr_compose_dir: "/opt/arr-stack"
+arr_compose_file: "{{ arr_compose_dir }}/docker-compose.yml"
+
+# Port configuration
+prowlarr_port: 9696
+sonarr_port: 8989
+radarr_port: 7878
+bazarr_port: 6767
+qbittorrent_port_web: 8080
+qbittorrent_port_bt: 6881
+overseerr_port: 5055
+
+# Media library structure
+media_movies_dir: "{{ arr_media_dir }}/movies"
+media_tv_dir: "{{ arr_media_dir }}/tv"
+media_downloads_dir: "{{ arr_media_dir }}/downloads"
+
+# Docker network
+arr_docker_network: "arr-stack"
+
+# Timezone
+arr_timezone: "{{ timezone | default('UTC') }}"
+
+# PUID/PGID for linuxserver.io containers
+# For VMs: Use standard user IDs
+# For LXC: Use root (UID 0) due to unprivileged LXC UID mapping
+arr_puid: 0
+arr_pgid: 0
