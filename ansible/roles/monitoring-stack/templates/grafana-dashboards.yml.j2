@@ -1,0 +1,26 @@
+---
+# Grafana dashboard provisioning
+# Managed by Ansible - do not edit manually
+
+apiVersion: 1
+
+providers:
+  - name: 'Default'
+    orgId: 1
+    folder: 'Homelab'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/definitions
+      foldersFromFilesStructure: true
+
+# Note: Dashboard JSON files can be placed in:
+# {{ grafana_data_dir }}/provisioning/dashboards/definitions/
+#
+# Recommended community dashboards to import manually or via automation:
+# - Node Exporter Full (ID: 1860) - For Linux host metrics
+# - Proxmox VE (ID: 10347) - For Proxmox metrics
+# - Docker cAdvisor (ID: 193) - For container metrics
+# - Loki Logs (ID: 13639) - For log exploration

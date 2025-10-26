@@ -1,0 +1,7 @@
+---
+# Handlers for Monitoring Stack role
+
+- name: Restart Monitoring Stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_compose_dir }}"
+    state: restarted

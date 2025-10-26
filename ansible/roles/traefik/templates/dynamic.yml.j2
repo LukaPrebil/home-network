@@ -136,6 +136,22 @@ http:
         - proxy-headers
         - security-headers
 
+    # Grafana Monitoring
+    grafana-secure:
+      rule: "Host(`grafana.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: grafana
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+        - security-headers
+
 {% endif %}
 
   # Services - backend targets
@@ -163,6 +179,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.1.141:2283"
+        passHostHeader: true
+
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.146:3000"
         passHostHeader: true
 {% endif %}
 

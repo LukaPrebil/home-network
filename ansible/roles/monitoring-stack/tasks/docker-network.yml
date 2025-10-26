@@ -1,0 +1,11 @@
+---
+# Create Docker network for monitoring stack
+
+- name: Create monitoring Docker network
+  community.docker.docker_network:
+    name: "{{ monitoring_docker_network }}"
+    state: present
+  tags:
+    - monitoring-stack
+    - docker
+    - network

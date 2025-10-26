@@ -1,0 +1,50 @@
+---
+# Create directories for the monitoring stack
+
+- name: Create monitoring compose directory
+  ansible.builtin.file:
+    path: "{{ monitoring_compose_dir }}"
+    state: directory
+    mode: '0755'
+  tags:
+    - monitoring-stack
+    - setup
+
+- name: Create monitoring directories on Proxmox host (for unprivileged LXCs)
+  ansible.builtin.file:
+    path: "/mnt/pve/truenas-docker/{{ item }}"
+    state: directory
+    mode: '0777'
+  loop:
+    - grafana
+    - grafana/provisioning
+    - grafana/provisioning/datasources
+    - grafana/provisioning/dashboards
+    - prometheus
+    - prometheus/config
+    - loki
+    - loki/config
+  delegate_to: "{{ groups['proxmox_hosts'][0] }}"
+  when: inventory_hostname in groups.get('lxc_containers', [])
+  tags:
+    - monitoring-stack
+    - setup
+
+- name: Create monitoring directories locally (for VMs)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_data_dir }}/provisioning"
+    - "{{ grafana_data_dir }}/provisioning/datasources"
+    - "{{ grafana_data_dir }}/provisioning/dashboards"
+    - "{{ prometheus_data_dir }}"
+    - "{{ prometheus_config_dir }}"
+    - "{{ loki_data_dir }}"
+    - "{{ loki_config_dir }}"
+  when: inventory_hostname not in groups.get('lxc_containers', [])
+  tags:
+    - monitoring-stack
+    - setup

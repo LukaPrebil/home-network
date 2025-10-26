@@ -1,0 +1,104 @@
+// Grafana Alloy configuration
+// Managed by Ansible - do not edit manually
+
+// Logging configuration
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+{% if alloy_collect_host_metrics %}
+// Prometheus - Unix/Node exporter metrics
+prometheus.exporter.unix "host_metrics" {
+  // Collect standard node_exporter metrics
+}
+
+// Scrape the unix exporter metrics
+prometheus.scrape "host_metrics" {
+  targets    = prometheus.exporter.unix.host_metrics.targets
+  forward_to = [prometheus.remote_write.metrics.receiver]
+
+  scrape_interval = "15s"
+
+  clustering {
+    enabled = true
+  }
+}
+{% endif %}
+
+// Prometheus remote write to monitoring stack
+prometheus.remote_write "metrics" {
+  endpoint {
+    url = "{{ prometheus_url }}/api/v1/write"
+
+    // Add labels to identify the source
+    queue_config {
+      capacity             = 10000
+      max_shards           = 10
+      max_samples_per_send = 5000
+    }
+  }
+
+  external_labels = {
+    hostname = "{{ inventory_hostname }}",
+    job      = "alloy",
+  }
+}
+
+// Loki - Log collection from local files
+loki.source.file "system_logs" {
+  targets = [
+{% for log_path in alloy_log_paths %}
+    {__path__ = "{{ log_path }}", job = "system", hostname = "{{ inventory_hostname }}"},
+{% endfor %}
+  ]
+  forward_to = [loki.write.logs.receiver]
+}
+
+{% if docker_installed %}
+// Loki - Docker container logs
+loki.source.docker "docker_logs" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = []
+  forward_to = [loki.process.add_docker_labels.receiver]
+  relabel_rules = loki.relabel.docker.rules
+}
+
+// Add Docker-specific labels
+loki.relabel "docker" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+}
+
+// Process Docker logs to add metadata
+loki.process "add_docker_labels" {
+  forward_to = [loki.write.logs.receiver]
+
+  stage.static_labels {
+    values = {
+      hostname = "{{ inventory_hostname }}",
+      job      = "docker",
+    }
+  }
+}
+{% endif %}
+
+// Loki remote write to monitoring stack
+loki.write "logs" {
+  endpoint {
+    url = "{{ loki_url }}/loki/api/v1/push"
+  }
+
+  external_labels = {
+    hostname = "{{ inventory_hostname }}",
+  }
+}

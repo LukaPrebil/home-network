@@ -1,0 +1,36 @@
+---
+# Main tasks file for Node Exporter role
+
+- name: Install Prometheus Node Exporter
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+  tags:
+    - node-exporter
+    - monitoring
+
+- name: Ensure Node Exporter is enabled and started
+  ansible.builtin.systemd:
+    name: prometheus-node-exporter
+    enabled: yes
+    state: started
+  tags:
+    - node-exporter
+    - monitoring
+
+- name: Check Node Exporter is responding
+  ansible.builtin.uri:
+    url: "http://localhost:{{ node_exporter_port }}/metrics"
+    method: GET
+    status_code: 200
+  register: node_exporter_health
+  until: node_exporter_health.status == 200
+  retries: 5
+  delay: 2
+  changed_when: false
+  tags:
+    - node-exporter
+    - monitoring
+    - healthcheck

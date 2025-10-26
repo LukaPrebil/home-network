@@ -107,6 +107,32 @@ lxc_containers:
     gpu_passthrough: false
     nfs_docker_volumes: false
 
+  - name: monitoring
+    vmid: 204
+    node: n5p
+    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.146  # Temporary IP (will migrate to 192.168.30.10 when VLANs are active)
+    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    netmask: 24
+    cores: 4
+    memory: 8192  # 8GB in MB (Prometheus + Grafana + Loki need memory for time-series data)
+    swap: 2048  # 2GB swap
+    disk: 32  # 32GB root disk (for metrics and log storage on NFS)
+    storage: truenas-vms
+    description: "Monitoring Stack - Prometheus, Grafana, Loki for observability"
+    unprivileged: true  # Use unprivileged container (more secure)
+    features:
+      - nesting=1  # Required for Docker inside LXC
+      - keyctl=1   # Required for systemd
+      - fuse=1     # Required for FUSE filesystems
+      - mknod=1    # Required for NFS mounts
+    onboot: true  # Start on Proxmox boot - critical infrastructure
+    # GPU passthrough not needed for monitoring
+    gpu_passthrough: false
+    # NFS storage for metrics and logs data
+    nfs_docker_volumes: true
+
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:
   cores: 2

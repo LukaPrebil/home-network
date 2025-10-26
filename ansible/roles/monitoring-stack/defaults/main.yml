@@ -1,0 +1,55 @@
+---
+# Monitoring Stack role default variables
+
+# Base directory for monitoring stack
+monitoring_base_dir: "/srv/docker"
+
+# Component-specific directories
+grafana_data_dir: "{{ monitoring_base_dir }}/grafana"
+prometheus_data_dir: "{{ monitoring_base_dir }}/prometheus"
+prometheus_config_dir: "{{ monitoring_base_dir }}/prometheus/config"
+loki_data_dir: "{{ monitoring_base_dir }}/loki"
+loki_config_dir: "{{ monitoring_base_dir }}/loki/config"
+
+# Docker Compose configuration
+monitoring_compose_dir: "/opt/monitoring"
+monitoring_compose_file: "{{ monitoring_compose_dir }}/docker-compose.yml"
+
+# Grafana configuration
+grafana_version: "12.2.0"
+grafana_port: 3000
+grafana_admin_user: "admin"
+grafana_admin_password: "{{ vault_grafana_admin_password }}"
+
+# Prometheus configuration
+prometheus_version: "v3.7.2"
+prometheus_port: 9090
+prometheus_retention: "30d"
+
+# Loki configuration
+loki_version: "3.5.7"
+loki_port: 3100
+loki_retention_days: 30
+
+# cAdvisor configuration
+cadvisor_version: "v0.52.0"
+cadvisor_port: 8080
+
+# Proxmox Exporter configuration
+proxmox_exporter_version: "3.5.5"
+proxmox_exporter_port: 9221
+proxmox_api_url: "https://{{ hostvars['n5p']['ansible_host'] }}:8006"
+proxmox_api_verify_ssl: false
+
+# Omada Exporter configuration
+omada_exporter_version: "0.13.1"
+omada_exporter_port: 9202
+omada_controller_url: "https://{{ hostvars['omada']['ansible_host'] }}:8043"
+omada_site: "Home"
+
+# Docker network
+monitoring_docker_network: "monitoring"
+
+# Traefik integration
+monitoring_domain: "{{ domain | default('home.local') }}"
+grafana_subdomain: "grafana"

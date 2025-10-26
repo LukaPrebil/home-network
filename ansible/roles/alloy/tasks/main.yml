@@ -1,0 +1,147 @@
+---
+# Main tasks file for Grafana Alloy role
+
+- name: Create Alloy directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ alloy_config_dir }}"
+    - "{{ alloy_data_dir }}"
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - unzip
+      - curl
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Check if Docker is installed
+  ansible.builtin.command: which docker
+  register: docker_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Set Docker installed fact
+  ansible.builtin.set_fact:
+    docker_installed: "{{ docker_check.rc == 0 }}"
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Detect system architecture
+  ansible.builtin.set_fact:
+    alloy_arch: "{{ alloy_arch_map[ansible_architecture] | default('amd64') }}"
+    alloy_binary_name: "alloy-linux-{{ alloy_arch_map[ansible_architecture] | default('amd64') }}"
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Set Alloy binary URL
+  ansible.builtin.set_fact:
+    alloy_binary_url: "https://github.com/grafana/alloy/releases/download/v{{ alloy_version }}/{{ alloy_binary_name }}.zip"
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Download Alloy binary
+  ansible.builtin.unarchive:
+    src: "{{ alloy_binary_url }}"
+    dest: "{{ alloy_install_dir }}"
+    remote_src: yes
+    creates: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Make Alloy binary executable
+  ansible.builtin.file:
+    path: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
+    mode: '0755'
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Create Alloy symlink
+  ansible.builtin.file:
+    src: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
+    dest: "{{ alloy_install_dir }}/alloy"
+    state: link
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Deploy Alloy configuration
+  ansible.builtin.template:
+    src: config.alloy.j2
+    dest: "{{ alloy_config_dir }}/config.alloy"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Alloy
+  tags:
+    - alloy
+    - monitoring
+    - logging
+    - config
+
+- name: Deploy Alloy systemd service
+  ansible.builtin.template:
+    src: alloy.service.j2
+    dest: /etc/systemd/system/alloy.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Alloy
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Enable and start Alloy service
+  ansible.builtin.systemd:
+    name: alloy
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Check Alloy is responding
+  ansible.builtin.uri:
+    url: "http://localhost:{{ alloy_listen_port }}/ready"
+    method: GET
+    status_code: 200
+  register: alloy_health
+  until: alloy_health.status == 200
+  retries: 5
+  delay: 2
+  changed_when: false
+  tags:
+    - alloy
+    - monitoring
+    - logging
+    - healthcheck

@@ -1,0 +1,114 @@
+---
+# Docker Compose file for Monitoring Stack
+# Managed by Ansible - do not edit manually
+
+services:
+  prometheus:
+    image: prom/prometheus:{{ prometheus_version }}
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time={{ prometheus_retention }}'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - {{ monitoring_docker_network }}
+    ports:
+      - "{{ prometheus_port }}:9090"
+    volumes:
+      - {{ prometheus_config_dir }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - {{ prometheus_data_dir }}:/prometheus
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+
+  loki:
+    image: grafana/loki:{{ loki_version }}
+    container_name: loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    networks:
+      - {{ monitoring_docker_network }}
+    ports:
+      - "{{ loki_port }}:3100"
+    volumes:
+      - {{ loki_config_dir }}/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - {{ loki_data_dir }}:/loki
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+
+  grafana:
+    image: grafana/grafana:{{ grafana_version }}
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      - {{ monitoring_docker_network }}
+    ports:
+      - "{{ grafana_port }}:3000"
+    volumes:
+      - {{ grafana_data_dir }}:/var/lib/grafana
+      - {{ grafana_data_dir }}/provisioning:/etc/grafana/provisioning
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+      - GF_SECURITY_ADMIN_USER={{ grafana_admin_user }}
+      - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password | replace('$', '$$') }}
+      - GF_INSTALL_PLUGINS=
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:{{ cadvisor_version }}
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    networks:
+      - {{ monitoring_docker_network }}
+    ports:
+      - "{{ cadvisor_port }}:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+
+  proxmox-exporter:
+    image: prompve/prometheus-pve-exporter:{{ proxmox_exporter_version }}
+    container_name: proxmox-exporter
+    restart: unless-stopped
+    networks:
+      - {{ monitoring_docker_network }}
+    ports:
+      - "{{ proxmox_exporter_port }}:9221"
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+      - PVE_URL={{ proxmox_api_url }}
+      - PVE_USER={{ vault_proxmox_api_user }}
+      - PVE_TOKEN_NAME={{ vault_proxmox_api_token_name }}
+      - PVE_TOKEN_VALUE={{ vault_proxmox_api_token_secret | replace('$', '$$') }}
+      - PVE_VERIFY_SSL={{ proxmox_api_verify_ssl | string | lower }}
+
+  omada-exporter:
+    image: chhaley/omada_exporter:{{ omada_exporter_version }}
+    container_name: omada-exporter
+    restart: unless-stopped
+    networks:
+      - {{ monitoring_docker_network }}
+    ports:
+      - "{{ omada_exporter_port }}:9202"
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+      - OMADA_HOST={{ omada_controller_url }}
+      - OMADA_USER={{ vault_omada_controller_user }}
+      - OMADA_PASS={{ vault_omada_controller_password | replace('$', '$$') }}
+      - OMADA_SITE={{ omada_site }}
+      - OMADA_INSECURE=true
+
+networks:
+  {{ monitoring_docker_network }}:
+    external: true

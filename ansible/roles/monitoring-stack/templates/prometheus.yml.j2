@@ -1,0 +1,65 @@
+---
+# Prometheus configuration
+# Managed by Ansible - do not edit manually
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'homelab'
+    environment: 'production'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Proxmox Host metrics via Proxmox Exporter
+  - job_name: 'proxmox'
+    static_configs:
+      - targets: ['proxmox-exporter:9221']
+        labels:
+          instance: 'n5p'
+
+  # Omada Controller metrics
+  - job_name: 'omada'
+    static_configs:
+      - targets: ['omada-exporter:9202']
+        labels:
+          instance: 'omada-controller'
+
+  # Docker container metrics via cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          instance: 'monitoring-lxc'
+
+  # Node Exporter metrics from all hosts with monitoring agents
+  - job_name: 'node-exporter'
+    static_configs:
+{% for host in groups['monitoring_agents'] %}
+      - targets: ['{{ hostvars[host]['ansible_host'] }}:9100']
+        labels:
+          instance: '{{ host }}'
+          type: '{% if host in groups.get('proxmox_hosts', []) %}proxmox{% elif host in groups.get('lxc_containers', []) %}lxc{% elif host in groups.get('docker_hosts', []) %}docker-host{% else %}unknown{% endif %}'
+{% endfor %}
+
+  # Alloy metrics from all hosts running Alloy
+  - job_name: 'alloy'
+    static_configs:
+{% for host in groups['monitoring_agents'] %}
+      - targets: ['{{ hostvars[host]['ansible_host'] }}:12345']
+        labels:
+          instance: '{{ host }}'
+{% endfor %}
+
+  # TrueNAS built-in metrics (manual - enable in TrueNAS UI)
+  # Uncomment when TrueNAS metrics are enabled
+  # - job_name: 'truenas'
+  #   static_configs:
+  #     - targets: ['192.168.1.150:9100']
+  #       labels:
+  #         instance: 'tn-storage'

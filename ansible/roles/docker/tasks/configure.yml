@@ -9,13 +9,33 @@
   loop: "{{ docker_users }}"
   when: docker_users is defined and docker_users | length > 0
 
-- name: Create Docker base directory
+- name: Check if running in LXC container
+  ansible.builtin.stat:
+    path: /proc/1/environ
+  register: proc_environ
+
+- name: Detect LXC environment
+  ansible.builtin.shell: grep -q container=lxc /proc/1/environ
+  register: is_lxc
+  failed_when: false
+  changed_when: false
+  when: proc_environ.stat.exists
+
+- name: Create Docker base directory (with ownership for VMs)
   ansible.builtin.file:
     path: "{{ docker_base_dir }}"
     state: directory
     mode: '0755'
     owner: root
     group: docker
+  when: is_lxc.rc | default(1) != 0
+
+- name: Ensure Docker base directory exists (without ownership for LXCs)
+  ansible.builtin.file:
+    path: "{{ docker_base_dir }}"
+    state: directory
+    mode: '0755'
+  when: is_lxc.rc | default(1) == 0
 
 - name: Configure Docker daemon
   ansible.builtin.copy:

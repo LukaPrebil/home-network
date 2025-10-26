@@ -1,0 +1,33 @@
+---
+# Grafana Alloy role default variables
+
+# Alloy version (check https://github.com/grafana/alloy/releases for latest)
+alloy_version: "1.11.2"
+
+# Alloy installation (architecture is detected automatically)
+alloy_install_dir: "/usr/local/bin"
+alloy_config_dir: "/etc/alloy"
+alloy_data_dir: "/var/lib/alloy"
+
+# Architecture mapping for binary downloads
+alloy_arch_map:
+  x86_64: "amd64"
+  aarch64: "arm64"
+  armv7l: "armv7"
+
+# Prometheus server configuration (for sending metrics)
+prometheus_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:9090"
+
+# Loki server configuration (for sending logs)
+loki_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:3100"
+
+# Alloy service configuration
+alloy_listen_port: 12345
+alloy_ui_enabled: true
+
+# Log paths to scrape (can be overridden in group_vars or host_vars)
+alloy_log_paths:
+  - /var/log/syslog
+
+# Metrics collection (node_exporter compatible metrics)
+alloy_collect_host_metrics: true

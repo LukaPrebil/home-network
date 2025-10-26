@@ -17,3 +17,28 @@
     - secrets.yml
   roles:
     - proxmox
+
+- name: Deploy Node Exporter for metrics collection
+  hosts: monitoring_agents
+  become: true
+  vars_files:
+    - secrets.yml
+  roles:
+    - node-exporter
+
+- name: Deploy Grafana Alloy for metrics and log shipping
+  hosts: monitoring_agents
+  become: true
+  vars_files:
+    - secrets.yml
+  roles:
+    - alloy
+
+- name: Deploy monitoring stack
+  hosts: monitoring_hosts
+  become: true
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - monitoring-stack
