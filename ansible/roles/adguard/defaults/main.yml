@@ -106,3 +106,18 @@ adguard_dns_rewrites:
   # Raspberry Pis
   - domain: "rpi4.lan"
     answer: "192.168.1.110"
+
+  # Public domain local overrides (split-DNS for internal access)
+  # These override public DNS to provide direct local access
+  - domain: "plex.lukapg.dev"
+    answer: "192.168.1.147"
+  - domain: "ha.lukapg.dev"
+    answer: "192.168.1.144"
+  - domain: "photos.lukapg.dev"
+    answer: "192.168.1.141"
+  - domain: "grafana.lukapg.dev"
+    answer: "192.168.1.146"
+  - domain: "kuma.lukapg.dev"
+    answer: "192.168.1.140"
+  - domain: "status.lukapg.dev"
+    answer: "192.168.1.140"
