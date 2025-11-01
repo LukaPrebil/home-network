@@ -8,6 +8,7 @@ radarr_version: "latest"
 bazarr_version: "latest"
 qbittorrent_version: "latest"
 overseerr_version: "latest"
+flaresolverr_version: "latest"
 
 # Base directories
 arr_base_dir: "/srv/docker"  # NFS mount for configs (docker-volumes on TrueNAS)
@@ -33,6 +34,7 @@ bazarr_port: 6767
 qbittorrent_port_web: 8080
 qbittorrent_port_bt: 6881
 overseerr_port: 5055
+flaresolverr_port: 8191
 
 # Media library structure
 media_movies_dir: "{{ arr_media_dir }}/movies"

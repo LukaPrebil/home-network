@@ -18,6 +18,18 @@ services:
       - PUID={{ arr_puid }}
       - PGID={{ arr_pgid }}
 
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:{{ flaresolverr_version }}
+    container_name: flaresolverr
+    restart: unless-stopped
+    networks:
+      - {{ arr_docker_network }}
+    ports:
+      - "{{ flaresolverr_port }}:8191"
+    environment:
+      - LOG_LEVEL=info
+      - TZ={{ arr_timezone }}
+
   sonarr:
     image: linuxserver/sonarr:{{ sonarr_version }}
     container_name: sonarr
