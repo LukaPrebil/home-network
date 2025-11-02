@@ -1,0 +1,40 @@
+---
+# Docker Compose file for Jellyfin Media Server
+# Managed by Ansible - do not edit manually
+
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:{{ jellyfin_version }}
+    container_name: jellyfin
+    restart: unless-stopped
+    network_mode: "{{ jellyfin_network }}"
+{% if jellyfin_network != 'host' %}
+    ports:
+      - "{{ jellyfin_port }}:8096/tcp"  # Jellyfin Web UI
+      - "{{ jellyfin_https_port }}:8920/tcp"  # HTTPS (optional)
+      - "7359:7359/udp"  # DLNA discovery
+      - "1900:1900/udp"  # DLNA
+{% endif %}
+    environment:
+      - TZ={{ jellyfin_timezone }}
+      - JELLYFIN_PublishedServerUrl=http://192.168.1.147  # Set to Plex LXC IP for now
+    volumes:
+      - {{ jellyfin_config_dir }}:/config
+      - {{ jellyfin_cache_dir }}:/cache
+      - {{ jellyfin_movies_dir }}:/data/movies:ro  # Read-only mount for movies
+      - {{ jellyfin_tv_dir }}:/data/tv:ro  # Read-only mount for TV shows
+      - /tmp/jellyfin-transcode:/transcode  # Transcode directory (local for performance)
+{% if jellyfin_enable_gpu %}
+    devices:
+      - /dev/dri:/dev/dri  # AMD GPU passthrough for hardware transcoding
+    # Group memberships for GPU access
+    group_add:
+      - "44"   # video group
+      - "993"  # render group
+{% endif %}
+
+{% if jellyfin_network != 'host' %}
+networks:
+  {{ jellyfin_docker_network }}:
+    external: true
+{% endif %}

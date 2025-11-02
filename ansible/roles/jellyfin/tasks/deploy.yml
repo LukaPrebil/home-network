@@ -1,0 +1,40 @@
+---
+# Deploy and manage Jellyfin with Docker Compose
+
+- name: Deploy Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ jellyfin_compose_file }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart Jellyfin
+
+- name: Pull Jellyfin Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ jellyfin_compose_dir }}"
+    pull: "always"
+  register: jellyfin_pull
+
+- name: Start Jellyfin service
+  community.docker.docker_compose_v2:
+    project_src: "{{ jellyfin_compose_dir }}"
+    state: present
+  register: jellyfin_deploy
+
+- name: Wait for Jellyfin to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ jellyfin_port }}"
+    timeout: 60
+    delay: 5
+
+- name: Display Jellyfin deployment status
+  ansible.builtin.debug:
+    msg:
+      - "Jellyfin deployment complete!"
+      - "Access Jellyfin at: http://{{ ansible_host }}:{{ jellyfin_port }}"
+      - "Public URL: https://jellyfin.lukapg.dev (via Traefik - after configuring)"
+      - ""
+      - "GPU Transcoding: {{ 'Enabled (AMD)' if jellyfin_enable_gpu else 'Disabled' }}"
+      - "Media Library: Shared with Plex"

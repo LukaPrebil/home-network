@@ -1,0 +1,8 @@
+---
+# Handlers for Jellyfin role
+
+- name: Restart Jellyfin
+  community.docker.docker_compose_v2:
+    project_src: "{{ jellyfin_compose_dir }}"
+    state: restarted
+  listen: Restart Jellyfin

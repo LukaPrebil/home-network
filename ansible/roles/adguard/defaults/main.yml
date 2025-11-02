@@ -111,6 +111,8 @@ adguard_dns_rewrites:
   # These override public DNS to provide direct local access
   - domain: "plex.lukapg.dev"
     answer: "192.168.1.147"
+  - domain: "jellyfin.lukapg.dev"
+    answer: "192.168.1.147"
   - domain: "ha.lukapg.dev"
     answer: "192.168.1.144"
   - domain: "photos.lukapg.dev"

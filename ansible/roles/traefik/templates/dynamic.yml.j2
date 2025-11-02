@@ -167,6 +167,21 @@ http:
       middlewares:
         - proxy-headers
 
+    # Jellyfin Media Server
+    jellyfin-secure:
+      rule: "Host(`jellyfin.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: jellyfin
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+
 {% endif %}
 
   # Services - backend targets
@@ -206,6 +221,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.1.147:32400"
+        passHostHeader: true
+
+    jellyfin:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.147:8096"
         passHostHeader: true
 {% endif %}
 

@@ -1,0 +1,26 @@
+---
+# Create necessary directories for Jellyfin
+
+- name: Ensure Jellyfin compose directory exists
+  ansible.builtin.file:
+    path: "{{ jellyfin_compose_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure Jellyfin config directory exists on NFS
+  ansible.builtin.file:
+    path: "{{ jellyfin_config_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure Jellyfin cache directory exists
+  ansible.builtin.file:
+    path: "{{ jellyfin_cache_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure transcode temp directory exists
+  ansible.builtin.file:
+    path: /tmp/jellyfin-transcode
+    state: directory
+    mode: '0755'
