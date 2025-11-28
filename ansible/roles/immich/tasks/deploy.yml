@@ -6,28 +6,4 @@
     project_src: "{{ immich_base_dir }}"
     pull: "always"
   register: immich_pull
-
-- name: Start Immich services
-  community.docker.docker_compose_v2:
-    project_src: "{{ immich_base_dir }}"
-    state: present
-  register: immich_deploy
-
-- name: Wait for Immich to be ready
-  ansible.builtin.uri:
-    url: "http://localhost:2283/api/server-info/ping"
-    method: GET
-    status_code: 200
-  register: immich_health
-  until: immich_health.status == 200
-  retries: 30
-  delay: 10
-  changed_when: false
-
-- name: Display Immich deployment status
-  ansible.builtin.debug:
-    msg:
-      - "Immich is now running!"
-      - "Access Immich at: http://{{ ansible_host }}:2283"
-      - "Login with your configured admin email"
-      - "First user to register becomes the admin"
+  notify: restart immich

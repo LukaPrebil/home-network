@@ -2,7 +2,7 @@
 # Immich role default variables
 
 # Immich version (use specific version for ROCm compatibility)
-immich_version: "v2.0.1"  # Specific version required for -rocm tag availability
+immich_version: "v2.0.1"  # Stable version with working ROCm builds
 
 # Immich directories
 immich_base_dir: "/opt/immich"
@@ -32,7 +32,7 @@ immich_log_level: "log"  # log, verbose, debug, warn, error
 # Hardware acceleration
 immich_enable_hw_accel: true  # Master switch for any GPU acceleration
 immich_enable_vaapi: true     # VA-API for video transcoding (works)
-immich_enable_rocm: false     # ROCm for ML inference (incompatible with gfx1150)
+immich_enable_rocm: true      # ROCm for ML inference (requires custom image with ROCm 6.4.4 for gfx1150)
 immich_gpu_devices:
   - /dev/dri/card0
   - /dev/dri/renderD128

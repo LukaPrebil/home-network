@@ -30,12 +30,14 @@ services:
 
   immich-machine-learning:
     container_name: immich_machine_learning
-    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}{% if immich_enable_rocm %}-rocm{% endif %}
-
 {% if immich_enable_rocm %}
+    # Using custom-built image with ROCm 6.4.4 for gfx1150 support
+    image: immich-ml-rocm-custom:${IMMICH_VERSION}
     extends:
       file: hwaccel.ml.yml
       service: rocm
+{% else %}
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
 {% endif %}
     volumes:
       - {{ immich_upload_dir }}/model-cache:/cache

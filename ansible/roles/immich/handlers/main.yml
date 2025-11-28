@@ -2,6 +2,4 @@
 # Handlers for Immich role
 
 - name: restart immich
-  community.docker.docker_compose_v2:
-    project_src: "{{ immich_base_dir }}"
-    state: restarted
+  ansible.builtin.include_tasks: restart.yml
