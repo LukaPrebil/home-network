@@ -32,6 +32,10 @@ entryPoints:
 
   websecure:
     address: ":{{ traefik_https_port }}"
+{% if traefik_http3_enabled %}
+    http3:
+      advertisedPort: {{ traefik_http3_advertised_port }}
+{% endif %}
 {% if traefik_acme_enabled %}
     http:
       tls:
@@ -46,6 +50,11 @@ entryPoints:
 
   traefik:
     address: ":{{ traefik_dashboard_port }}"
+
+{% if traefik_metrics_enabled %}
+  metrics:
+    address: ":{{ traefik_metrics_port }}"
+{% endif %}
 
 # Providers
 providers:
@@ -94,4 +103,14 @@ log:
 accessLog:
   format: "common"
   bufferingSize: 100
+{% endif %}
+
+{% if traefik_metrics_enabled and traefik_metrics_prometheus %}
+# Prometheus Metrics
+metrics:
+  prometheus:
+    entryPoint: "metrics"
+    addEntryPointsLabels: {{ traefik_metrics_add_entrypoints_labels | lower }}
+    addRoutersLabels: {{ traefik_metrics_add_routers_labels | lower }}
+    addServicesLabels: {{ traefik_metrics_add_services_labels | lower }}
 {% endif %}

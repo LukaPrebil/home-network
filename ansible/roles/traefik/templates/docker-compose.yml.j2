@@ -14,8 +14,14 @@ services:
     ports:
       - "{{ traefik_http_port }}:80"
       - "{{ traefik_https_port }}:443"
+{% if traefik_http3_enabled %}
+      - "{{ traefik_https_port }}:443/udp"  # HTTP/3 (QUIC)
+{% endif %}
 {% if traefik_dashboard_enabled %}
       - "{{ traefik_dashboard_port }}:8080"
+{% endif %}
+{% if traefik_metrics_enabled %}
+      - "{{ traefik_metrics_port }}:8082"  # Prometheus metrics
 {% endif %}
     volumes:
       # Traefik configuration

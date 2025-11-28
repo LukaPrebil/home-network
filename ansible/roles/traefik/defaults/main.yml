@@ -2,7 +2,7 @@
 # Traefik role default variables
 
 # Traefik version
-traefik_version: "v3"
+traefik_version: "v3.6"  # Latest: 3.6.2 (Ramequin, November 2025)
 
 # Traefik directories
 traefik_base_dir: "/opt/traefik"
@@ -20,6 +20,7 @@ traefik_access_logs: true
 traefik_http_port: 80
 traefik_https_port: 443
 traefik_dashboard_port: 8080
+traefik_metrics_port: 8082  # Prometheus metrics endpoint
 
 # Dashboard configuration
 traefik_dashboard_enabled: true
@@ -40,3 +41,14 @@ traefik_docker_network: "traefik"
 traefik_file_provider_enabled: true
 traefik_file_provider_directory: "{{ traefik_config_dir }}/dynamic"
 traefik_file_provider_watch: true
+
+# HTTP/3 (QUIC) configuration
+traefik_http3_enabled: true
+traefik_http3_advertised_port: 443
+
+# Metrics configuration
+traefik_metrics_enabled: true
+traefik_metrics_prometheus: true
+traefik_metrics_add_entrypoints_labels: true
+traefik_metrics_add_routers_labels: false  # Can be verbose, enable if needed
+traefik_metrics_add_services_labels: true
