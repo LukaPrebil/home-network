@@ -45,6 +45,31 @@
     - config
     - grafana
 
+- name: Find all dashboard JSON files
+  ansible.builtin.find:
+    paths: "{{ role_path }}/files/dashboards"
+    patterns: "*.json"
+  register: dashboard_files
+  delegate_to: localhost
+  become: false
+  tags:
+    - monitoring-stack
+    - config
+    - grafana
+
+- name: Deploy Grafana dashboard definitions
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ grafana_data_dir }}/provisioning/dashboards/definitions/{{ item.path | basename }}"
+    mode: '0644'
+  loop: "{{ dashboard_files.files }}"
+  when: dashboard_files.files | length > 0
+  notify: Restart Monitoring Stack
+  tags:
+    - monitoring-stack
+    - config
+    - grafana
+
 - name: Deploy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2

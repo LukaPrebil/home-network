@@ -56,6 +56,13 @@ scrape_configs:
           instance: '{{ host }}'
 {% endfor %}
 
+  # Traefik reverse proxy metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['{{ hostvars['traefik']['ansible_host'] }}:8082']
+        labels:
+          instance: 'traefik'
+
   # TrueNAS built-in metrics (manual - enable in TrueNAS UI)
   # Uncomment when TrueNAS metrics are enabled
   # - job_name: 'truenas'
