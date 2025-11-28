@@ -46,7 +46,8 @@
           "max-size": "10m",
           "max-file": "3"
         },
-        "data-root": "/var/lib/docker"
+        "data-root": "/var/lib/docker",
+        "dns": ["192.168.1.145", "192.168.1.110", "1.1.1.1", "1.0.0.1"]
       }
     dest: /etc/docker/daemon.json
     mode: '0644'
