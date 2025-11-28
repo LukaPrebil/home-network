@@ -11,16 +11,21 @@
     name:
       - wget
       - curl
-      - openjdk-17-jre-headless  # Java 17 required for Omada 5.x
+      - "openjdk-{{ omada_java_version }}-jre-headless"  # Java version from defaults
       - jsvc  # Java service wrapper
       - gnupg
       - ca-certificates
     state: present
 
 # MongoDB setup for Ubuntu 25.04 (using Jammy/22.04 packages)
+# Omada v6.0 requires MongoDB 8.0
+- name: Determine MongoDB version based on Omada version
+  ansible.builtin.set_fact:
+    mongodb_version: "{{ '8.0' if omada_controller_version is version('6.0', '>=') else '7.0' }}"
+
 - name: Check if MongoDB repository is already configured
   ansible.builtin.stat:
-    path: /etc/apt/sources.list.d/mongodb-org-7.0.list
+    path: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
   register: mongodb_repo_check
 
 - name: Create directory for MongoDB GPG key
@@ -32,14 +37,14 @@
 
 - name: Download and add MongoDB GPG key
   ansible.builtin.shell:
-    cmd: curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-    creates: /usr/share/keyrings/mongodb-server-7.0.gpg
+    cmd: "curl -fsSL https://pgp.mongodb.com/server-{{ mongodb_version }}.asc | gpg -o /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg --dearmor"
+    creates: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
   when: not mongodb_repo_check.stat.exists
 
 - name: Add MongoDB repository (using Jammy packages for Ubuntu 25.04)
   ansible.builtin.lineinfile:
-    path: /etc/apt/sources.list.d/mongodb-org-7.0.list
-    line: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse"
+    path: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
+    line: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/{{ mongodb_version }} multiverse"
     create: yes
     mode: '0644'
   when: not mongodb_repo_check.stat.exists

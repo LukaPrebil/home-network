@@ -13,12 +13,23 @@
     mode: '0755'
   when: not omada_installed.stat.exists
 
+- name: Copy local Omada .deb package to target
+  ansible.builtin.copy:
+    src: "{{ omada_controller_deb_local }}"
+    dest: "/tmp/omada-installer/omada_{{ omada_controller_version }}.deb"
+    mode: '0644'
+  when:
+    - not omada_installed.stat.exists
+    - omada_use_local_deb | bool
+
 - name: Download Omada Controller .deb package
   ansible.builtin.get_url:
     url: "{{ omada_controller_deb_url }}"
     dest: "/tmp/omada-installer/omada_{{ omada_controller_version }}.deb"
     mode: '0644'
-  when: not omada_installed.stat.exists
+  when:
+    - not omada_installed.stat.exists
+    - not (omada_use_local_deb | bool)
 
 - name: Install Omada Controller from .deb package
   ansible.builtin.apt:

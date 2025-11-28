@@ -2,8 +2,9 @@
 # Omada Controller role defaults
 
 # Omada Controller version
-omada_controller_version: "5.15.24.19"
-omada_controller_deb_url: "https://static.tp-link.com/upload/software/2025/202508/20250802/omada_v5.15.24.19_linux_x64_20250724152622.deb"
+omada_controller_version: "6.0.0.25"
+omada_controller_deb_url: "https://static.tp-link.com/upload/software/2025/202511/20251120/omada_v6.0.0.25_linux_x64_20251120205747.deb"
+omada_controller_deb_local: "{{ playbook_dir }}/../backups/omada/omada_v6.0.0.25_linux_x64_20251120205747_1764215914436.deb"
 
 # Installation paths
 omada_install_dir: "/opt/tplink/EAPController"
@@ -20,10 +21,19 @@ omada_http_port: 8088
 omada_https_port: 8043
 omada_portal_http_port: 8088
 omada_portal_https_port: 8843
+omada_device_mgmt_port: 29817  # New in v6.0 for optimized device management
 
 # MongoDB configuration (bundled with Omada)
 omada_mongodb_port: 27217
 
+# Java configuration
+omada_java_version: "21"  # Java 21 recommended for v6.0
+
+# Upgrade configuration
+omada_upgrade_mode: false  # Set to true when upgrading from v5 to v6
+omada_previous_version: "5.15.24.19"  # Track previous version for upgrade path
+
 # Migration/backup configuration
 omada_restore_backup: false
 omada_backup_source_dir: "{{ playbook_dir }}/../backups/omada"
+omada_use_local_deb: true  # Use pre-downloaded .deb from backups folder

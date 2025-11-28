@@ -5,8 +5,14 @@
   ansible.builtin.import_tasks: prerequisites.yml
   tags: [omada, prerequisites]
 
+- name: Include Omada Controller upgrade tasks (if enabled)
+  ansible.builtin.import_tasks: upgrade.yml
+  when: omada_upgrade_mode | bool
+  tags: [omada, upgrade]
+
 - name: Include Omada Controller installation tasks
   ansible.builtin.import_tasks: install.yml
+  when: not (omada_upgrade_mode | bool)
   tags: [omada, install]
 
 - name: Include backup restore tasks (if enabled)
@@ -16,4 +22,5 @@
 
 - name: Include service management tasks
   ansible.builtin.import_tasks: service.yml
+  when: not (omada_upgrade_mode | bool)
   tags: [omada, service]
