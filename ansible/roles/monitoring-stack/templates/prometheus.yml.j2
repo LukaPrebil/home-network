@@ -72,9 +72,10 @@ scrape_configs:
   #         instance: 'tn-storage'
 
   # Ookla Speedtest metrics (bandwidth intensive - long interval)
+  # Timeout set high for multiple server tests (each test takes ~60-90s)
   - job_name: 'speedtest'
     scrape_interval: {{ speedtest_scrape_interval }}
-    scrape_timeout: 120s
+    scrape_timeout: {{ speedtest_scrape_timeout }}
     metrics_path: /probe
     params:
       script: [speedtest]

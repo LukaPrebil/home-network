@@ -57,8 +57,10 @@ grafana_subdomain: "grafana"
 # Speedtest Exporter configuration (Ookla)
 speedtest_exporter_version: "latest"
 speedtest_exporter_port: 9469
-# Slovenian servers: 41998 (Telekom), 11367 (T-2), 53146 (Telemach), 54112 (A1)
-# Using T-2 (different from user's Telekom ISP for true inter-ISP test)
-# Leave empty for auto-select best server
-speedtest_server_ids: "11367"
+# Server IDs (comma-separated for multiple servers):
+#   Slovenia: 41998 (Telekom), 11367 (T-2), 53146 (Telemach), 54112 (A1)
+#   Frankfurt: 19034 (Vodafone), 54504 (Deutsche Glasfaser), 32298 (SYNLINQ)
+# Using T-2 Slovenia (inter-ISP) + Vodafone Frankfurt (general internet)
+speedtest_server_ids: "11367,19034"
 speedtest_scrape_interval: "30m"  # Easy to change to 60m
+speedtest_scrape_timeout: "300s"  # 5 min timeout for multiple server tests
