@@ -70,3 +70,16 @@ scrape_configs:
   #     - targets: ['192.168.1.150:9100']
   #       labels:
   #         instance: 'tn-storage'
+
+  # Ookla Speedtest metrics (bandwidth intensive - long interval)
+  - job_name: 'speedtest'
+    scrape_interval: {{ speedtest_scrape_interval }}
+    scrape_timeout: 120s
+    metrics_path: /probe
+    params:
+      script: [speedtest]
+    static_configs:
+      - targets: ['speedtest-exporter:9469']
+        labels:
+          instance: 'speedtest-ookla'
+

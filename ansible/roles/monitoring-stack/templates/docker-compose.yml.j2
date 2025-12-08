@@ -109,6 +109,20 @@ services:
       - OMADA_SITE={{ omada_site }}
       - OMADA_INSECURE=true
 
+  speedtest-exporter:
+    image: billimek/prometheus-speedtest-exporter:{{ speedtest_exporter_version }}
+    container_name: speedtest-exporter
+    restart: unless-stopped
+    networks:
+      - {{ monitoring_docker_network }}
+    ports:
+      - "{{ speedtest_exporter_port }}:9469"
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+{% if speedtest_server_ids is defined and speedtest_server_ids %}
+      - server_ids={{ speedtest_server_ids }}
+{% endif %}
+
 networks:
   {{ monitoring_docker_network }}:
     external: true
