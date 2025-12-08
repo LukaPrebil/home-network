@@ -126,8 +126,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "speedtest_download_bytes / 125000",
-          "legendFormat": "Download (Slovenia)",
+          "expr": "label_replace(label_replace(speedtest_download_bytes / 125000, \"server_name\", \"Slovenia (T-2)\", \"server_id\", \"11367\"), \"server_name\", \"Frankfurt (Vodafone)\", \"server_id\", \"19034\")",
+          "legendFormat": "{{server_name}}",
           "range": true,
           "refId": "A"
         }
@@ -227,8 +227,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "speedtest_upload_bytes / 125000",
-          "legendFormat": "Upload (Slovenia)",
+          "expr": "label_replace(label_replace(speedtest_upload_bytes / 125000, \"server_name\", \"Slovenia (T-2)\", \"server_id\", \"11367\"), \"server_name\", \"Frankfurt (Vodafone)\", \"server_id\", \"19034\")",
+          "legendFormat": "{{server_name}}",
           "range": true,
           "refId": "A"
         }
@@ -336,8 +336,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "speedtest_latency_seconds * 1000",
-          "legendFormat": "Ping (Slovenia)",
+          "expr": "label_replace(label_replace(speedtest_latency_seconds, \"server_name\", \"Slovenia (T-2)\", \"server_id\", \"11367\"), \"server_name\", \"Frankfurt (Vodafone)\", \"server_id\", \"19034\")",
+          "legendFormat": "{{server_name}}",
           "range": true,
           "refId": "A"
         }
@@ -445,8 +445,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "speedtest_jittter_seconds * 1000",
-          "legendFormat": "Jitter (Slovenia)",
+          "expr": "label_replace(label_replace(speedtest_jittter_seconds, \"server_name\", \"Slovenia (T-2)\", \"server_id\", \"11367\"), \"server_name\", \"Frankfurt (Vodafone)\", \"server_id\", \"19034\")",
+          "legendFormat": "{{server_name}}",
           "range": true,
           "refId": "A"
         }
