@@ -2,7 +2,7 @@
 # Immich role default variables
 
 # Immich version (use specific version for ROCm compatibility)
-immich_version: "v2.0.1"  # Stable version with working ROCm builds
+immich_version: "v2.4.1"  # Upgraded from v2.0.1 - includes ONNX Runtime v1.22.1 fix for ROCm
 
 # Immich directories
 immich_base_dir: "/opt/immich"

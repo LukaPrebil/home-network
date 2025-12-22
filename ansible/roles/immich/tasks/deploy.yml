@@ -1,9 +1,9 @@
 ---
 # Deploy and manage Immich with Docker Compose
 
-- name: Pull Immich Docker images
+- name: Deploy Immich Docker Compose stack
   community.docker.docker_compose_v2:
     project_src: "{{ immich_base_dir }}"
-    pull: "always"
+    pull: "missing"  # Don't pull locally-built images (immich-ml-rocm-custom)
   register: immich_pull
   notify: restart immich
