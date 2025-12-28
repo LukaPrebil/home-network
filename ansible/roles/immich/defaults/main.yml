@@ -14,6 +14,12 @@ immich_nfs_share: "/mnt/tank/immich-photos"
 immich_nfs_mount_point: "{{ immich_upload_dir }}"
 immich_nfs_opts: "defaults,nofail,_netdev"
 
+# External libraries configuration (for importing existing photos)
+# List of host paths to mount read-only into the container
+# These are typically NFS mounts on the LXC host
+immich_external_libraries:
+  - /mnt/external-data
+
 # Docker Compose configuration
 immich_compose_file: "{{ immich_base_dir }}/docker-compose.yml"
 immich_env_file: "{{ immich_base_dir }}/.env"

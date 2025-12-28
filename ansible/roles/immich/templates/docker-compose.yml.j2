@@ -17,6 +17,9 @@ services:
     volumes:
       - ${UPLOAD_LOCATION}:/data
       - /etc/localtime:/etc/localtime:ro
+{% for path in immich_external_libraries | default([]) %}
+      - {{ path }}:{{ path }}:ro
+{% endfor %}
     env_file:
       - .env
     ports:
