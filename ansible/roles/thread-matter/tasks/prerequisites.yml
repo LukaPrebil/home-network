@@ -1,0 +1,93 @@
+---
+# Prerequisites for Thread Matter Stack
+# Ensures kernel modules, sysctl settings, and dependencies are available
+
+- name: Install linux-modules-extra for USB serial support
+  ansible.builtin.apt:
+    name: "linux-modules-extra-{{ ansible_kernel }}"
+    state: present
+    update_cache: true
+  register: modules_install
+
+- name: Enable IPv4 forwarding (required for Thread border routing)
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Enable IPv6 (required for Thread)
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.disable_ipv6
+    value: '0'
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Enable IPv6 forwarding (required for Thread border routing)
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: '1'
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Ensure required kernel modules load on boot
+  ansible.builtin.copy:
+    content: |
+      # CDC ACM driver for USB serial devices (OpenThread dongle)
+      cdc_acm
+      # IPv6 tables for OTBR firewall
+      ip6_tables
+      ip6table_filter
+      ip6table_nat
+    dest: /etc/modules-load.d/thread-matter.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Load cdc_acm module now
+  community.general.modprobe:
+    name: cdc_acm
+    state: present
+
+- name: Load ip6_tables module now
+  community.general.modprobe:
+    name: ip6_tables
+    state: present
+
+- name: Load ip6table_filter module now
+  community.general.modprobe:
+    name: ip6table_filter
+    state: present
+
+- name: Load ip6table_nat module now
+  community.general.modprobe:
+    name: ip6table_nat
+    state: present
+
+- name: Wait for USB device to appear
+  ansible.builtin.wait_for:
+    path: "{{ thread_usb_device }}"
+    timeout: 30
+  register: usb_wait
+
+- name: Verify USB device exists
+  ansible.builtin.stat:
+    path: "{{ thread_usb_device }}"
+  register: usb_device_stat
+
+- name: Fail if USB device not found
+  ansible.builtin.fail:
+    msg: |
+      USB device {{ thread_usb_device }} not found!
+      Please verify:
+        1. Sonoff ZB-Dongle-E is connected and passed through from Proxmox
+        2. Device path is correct (check: ls -la /dev/serial/by-id/)
+        3. Override thread_usb_device variable if needed
+  when: not usb_device_stat.stat.exists
+
+- name: Display USB device info
+  ansible.builtin.debug:
+    msg: "USB device found: {{ thread_usb_device }} -> {{ usb_device_stat.stat.lnk_source | default('direct device') }}"

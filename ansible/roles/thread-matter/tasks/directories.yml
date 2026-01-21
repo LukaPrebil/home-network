@@ -1,0 +1,34 @@
+---
+# Create required directories for Thread Matter Stack
+
+- name: Create thread-matter compose directory
+  ansible.builtin.file:
+    path: "{{ thread_matter_compose_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create thread-matter base directory on NFS
+  ansible.builtin.file:
+    path: "{{ thread_matter_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create OTBR data directory
+  ansible.builtin.file:
+    path: "{{ otbr_data_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create Matter Server data directory
+  ansible.builtin.file:
+    path: "{{ matter_server_data_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
