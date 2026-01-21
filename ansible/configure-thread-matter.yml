@@ -1,0 +1,38 @@
+---
+# Playbook to deploy Thread Matter Stack on containers VM
+#
+# This playbook deploys:
+#   - OpenThread Border Router (OTBR) - Thread network coordinator
+#   - Python Matter Server - Matter device controller for Home Assistant
+#
+# Prerequisites:
+#   - containers VM is configured with common and docker roles
+#   - USB device (Sonoff ZB-Dongle-E) is passed through from Proxmox
+#   - NFS mount at /srv/docker is available
+#
+# Usage:
+#   # Standard deployment:
+#   ansible-playbook configure-thread-matter.yml
+#
+#   # With custom USB device path:
+#   ansible-playbook configure-thread-matter.yml -e thread_usb_device=/dev/ttyACM0
+#
+#   # Only run deployment tasks (skip prerequisites):
+#   ansible-playbook configure-thread-matter.yml --tags deploy
+
+- name: Deploy Thread Matter Stack
+  hosts: containers
+  become: true
+  vars_files:
+    - secrets.yml
+
+  pre_tasks:
+    - name: Verify NFS mount is available
+      ansible.builtin.command: mountpoint -q /srv/docker
+      register: nfs_check
+      failed_when: nfs_check.rc != 0
+      changed_when: false
+
+  roles:
+    - docker
+    - thread-matter
