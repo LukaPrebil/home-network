@@ -1,0 +1,20 @@
+---
+# Docker Compose for Autoheal
+# Managed by Ansible - DO NOT EDIT MANUALLY
+#
+# Monitors containers with healthchecks and restarts unhealthy ones.
+# Containers must have the label "autoheal=true" to be monitored.
+
+services:
+  autoheal:
+    image: {{ autoheal_image }}:{{ autoheal_version }}
+    container_name: {{ autoheal_container_name }}
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: {{ autoheal_timezone }}
+      AUTOHEAL_CONTAINER_LABEL: "{{ autoheal_container_label }}"
+      AUTOHEAL_INTERVAL: "{{ autoheal_interval }}"
+      AUTOHEAL_START_PERIOD: "{{ autoheal_start_period }}"
+      AUTOHEAL_DEFAULT_STOP_TIMEOUT: "{{ autoheal_stop_timeout }}"

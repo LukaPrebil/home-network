@@ -1,0 +1,30 @@
+---
+# Autoheal Role - Default Configuration
+# Monitors Docker containers with healthchecks and restarts unhealthy ones
+
+# Docker image
+autoheal_image: "willfarrell/autoheal"
+autoheal_version: "latest"
+
+# Container name
+autoheal_container_name: "autoheal"
+
+# Compose directory
+autoheal_compose_dir: "/opt/autoheal"
+
+# How often (in seconds) to check container health
+autoheal_interval: 30
+
+# Grace period (in seconds) before monitoring newly started containers
+autoheal_start_period: 120
+
+# Timeout (in seconds) for stopping unhealthy containers before restart
+autoheal_stop_timeout: 10
+
+# Which containers to monitor:
+#   "autoheal" - only containers with label autoheal=true
+#   "all"      - all containers with healthchecks
+autoheal_container_label: "autoheal"
+
+# Timezone (inherit from global or default to UTC)
+autoheal_timezone: "{{ timezone | default('UTC') }}"

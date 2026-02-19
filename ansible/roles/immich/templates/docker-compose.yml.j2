@@ -30,6 +30,8 @@ services:
     restart: always
     healthcheck:
       disable: false
+    labels:
+      - "autoheal=true"
 
   immich-machine-learning:
     container_name: immich_machine_learning
@@ -49,6 +51,8 @@ services:
     restart: always
     healthcheck:
       disable: false
+    labels:
+      - "autoheal=true"
 
   redis:
     container_name: immich_redis
@@ -56,6 +60,8 @@ services:
     healthcheck:
       test: redis-cli ping || exit 1
     restart: always
+    labels:
+      - "autoheal=true"
 
   database:
     container_name: immich_postgres

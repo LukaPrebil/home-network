@@ -1,0 +1,23 @@
+---
+# Deploy autoheal container
+
+- name: Deploy autoheal docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ autoheal_compose_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart autoheal
+
+- name: Pull autoheal Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ autoheal_compose_dir }}"
+    pull: always
+  register: autoheal_pull
+
+- name: Start autoheal service
+  community.docker.docker_compose_v2:
+    project_src: "{{ autoheal_compose_dir }}"
+    state: present
+  register: autoheal_deploy

@@ -1,0 +1,10 @@
+---
+# Create required directories for autoheal
+
+- name: Create autoheal compose directory
+  ansible.builtin.file:
+    path: "{{ autoheal_compose_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

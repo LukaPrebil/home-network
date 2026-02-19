@@ -34,6 +34,13 @@
   roles:
     - alloy
 
+- name: Deploy Autoheal container health monitor
+  hosts: docker_hosts
+  become: true
+  roles:
+    - docker
+    - autoheal
+
 - name: Deploy monitoring stack
   hosts: monitoring_hosts
   become: true
