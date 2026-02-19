@@ -1,0 +1,54 @@
+---
+# Deploy OTBR container
+
+- name: Deploy OTBR docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ otbr_compose_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart otbr
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2:
+    project_src: "{{ otbr_compose_dir }}"
+    pull: always
+  register: otbr_pull
+
+- name: Start OTBR service
+  community.docker.docker_compose_v2:
+    project_src: "{{ otbr_compose_dir }}"
+    state: present
+  register: otbr_deploy
+
+- name: Wait for OTBR REST API to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ otbr_port_rest }}"
+    timeout: 120
+    delay: 10
+
+- name: Verify OTBR REST API is responding
+  ansible.builtin.uri:
+    url: "http://localhost:{{ otbr_port_rest }}/node/state"
+    method: GET
+    status_code: [200, 503]  # 503 if Thread not started yet, which is OK
+    timeout: 10
+  register: otbr_api_check
+  retries: 5
+  delay: 5
+  until: otbr_api_check.status in [200, 503]
+
+- name: Display OTBR deployment status
+  ansible.builtin.debug:
+    msg: |
+      OpenThread Border Router deployed successfully!
+
+      Web UI: http://{{ ansible_host }}:{{ otbr_port_web }}
+      REST API: http://{{ ansible_host }}:{{ otbr_port_rest }}
+
+      Thread Network:
+        - Channel: {{ thread_channel }}
+        - Network Name: {{ thread_network_name }}
+        - PAN ID: {{ thread_panid }}

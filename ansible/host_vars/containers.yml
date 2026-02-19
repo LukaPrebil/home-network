@@ -1,0 +1,18 @@
+---
+# Host-specific variables for containers VM
+#
+# Hardware: Proxmox VM (4 cores, 8GB RAM)
+# Role: Docker host for containerized services
+# IP: 192.168.1.140 (temporary, will migrate to 192.168.30.4)
+
+# OTBR Configuration (containers VM hosts the USB dongle and OTBR)
+thread_usb_device: "/dev/serial/by-id/usb-ITEAD_SONOFF_Zigbee_3.0_USB_Dongle_Plus_V2_20221029081826-if00"
+otbr_backbone_interface: "eth0"
+
+# Thread Network Configuration (actual running values)
+# IMPORTANT: These values match the existing, operational Thread network
+thread_channel: 15
+thread_network_name: "OpenThreadHA"
+thread_panid: "0x1234"
+thread_extpanid: "1111111122222222"
+# thread_network_key is stored in secrets.yml vault

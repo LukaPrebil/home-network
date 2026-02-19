@@ -1,0 +1,73 @@
+---
+# Deploy Matter Server container
+
+- name: Deploy Matter Server docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ matter_server_compose_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart matter-server
+
+- name: Pull Docker images
+  community.docker.docker_compose_v2:
+    project_src: "{{ matter_server_compose_dir }}"
+    pull: always
+  register: matter_server_pull
+
+- name: Start Matter Server service
+  community.docker.docker_compose_v2:
+    project_src: "{{ matter_server_compose_dir }}"
+    state: present
+  register: matter_server_deploy
+
+- name: Wait for Matter Server to be ready
+  ansible.builtin.wait_for:
+    host: localhost
+    port: "{{ matter_server_port }}"
+    timeout: 120
+    delay: 10
+
+- name: Verify Matter Server WebSocket is responding
+  ansible.builtin.uri:
+    url: "http://localhost:{{ matter_server_port }}"
+    method: GET
+    status_code: [200, 400, 404, 426]  # 426 = Upgrade Required (WebSocket endpoint)
+    timeout: 10
+  register: matter_api_check
+  retries: 5
+  delay: 5
+  until: matter_api_check.status in [200, 400, 404, 426]
+
+- name: Display Matter Server deployment status
+  ansible.builtin.debug:
+    msg: |
+      Python Matter Server deployed successfully!
+
+      WebSocket API: ws://{{ ansible_host }}:{{ matter_server_port }}/ws
+
+      CRITICAL: Update Home Assistant Configuration
+      ──────────────────────────────────────────────
+      The Matter Server has moved from containers VM to rpi4.
+      You MUST update Home Assistant to use the new URL:
+
+      1. Navigate to Home Assistant
+         http://{{ home_assistant_host }}:8123
+
+      2. Go to Settings -> Devices & Services
+
+      3. Find 'Matter (BETA)' integration
+
+      4. Click the 3-dot menu -> Configure
+
+      5. Update Server URL to:
+         ws://{{ ansible_host }}:{{ matter_server_port }}/ws
+
+      6. Click Submit and wait for connection
+
+      7. Verify all Matter devices are still visible
+
+      Thread Border Router:
+        OTBR Location: {{ otbr_host }}:{{ otbr_rest_api_port }}
+        Matter Server will discover Thread network automatically

@@ -1,6 +1,6 @@
 ---
-# Prerequisites for Thread Matter Stack
-# Ensures kernel modules, sysctl settings, and dependencies are available
+# Prerequisites for OTBR
+# Ensures kernel modules, sysctl settings, and USB device are available
 
 - name: Install linux-modules-extra for USB serial support
   ansible.builtin.apt:
@@ -42,7 +42,7 @@
       ip6_tables
       ip6table_filter
       ip6table_nat
-    dest: /etc/modules-load.d/thread-matter.conf
+    dest: /etc/modules-load.d/otbr.conf
     owner: root
     group: root
     mode: '0644'

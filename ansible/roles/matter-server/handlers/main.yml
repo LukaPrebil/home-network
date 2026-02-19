@@ -1,0 +1,13 @@
+---
+# Handlers for Matter Server role
+
+- name: Restart matter-server
+  community.docker.docker_compose_v2:
+    project_src: "{{ matter_server_compose_dir }}"
+    state: restarted
+
+- name: Restart matter-server container
+  community.docker.docker_container:
+    name: "{{ matter_server_container_name }}"
+    state: started
+    restart: true

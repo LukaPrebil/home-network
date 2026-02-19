@@ -1,10 +1,9 @@
 ---
-# Docker Compose for Thread Matter Stack
+# Docker Compose for OpenThread Border Router (OTBR)
 # Managed by Ansible - DO NOT EDIT MANUALLY
 #
 # Services:
 #   - OpenThread Border Router (OTBR) - Thread network coordinator
-#   - Python Matter Server - Matter device controller for Home Assistant
 
 services:
   otbr:
@@ -21,11 +20,11 @@ services:
     volumes:
       - {{ otbr_data_dir }}:/var/lib/thread
     devices:
-      - {{ thread_usb_device }}:/dev/ttyACM0
+      - {{ thread_usb_device }}:/dev/ttyUSB0
     environment:
-      TZ: {{ thread_matter_timezone }}
+      TZ: {{ otbr_timezone }}
       # Radio URL for the Thread dongle
-      RADIO_URL: "spinel+hdlc+uart:///dev/ttyACM0?uart-baudrate=460800"
+      RADIO_URL: "spinel+hdlc+uart:///dev/ttyUSB0?uart-baudrate=460800&uart-flow-control=0"
       # Backbone interface for border routing
       BACKBONE_IF: "{{ otbr_backbone_interface }}"
       BORDER_ROUTING: "1"
@@ -48,31 +47,5 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-
-  matter-server:
-    image: {{ matter_server_image }}:{{ matter_server_version }}
-    container_name: {{ matter_server_container_name }}
-    restart: unless-stopped
-    # Host networking required for mDNS discovery and Matter communication
-    network_mode: host
-    volumes:
-      - {{ matter_server_data_dir }}:/data
-      - /run/dbus:/run/dbus:ro
-    environment:
-      TZ: {{ thread_matter_timezone }}
-    command:
-      - --storage-path
-      - /data
-      - --port
-      - "{{ matter_server_port }}"
-      - --log-level
-      - info
-    depends_on:
-      otbr:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('localhost', {{ matter_server_port }})); s.close()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    labels:
+      - "autoheal=true"

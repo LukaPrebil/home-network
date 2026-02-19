@@ -1,0 +1,30 @@
+---
+# Python Matter Server Role - Default Configuration
+
+# Docker images
+matter_server_image: "ghcr.io/home-assistant-libs/python-matter-server"
+matter_server_version: "stable"
+
+# Container names
+matter_server_container_name: "matter-server"
+
+# Base directories (on rpi4 local storage or NFS)
+matter_server_base_dir: "/srv/docker/matter-server"
+matter_server_compose_dir: "/opt/matter-server"
+
+# Data directories
+matter_server_data_dir: "{{ matter_server_base_dir }}/data"
+
+# Matter Server Configuration
+matter_server_port: 5580  # WebSocket API port for Home Assistant
+matter_server_log_level: "info"  # Log level: debug, info, warning, error
+
+# Timezone (inherit from global or default to UTC)
+matter_server_timezone: "{{ timezone | default('UTC') }}"
+
+# Home Assistant integration info
+home_assistant_host: "192.168.1.144"
+
+# OTBR connection (Matter Server connects to OTBR over network for Thread)
+otbr_host: "192.168.1.140"  # containers VM
+otbr_rest_api_port: 8081

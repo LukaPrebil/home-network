@@ -1,23 +1,23 @@
 ---
-# Main tasks file for Thread Matter role
-# Deploys OpenThread Border Router and Python Matter Server
+# Main tasks file for OTBR role
+# Deploys OpenThread Border Router
 
 - name: Include prerequisite tasks
   ansible.builtin.include_tasks: prerequisites.yml
   tags:
-    - thread-matter
+    - otbr
     - prerequisites
     - setup
 
 - name: Include directory setup tasks
   ansible.builtin.include_tasks: directories.yml
   tags:
-    - thread-matter
+    - otbr
     - directories
     - setup
 
 - name: Include deployment tasks
   ansible.builtin.include_tasks: deploy.yml
   tags:
-    - thread-matter
+    - otbr
     - deploy

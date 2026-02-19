@@ -1,0 +1,34 @@
+---
+# Docker Compose for Python Matter Server
+# Managed by Ansible - DO NOT EDIT MANUALLY
+#
+# Note: Matter Server must use host networking for mDNS discovery
+# It connects to OTBR over the network for Thread device support
+
+services:
+  matter-server:
+    image: {{ matter_server_image }}:{{ matter_server_version }}
+    container_name: {{ matter_server_container_name }}
+    restart: unless-stopped
+    # Host networking required for mDNS discovery and Matter communication
+    network_mode: host
+    volumes:
+      - {{ matter_server_data_dir }}:/data
+      - /run/dbus:/run/dbus:ro
+    environment:
+      TZ: {{ matter_server_timezone }}
+    command:
+      - --storage-path
+      - /data
+      - --port
+      - "{{ matter_server_port }}"
+      - --log-level
+      - "{{ matter_server_log_level }}"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('localhost', {{ matter_server_port }})); s.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "autoheal=true"

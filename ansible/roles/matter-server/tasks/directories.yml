@@ -1,0 +1,26 @@
+---
+# Create required directories for Matter Server
+
+- name: Create Matter Server compose directory
+  ansible.builtin.file:
+    path: "{{ matter_server_compose_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create Matter Server base directory
+  ansible.builtin.file:
+    path: "{{ matter_server_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create Matter Server data directory
+  ansible.builtin.file:
+    path: "{{ matter_server_data_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

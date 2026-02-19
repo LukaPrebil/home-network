@@ -1,0 +1,23 @@
+---
+# Main tasks file for Matter Server role
+# Deploys Python Matter Server for Home Assistant
+
+- name: Include prerequisite tasks
+  ansible.builtin.include_tasks: prerequisites.yml
+  tags:
+    - matter-server
+    - prerequisites
+    - setup
+
+- name: Include directory setup tasks
+  ansible.builtin.include_tasks: directories.yml
+  tags:
+    - matter-server
+    - directories
+    - setup
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - matter-server
+    - deploy

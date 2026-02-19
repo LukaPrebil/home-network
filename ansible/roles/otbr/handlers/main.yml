@@ -1,0 +1,13 @@
+---
+# Handlers for OTBR role
+
+- name: Restart otbr
+  community.docker.docker_compose_v2:
+    project_src: "{{ otbr_compose_dir }}"
+    state: restarted
+
+- name: Restart otbr container
+  community.docker.docker_container:
+    name: "{{ otbr_container_name }}"
+    state: started
+    restart: true
