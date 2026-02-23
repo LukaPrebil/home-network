@@ -83,7 +83,7 @@ The agent should create the following new roles:
     * **Target:** `containers` VM.
     * **Tasks:** Deploys the core Docker stack (Grafana, Prometheus, Loki, cAdvisor, PVE Exporter, Omada Exporter). Manages the `prometheus.yml` configuration file via a template.
 2.  **`node-exporter`:**
-    * **Target:** All Linux hosts (`n5p`, `rpi4`, `rpi2`, all VMs/LXCs).
+    * **Target:** All Linux hosts (`n5p`, `rpi4`, all VMs/LXCs).
     * **Tasks:** Installs and enables the `node_exporter` service.
 3.  **`promtail`:**
     * **Target:** All Linux hosts.

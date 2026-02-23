@@ -21,8 +21,7 @@ The network is designed around four core principles:
 | **Switch 1**  | YuanLey 4x2.5G PoE + 2x10G SFP+  | High-Speed & PoE Switch          |
 | **Switch 2**  | MikroTik CSS326-24G-2S+RM        | 24-Port Distribution Switch      |
 | **Server 1**  | Minisforum N5 Pro                | Proxmox Host, 1x 10GbE, 1x5GbE   |
-| **Server 2**  | Raspberry Pi 4                   | Zigbee & Bluetooth Hub           |
-| **Server 3**  | Raspberry Pi 2                   | MQTT & Redundant DNS             |
+| **Server 2**  | Raspberry Pi 4                   | Docker Services + Secondary DNS  |
 | **WiFi**      | 3 x Omada EAP650                 | WiFi 6 Access Points             |
 
 ---
@@ -54,9 +53,8 @@ graph TD
         end
         
         subgraph "Servers & Services"
-            nas["<br>🗄️<br><b>Minisforum N5 Pro</b><br>Host OS: Proxmox<br><b>VMs on VLANs 30 & 60</b><br><br><u>Services:</u><br>- TrueNAS Scale (VLAN 30)<br>- Home Assistant OS VM (VLAN 30)<br>- Immich LXC (VLAN 30)<br>- Plex/Jellyfin VM (VLAN 30)<br>- Traefik LXC (VLAN 60)<br>- AdGuard #1 (VLAN 30)"]
-            rpi4["<br>🍓<br><b>Raspberry Pi 4</b><br><b>VLAN 30: Servers</b><br><br><u>Services:</u><br>- Zigbee2MQTT<br>- Bluetooth Proxy"]
-            rpi2["<br>🍓<br><b>Raspberry Pi 2</b><br><b>VLAN 30: Servers</b><br><br><u>Services:</u><br>- Mosquitto MQTT<br>- AdGuard #2 (Redundant)"]
+            nas["<br>🗄️<br><b>Minisforum N5 Pro</b><br>Host OS: Proxmox<br><b>VMs on VLANs 30 & 60</b><br><br><u>Services:</u><br>- TrueNAS Scale (VLAN 30)<br>- Home Assistant OS VM (VLAN 30, USB Zigbee ZBT-2)<br>- Immich LXC (VLAN 30)<br>- Plex/Jellyfin LXC (VLAN 30)<br>- Traefik LXC (VLAN 60)<br>- AdGuard #1 (VLAN 30)"]
+            rpi4["<br>🍓<br><b>Raspberry Pi 4</b><br><b>VLAN 30: Servers</b><br><br><u>Services:</u><br>- Matter Server<br>- AdGuard Home #2"]
         end
 
         subgraph "Clients & Devices"
@@ -78,7 +76,6 @@ graph TD
     nas ---|"10GbE<br>(VLAN Trunk)"| sw_yuanley
     nas ---|"1Gb <br>(1GbE)"| sw_mikrotik
     rpi4 ---|"1Gbps<br>VLAN 30"| sw_mikrotik
-    rpi2 ---|"1Gbps<br>VLAN 30"| sw_mikrotik
 
     %% Client & PoE Device Connections
     sw_yuanley --"PoE<br>VLAN 50"--> doorbell
@@ -119,21 +116,14 @@ graph TD
 ### Home Assistant VM (on N5 Pro)
 * **OS:** Home Assistant OS
 * **Purpose:** The central controller for all smart home devices and automations.
-* **Details:** Runs the full HA OS to get the benefit of the Supervisor and Add-on store, ensuring maximum stability and easy management via Proxmox snapshots.
+* **Details:** Runs the full HA OS to get the benefit of the Supervisor and Add-on store, ensuring maximum stability and easy management via Proxmox snapshots. Zigbee is handled via ZHA with a Sonoff ZBT-2 USB coordinator passed through from the Proxmox host.
 
 ### Raspberry Pi 4
 * **OS:** Raspberry Pi OS Lite (or similar)
-* **Purpose:** Dedicated hub for physical smart home radio protocols.
+* **Purpose:** Docker service host and secondary DNS.
 * **Key Services:**
-    * **Zigbee2MQTT:** Manages the Zigbee mesh network via the Sonoff ZBDongle-E.
-    * **Bluetooth Proxy:** Extends Home Assistant's Bluetooth range.
-
-### Raspberry Pi 2
-* **OS:** Raspberry Pi OS Lite (or similar)
-* **Purpose:** Runs lightweight, high-availability services.
-* **Key Services:**
-    * **Mosquitto:** The central MQTT broker for all IoT communication.
-    * **AdGuard Home (Secondary):** Acts as a redundant DNS server for network-wide resilience.
+    * **Matter Server:** Python Matter Server for Thread/Matter device commissioning.
+    * **AdGuard Home (Secondary):** Redundant DNS server for network resilience.
 
 ---
 
@@ -151,7 +141,6 @@ This section contains the specific details required for the automated setup and 
 | **Docker Host VM** | `containers` | 30 (Servers) | `192.168.30.4` |
 | **Traefik LXC** | `traefik` | 60 (Public) | `192.168.60.2` |
 | **Raspberry Pi 4** | `rpi4` | 30 (Servers) | `192.168.30.5` |
-| **Raspberry Pi 2** | `rpi2` | 30 (Servers) | `192.168.30.6` |
 | **Home Assistant VM** | `haos` | 30 (Servers) | `192.168.30.7` |
 | **Immich LXC** | `immich` | 30 (Servers) | `192.168.30.8` |
 | **Desktop PC** | `desktop-pc` | 20 (Trusted) | `192.168.20.2` |
@@ -239,8 +228,7 @@ This section contains the specific details required for the automated setup and 
 
 #### Hardware
 - ⏳ Omada ER707-M2 Router (not yet deployed)
-- ✅ Raspberry Pi 4 (Zigbee/BT Hub + Secondary DNS)
-- ⏳ Raspberry Pi 2 (not yet configured)
+- ✅ Raspberry Pi 4 (Docker services + Secondary DNS)
 
 #### Virtual Machines & LXCs
 - ✅ TrueNAS Scale VM (192.168.1.150)
@@ -255,9 +243,7 @@ This section contains the specific details required for the automated setup and 
 
 #### Services
 - ✅ AdGuard Home (DNS filtering, primary + secondary)
-- ⏳ Zigbee2MQTT (future migration from ZHA)
-- ⏳ Mosquitto MQTT (needs migration from rpi4)
-- ✅ Home Assistant (HAOS VM with ZHA Zigbee integration)
+- ✅ Home Assistant (HAOS VM with ZHA via USB-passthrough Sonoff ZBT-2 on n5p)
 - ✅ Media services (Plex + Jellyfin on plex LXC)
 - ✅ *Arr suite (Sonarr, Radarr, Prowlarr on containers VM)
 - ✅ Immich (photo management with GPU acceleration)
@@ -275,7 +261,6 @@ This section contains the specific details required for the automated setup and 
 ### Next Steps
 
 1. **Plan Network Migration:** Prepare for transition to VLAN architecture when Omada router arrives
-2. **Mosquitto Migration:** Move MQTT broker from rpi4 to permanent location (rpi2 or containers VM)
 
 ---
 
@@ -287,7 +272,7 @@ This section details the final physical layout of the 7U wall-mounted network ra
 | :--- | :--- | :--- |
 | **U7** | 📄 Patch Panel | Terminates all incoming Ethernet drops. Incoming cable loom is routed up the side of the rack to this panel. |
 | **U6** | 🔌 MikroTik Switch | Main 24-port distribution switch. Connected to the patch panel with short (0.15m) patch cables. |
-| **U5** | ⚡ Custom 1U Mount | Houses the YuanLey PoE Switch and both Raspberry Pis. Connected to the MikroTik via a 10Gbps SFP+ backbone. |
+| **U5** | ⚡ Custom 1U Mount | Houses the YuanLey PoE Switch and Raspberry Pi 4. Connected to the MikroTik via a 10Gbps SFP+ backbone. |
 | **U4** | 🛡️ Omada Router | The main network router and firewall, completing the top-mounted "network block". |
 | **U3** | 🖌️ 1U Brush Panel | Provides a clean pass-through for cables running from the modem up to the router's WAN port. |
 | **U2** | 📠 Custom 3D Mount | A custom-printed mount for the Telekom Fiber Modem, providing a secure fit and better airflow than a shelf. |
