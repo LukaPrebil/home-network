@@ -23,8 +23,8 @@ matter_server_log_level: "info"  # Log level: debug, info, warning, error
 matter_server_timezone: "{{ timezone | default('UTC') }}"
 
 # Home Assistant integration info
-home_assistant_host: "192.168.1.144"
+home_assistant_host: "{{ hostvars['haos']['ansible_host'] }}"
 
 # OTBR connection (Matter Server connects to OTBR over network for Thread)
-otbr_host: "192.168.1.140"  # containers VM
+otbr_host: "{{ hostvars['containers']['ansible_host'] }}"
 otbr_rest_api_port: 8081

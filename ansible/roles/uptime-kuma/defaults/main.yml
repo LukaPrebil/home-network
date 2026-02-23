@@ -15,8 +15,3 @@ uptime_kuma_docker_network: "traefik"  # Connect to Traefik network for reverse 
 
 # Service state (can be overridden during migration)
 uptime_kuma_service_state: "started"  # Options: started, stopped, present
-
-# Data migration configuration
-uptime_kuma_migrate_data: false  # Set to true to sync data from rpi4
-uptime_kuma_source_host: "rpi4"  # Source host for data migration
-uptime_kuma_source_data_dir: "/home/luka/ha/kuma_data"  # Source directory on rpi4

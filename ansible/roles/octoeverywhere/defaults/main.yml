@@ -15,8 +15,3 @@ octoeverywhere_printer_ip: "192.168.1.100"  # IP address of the 3D printer
 
 # Service state (can be overridden during migration)
 octoeverywhere_service_state: "started"  # Options: started, stopped, present
-
-# Data migration configuration
-octoeverywhere_migrate_data: false  # Set to true to sync data from rpi4
-octoeverywhere_source_host: "rpi4"  # Source host for data migration
-octoeverywhere_source_data_dir: "/home/luka/ha/octo_data"  # Source directory on rpi4

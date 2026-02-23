@@ -15,8 +15,3 @@ ddns_updater_docker_network: "traefik"  # Connect to Traefik network (optional f
 
 # Service state (can be overridden during migration)
 ddns_updater_service_state: "started"  # Options: started, stopped, present
-
-# Data migration configuration
-ddns_updater_migrate_data: false  # Set to true to sync data from rpi4
-ddns_updater_source_host: "rpi4"  # Source host for data migration
-ddns_updater_source_data_dir: "/home/luka/ha/ddns-data"  # Source directory on rpi4

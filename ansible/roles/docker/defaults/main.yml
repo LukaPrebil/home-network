@@ -14,7 +14,4 @@ docker_base_dir: "/srv/docker"
 # Network configuration
 docker_mtu: 1492  # PPPoE max MTU - prevents fragmentation on 1Gb fiber
 
-# TrueNAS NFS mount for Docker volumes
-truenas_nfs_server: "192.168.1.150"  # Temporary (will be 192.168.30.3)
-truenas_docker_volumes_share: "/mnt/tank/docker-volumes"
 docker_nfs_mount_point: "{{ docker_base_dir }}"

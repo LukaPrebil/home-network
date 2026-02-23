@@ -7,13 +7,6 @@
     - uptime-kuma
     - directories
 
-- name: Include data migration tasks
-  ansible.builtin.include_tasks: migrate-data.yml
-  when: uptime_kuma_migrate_data | bool
-  tags:
-    - uptime-kuma
-    - migrate
-
 - name: Include deployment tasks
   ansible.builtin.include_tasks: deploy.yml
   tags:

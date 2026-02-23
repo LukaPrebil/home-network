@@ -9,7 +9,7 @@ immich_base_dir: "/opt/immich"
 immich_upload_dir: "/mnt/immich-photos"  # NFS mount point for photo library
 
 # NFS configuration for photo storage
-immich_nfs_server: "192.168.1.150"  # TrueNAS IP
+immich_nfs_server: "{{ truenas_nfs_server }}"
 immich_nfs_share: "/mnt/tank/immich-photos"
 immich_nfs_mount_point: "{{ immich_upload_dir }}"
 immich_nfs_opts: "defaults,nofail,_netdev"

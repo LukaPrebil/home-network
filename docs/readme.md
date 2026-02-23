@@ -99,7 +99,7 @@ graph TD
 | **30** | Servers           | `192.168.30.0/24` | Homelab servers and internal services.                        |
 | **40** | IoT               | `192.168.40.0/24` | Untrusted smart devices. **No Internet access.**              |
 | **50** | Cameras           | `192.168.50.0/24` | Security cameras. **No Internet access.**                     |
-| **60** | Public Services   | `192.168.60.0/24` | DMZ for services exposed to the internet (e.g., NPM).         |
+| **60** | Public Services   | `192.168.60.0/24` | DMZ for services exposed to the internet (e.g., Traefik).     |
 | **99** | Guest             | `192.168.99.0/24` | For visitors. **Internet access only.**                       |
 
 ---
@@ -235,37 +235,35 @@ This section contains the specific details required for the automated setup and 
   - `configure-truenas.yml` - Configures TrueNAS storage (ZFS, NFS, Proxmox integration)
 - ✅ TrueNAS API integration via midclt (JSON-RPC)
 
-### In Progress
-
-- 🚧 Cloud-init template playbook for Ubuntu VMs
-- 🚧 Docker Host VM provisioning playbook
-
 ### Not Started
 
 #### Hardware
 - ⏳ Omada ER707-M2 Router (not yet deployed)
-- ✅ Raspberry Pi 4 (decommissioned - all services migrated)
+- ✅ Raspberry Pi 4 (Zigbee/BT Hub + Secondary DNS)
 - ⏳ Raspberry Pi 2 (not yet configured)
 
-#### Virtual Machines
+#### Virtual Machines & LXCs
 - ✅ TrueNAS Scale VM (192.168.1.150)
 - ✅ Home Assistant OS VM (192.168.1.144) - **PRODUCTION**
 - ✅ Docker Host VM (192.168.1.140)
 - ✅ Traefik LXC (192.168.1.142) - **PRODUCTION**
 - ✅ Immich LXC (192.168.1.141)
 - ✅ Omada Controller LXC (192.168.1.143) - **PRODUCTION**
-- ⏳ Plex/Jellyfin VM
+- ✅ Plex LXC (192.168.1.147)
+- ✅ Cloud-init template playbook
+- ✅ Docker Host VM provisioning playbook
 
 #### Services
-- ⏳ AdGuard Home (DNS)
+- ✅ AdGuard Home (DNS filtering, primary + secondary)
 - ⏳ Zigbee2MQTT (future migration from ZHA)
 - ⏳ Mosquitto MQTT (needs migration from rpi4)
 - ✅ Home Assistant (HAOS VM with ZHA Zigbee integration)
-- ⏳ Media services (Plex/Jellyfin)
-- ⏳ *Arr suite
+- ✅ Media services (Plex + Jellyfin on plex LXC)
+- ✅ *Arr suite (Sonarr, Radarr, Prowlarr on containers VM)
 - ✅ Immich (photo management with GPU acceleration)
 - ✅ **Traefik Reverse Proxy** (serving 5 public services with Let's Encrypt)
 - ✅ **Omada SDN Controller** (managing network infrastructure)
+- ✅ **Monitoring Stack** (Prometheus + Grafana + Loki)
 
 #### Network Migration
 - ⏳ Deploy Omada router
@@ -276,11 +274,8 @@ This section contains the specific details required for the automated setup and 
 
 ### Next Steps
 
-1. **Deploy AdGuard Home:** DNS filtering and local DNS resolution
-2. **Monitoring Stack:** Prometheus + Grafana for infrastructure monitoring
-3. **Media Services:** Plex/Jellyfin VM with *Arr suite
-4. **Plan Network Migration:** Prepare for transition to VLAN architecture when Omada router arrives
-5. **Mosquitto Migration:** Move MQTT broker from rpi4 to permanent location (rpi2 or containers VM)
+1. **Plan Network Migration:** Prepare for transition to VLAN architecture when Omada router arrives
+2. **Mosquitto Migration:** Move MQTT broker from rpi4 to permanent location (rpi2 or containers VM)
 
 ---
 

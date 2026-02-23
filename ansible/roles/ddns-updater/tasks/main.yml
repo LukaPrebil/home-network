@@ -7,13 +7,6 @@
     - ddns-updater
     - directories
 
-- name: Include data migration tasks
-  ansible.builtin.include_tasks: migrate-data.yml
-  when: ddns_updater_migrate_data | bool
-  tags:
-    - ddns-updater
-    - migrate
-
 - name: Include deployment tasks
   ansible.builtin.include_tasks: deploy.yml
   tags:
