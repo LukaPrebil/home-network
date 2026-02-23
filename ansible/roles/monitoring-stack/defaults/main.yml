@@ -32,7 +32,7 @@ loki_port: 3100
 loki_retention_days: 30
 
 # cAdvisor configuration
-cadvisor_version: "v0.56.2"
+cadvisor_version: "0.56.2"
 cadvisor_port: 8080
 
 # Proxmox Exporter configuration

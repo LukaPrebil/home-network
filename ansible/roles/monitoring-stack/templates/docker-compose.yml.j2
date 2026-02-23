@@ -58,7 +58,7 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
 
   cadvisor:
-    image: ghcr.io/google/cadvisor/cadvisor:{{ cadvisor_version }}
+    image: ghcr.io/google/cadvisor:{{ cadvisor_version }}
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
