@@ -1,10 +1,23 @@
 ---
 # Main playbook for homelab infrastructure
-# This playbook applies roles to all managed hosts
+#
+# Usage:
+#   ansible-playbook site.yml                            # Full convergence
+#   ansible-playbook site.yml --tags traefik             # Just Traefik
+#   ansible-playbook site.yml --tags monitoring          # Monitoring stack
+#   ansible-playbook site.yml --tags adguard             # AdGuard on all hosts
+#   ansible-playbook site.yml --tags media               # Plex + Jellyfin + Arr
+#   ansible-playbook site.yml --tags thread-matter       # OTBR + Matter Server
+#   ansible-playbook site.yml --tags monitoring-agents   # Node Exporter + Alloy
+#   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
+#   ansible-playbook site.yml --limit immich             # Everything for Immich host
+#   ansible-playbook site.yml --limit 'all:!tn-storage'  # Skip TrueNAS (no apt)
 
 - name: Configure all Linux servers with common settings
   hosts: linux_servers
   become: true
+  tags:
+    - common
   vars_files:
     - secrets.yml
   roles:
@@ -13,6 +26,8 @@
 - name: Configure Proxmox hosts
   hosts: proxmox_hosts
   become: true
+  tags:
+    - proxmox
   vars_files:
     - secrets.yml
   roles:
@@ -21,6 +36,9 @@
 - name: Deploy Node Exporter for metrics collection
   hosts: monitoring_agents
   become: true
+  tags:
+    - node-exporter
+    - monitoring-agents
   vars_files:
     - secrets.yml
   roles:
@@ -29,6 +47,9 @@
 - name: Deploy Grafana Alloy for metrics and log shipping
   hosts: monitoring_agents
   become: true
+  tags:
+    - alloy
+    - monitoring-agents
   vars_files:
     - secrets.yml
   roles:
@@ -37,6 +58,8 @@
 - name: Deploy Autoheal container health monitor
   hosts: docker_hosts
   become: true
+  tags:
+    - autoheal
   roles:
     - docker
     - autoheal
@@ -44,15 +67,89 @@
 - name: Deploy monitoring stack
   hosts: monitoring_hosts
   become: true
+  tags:
+    - monitoring
   vars_files:
     - secrets.yml
   roles:
     - docker
     - monitoring-stack
 
-- name: Deploy Plex Media Server
+- name: Deploy Traefik reverse proxy
+  hosts: traefik
+  become: true
+  tags:
+    - traefik
+  vars_files:
+    - secrets.yml
+  roles:
+    - common
+    - docker
+    - traefik
+
+- name: Deploy Immich photo management
+  hosts: immich
+  become: true
+  tags:
+    - immich
+  vars_files:
+    - secrets.yml
+  roles:
+    - common
+    - docker
+    - immich
+
+- name: Deploy Omada Controller
+  hosts: omada
+  become: true
+  tags:
+    - omada
+  vars_files:
+    - secrets.yml
+  roles:
+    - common
+    - omada-controller
+
+- name: Deploy AdGuard Home DNS
+  hosts: adguard_hosts
+  become: true
+  tags:
+    - adguard
+  vars_files:
+    - secrets.yml
+  roles:
+    - adguard
+
+- name: Deploy OpenThread Border Router (OTBR)
+  hosts: containers
+  become: true
+  tags:
+    - otbr
+    - thread-matter
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - otbr
+
+- name: Deploy Python Matter Server
+  hosts: rpi4
+  become: true
+  tags:
+    - matter-server
+    - thread-matter
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - matter-server
+
+- name: Deploy Plex and Jellyfin media servers
   hosts: plex_hosts
   become: true
+  tags:
+    - plex
+    - media
   vars_files:
     - secrets.yml
   roles:
@@ -60,11 +157,27 @@
     - plex
     - jellyfin
 
-- name: Deploy Arr Stack (Sonarr, Radarr, Prowlarr, etc.)
+- name: Deploy Arr Stack (Sonarr, Radarr, Prowlarr)
   hosts: arr_stack_hosts
   become: true
+  tags:
+    - arr-stack
+    - media
   vars_files:
     - secrets.yml
   roles:
     - docker
     - arr-stack
+
+- name: Deploy container services (Uptime Kuma, DDNS, OctoEverywhere)
+  hosts: containers
+  become: true
+  tags:
+    - containers-services
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - uptime-kuma
+    - ddns-updater
+    - octoeverywhere
