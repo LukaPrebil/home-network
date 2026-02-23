@@ -2,7 +2,7 @@
 # AdGuard Home role defaults
 
 # Installation
-adguard_version: "v0.107.67"  # Latest stable release
+adguard_version: "v0.107.72"
 adguard_install_dir: "/opt/adguardhome"
 adguard_work_dir: "/var/lib/adguardhome"
 adguard_config_dir: "/etc/adguardhome"
@@ -13,31 +13,61 @@ adguard_bind_port: 3000  # Web UI port
 adguard_dns_port: 53  # DNS port
 
 # Upstream DNS servers (encrypted)
-# Primary: DoH to Cloudflare for maximum privacy
 adguard_upstream_dns:
-  - "https://dns.cloudflare.com/dns-query"  # Cloudflare DoH (primary)
+  - "https://dns.cloudflare.com/dns-query"
+  - "https://dns10.quad9.net/dns-query"
 
 # Bootstrap DNS (plain DNS used to resolve DoH/DoT hostnames)
 adguard_bootstrap_dns:
   - "1.1.1.1"
   - "1.0.0.1"
 
-# Fallback DNS (encrypted DoT, used if DoH fails)
+# Fallback DNS (encrypted, used if primary upstreams fail)
 adguard_fallback_dns:
-  - "tls://1.1.1.1"  # Cloudflare DoT
-  - "tls://1.0.0.1"  # Cloudflare DoT
+  - "https://dns10.quad9.net/dns-query"
+  - "tls://1.1.1.1"
+  - "tls://1.0.0.1"
 
-# AdGuard configuration
+# HTTP session
+adguard_session_ttl: "720h"
+
+# Query log
 adguard_querylog_enabled: true
 adguard_querylog_interval: "2160h"  # 90 days
-adguard_querylog_anonymize_client_ip: true  # Anonymize client IPs in query logs
-adguard_statistics_interval: "2160h"  # 90 days
+adguard_querylog_anonymize_client_ip: false
+
+# Statistics
+adguard_statistics_interval: "720h"  # 30 days
+
+# DNS settings
+adguard_dnssec_enabled: true
+adguard_cache_optimistic: true
+adguard_use_private_ptr_resolvers: true
 
 # Filtering
 adguard_filtering_enabled: true
 adguard_safebrowsing_enabled: true
 adguard_parental_enabled: false
 adguard_safesearch_enabled: false
+
+# Filter lists
+adguard_filters:
+  - enabled: true
+    url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt"
+    name: "AdGuard DNS filter"
+    id: 1
+  - enabled: true
+    url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt"
+    name: "AdAway Default Blocklist"
+    id: 2
+  - enabled: true
+    url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_59.txt"
+    name: "AdGuard DNS Popup Hosts filter"
+    id: 1767521884
+
+# User-defined filtering rules
+adguard_user_rules:
+  - "@@||stats.grafana.org^$important"
 
 # DHCP (disabled - router handles DHCP)
 adguard_dhcp_enabled: false

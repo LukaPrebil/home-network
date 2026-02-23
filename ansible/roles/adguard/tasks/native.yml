@@ -48,19 +48,38 @@
     path: "{{ adguard_install_dir }}/AdGuardHome"
   register: adguard_binary
 
+- name: Check installed AdGuard Home version
+  ansible.builtin.command:
+    cmd: "{{ adguard_install_dir }}/AdGuardHome --version"
+  register: adguard_installed_version
+  changed_when: false
+  when: adguard_binary.stat.exists
+
+- name: Determine if install or upgrade is needed
+  ansible.builtin.set_fact:
+    adguard_needs_install: "{{ not adguard_binary.stat.exists or adguard_version not in (adguard_installed_version.stdout | default('')) }}"
+
+- name: Stop AdGuard Home service before upgrade
+  ansible.builtin.systemd:
+    name: AdGuardHome
+    state: stopped
+  when:
+    - adguard_needs_install
+    - adguard_binary.stat.exists
+
 - name: Download AdGuard Home
   ansible.builtin.get_url:
     url: "https://github.com/AdguardTeam/AdGuardHome/releases/download/{{ adguard_version }}/AdGuardHome_linux_amd64.tar.gz"
     dest: "/tmp/adguardhome.tar.gz"
     mode: '0644'
-  when: not adguard_binary.stat.exists
+  when: adguard_needs_install
 
 - name: Extract AdGuard Home
   ansible.builtin.unarchive:
     src: "/tmp/adguardhome.tar.gz"
     dest: "/tmp"
     remote_src: yes
-  when: not adguard_binary.stat.exists
+  when: adguard_needs_install
 
 - name: Move AdGuard Home binary to install directory
   ansible.builtin.copy:
@@ -68,7 +87,8 @@
     dest: "{{ adguard_install_dir }}/AdGuardHome"
     mode: '0755'
     remote_src: yes
-  when: not adguard_binary.stat.exists
+  when: adguard_needs_install
+  notify: Restart AdGuard Home
 
 - name: Clean up downloaded files
   ansible.builtin.file:
@@ -77,7 +97,7 @@
   loop:
     - "/tmp/adguardhome.tar.gz"
     - "/tmp/AdGuardHome"
-  when: not adguard_binary.stat.exists
+  when: adguard_needs_install
 
 - name: Install apache2-utils for htpasswd
   ansible.builtin.apt:
