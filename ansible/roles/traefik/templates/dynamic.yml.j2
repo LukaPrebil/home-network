@@ -182,6 +182,22 @@ http:
       middlewares:
         - proxy-headers
 
+    # Paperless-ngx Document Management
+    paperless-secure:
+      rule: "Host(`documents.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: paperless
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+        - security-headers
+
 {% endif %}
 
   # Services - backend targets
@@ -227,6 +243,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.1.147:8096"
+        passHostHeader: true
+
+    paperless:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.140:8000"
         passHostHeader: true
 {% endif %}
 

@@ -1,0 +1,20 @@
+---
+# Main tasks file for Paperless-ngx role
+
+- name: Include directory setup tasks
+  ansible.builtin.include_tasks: directories.yml
+  tags:
+    - paperless-ngx
+    - directories
+
+- name: Include NFS mount tasks
+  ansible.builtin.include_tasks: nfs.yml
+  tags:
+    - paperless-ngx
+    - nfs
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - paperless-ngx
+    - deploy

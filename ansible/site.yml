@@ -9,6 +9,7 @@
 #   ansible-playbook site.yml --tags media               # Plex + Jellyfin + Arr
 #   ansible-playbook site.yml --tags thread-matter       # OTBR + Matter Server
 #   ansible-playbook site.yml --tags monitoring-agents   # Node Exporter + Alloy
+#   ansible-playbook site.yml --tags paperless-ngx       # Paperless-ngx document management
 #   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
 #   ansible-playbook site.yml --limit immich             # Everything for Immich host
 #   ansible-playbook site.yml --limit 'all:!tn-storage'  # Skip TrueNAS (no apt)
@@ -168,6 +169,17 @@
   roles:
     - docker
     - arr-stack
+
+- name: Deploy Paperless-ngx document management
+  hosts: containers
+  become: true
+  tags:
+    - paperless-ngx
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - paperless-ngx
 
 - name: Deploy container services (Uptime Kuma, DDNS, OctoEverywhere)
   hosts: containers

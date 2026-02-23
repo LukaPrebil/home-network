@@ -57,6 +57,11 @@ zfs_datasets:
     compression: lz4
     recordsize: 1M  # Optimized for photo/video files
 
+  - name: "{{ zfs_pool_name }}/paperless"
+    quota: 50G
+    description: "Paperless-ngx document storage"
+    compression: zstd  # Documents compress well
+
 # NFS Share Configuration
 nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/proxmox-vms"
@@ -122,6 +127,17 @@ nfs_shares:
       - async  # Better performance for photo library
       - no_subtree_check
       - no_root_squash  # Immich container needs root access
+
+  - path: "/mnt/{{ zfs_pool_name }}/paperless"
+    name: paperless
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    options:
+      - rw
+      - sync
+      - no_subtree_check
+      - no_root_squash  # Paperless container needs root access
 
   # Separate pool for Plex and arr stack application configs
   - path: "/mnt/plex-apps"

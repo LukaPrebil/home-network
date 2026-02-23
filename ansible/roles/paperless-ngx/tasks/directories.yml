@@ -1,0 +1,23 @@
+---
+# Create required directories for Paperless-ngx
+
+- name: Create Paperless-ngx base directory
+  ansible.builtin.file:
+    path: "{{ paperless_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create Paperless-ngx data directories
+  ansible.builtin.file:
+    path: "{{ paperless_base_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - data
+    - consume
+    - pgdata
+    - redisdata

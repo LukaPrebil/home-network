@@ -1,0 +1,55 @@
+---
+# Docker Compose file for Paperless-ngx
+
+services:
+  paperless-broker:
+    image: redis:{{ paperless_redis_version }}
+    container_name: paperless-redis
+    restart: unless-stopped
+    volumes:
+      - {{ paperless_base_dir }}/redisdata:/data
+
+  paperless-db:
+    image: postgres:{{ paperless_postgres_version }}
+    container_name: paperless-db
+    restart: unless-stopped
+    volumes:
+      - {{ paperless_base_dir }}/pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: {{ paperless_db_name }}
+      POSTGRES_USER: {{ paperless_db_user }}
+      POSTGRES_PASSWORD: "{{ vault_paperless_db_password | replace('$', '$$') }}"
+
+  paperless-web:
+    image: ghcr.io/paperless-ngx/paperless-ngx:{{ paperless_version }}
+    container_name: paperless-ngx
+    restart: unless-stopped
+    depends_on:
+      - paperless-db
+      - paperless-broker
+    ports:
+      - "{{ paperless_port }}:8000"
+    networks:
+      - default
+      - {{ paperless_docker_network }}
+    volumes:
+      - {{ paperless_base_dir }}/data:/usr/src/paperless/data
+      - {{ paperless_nfs_mount_point }}/media:/usr/src/paperless/media
+      - {{ paperless_nfs_mount_point }}/export:/usr/src/paperless/export
+      - {{ paperless_base_dir }}/consume:/usr/src/paperless/consume
+    environment:
+      PAPERLESS_REDIS: redis://paperless-broker:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: {{ paperless_db_name }}
+      PAPERLESS_DBUSER: {{ paperless_db_user }}
+      PAPERLESS_DBPASS: "{{ vault_paperless_db_password | replace('$', '$$') }}"
+      PAPERLESS_SECRET_KEY: "{{ vault_paperless_secret_key | replace('$', '$$') }}"
+      PAPERLESS_TIME_ZONE: {{ paperless_time_zone }}
+      PAPERLESS_OCR_LANGUAGE: {{ paperless_ocr_language }}
+      PAPERLESS_ADMIN_USER: {{ paperless_admin_user }}
+      PAPERLESS_ADMIN_PASSWORD: "{{ vault_paperless_admin_password | replace('$', '$$') }}"
+      PAPERLESS_URL: https://documents.{{ traefik_domain | default('lukapg.dev') }}
+
+networks:
+  {{ paperless_docker_network }}:
+    external: true
