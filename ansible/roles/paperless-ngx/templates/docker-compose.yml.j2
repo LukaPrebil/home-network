@@ -46,6 +46,7 @@ services:
       PAPERLESS_SECRET_KEY: "{{ vault_paperless_secret_key | replace('$', '$$') }}"
       PAPERLESS_TIME_ZONE: {{ paperless_time_zone }}
       PAPERLESS_OCR_LANGUAGE: {{ paperless_ocr_language }}
+      PAPERLESS_OCR_LANGUAGES: {{ paperless_ocr_install_languages }}
       PAPERLESS_ADMIN_USER: {{ paperless_admin_user }}
       PAPERLESS_ADMIN_PASSWORD: "{{ vault_paperless_admin_password | replace('$', '$$') }}"
       PAPERLESS_URL: https://documents.{{ traefik_domain | default('lukapg.dev') }}
