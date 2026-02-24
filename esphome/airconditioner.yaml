@@ -1,0 +1,125 @@
+esphome:
+  name: airconditioner
+  friendly_name: Air Conditioner
+
+esp32:
+  board: esp32cam
+  framework:
+    type: esp-idf
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "AC_Fallback"
+    password: "fallback123"
+
+web_server:
+  port: 80
+
+captive_portal:
+
+logger:
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+external_components:
+  - source: github://echavet/MitsubishiCN105ESPHome
+
+uart:
+  id: HP_UART
+  baud_rate: 2400
+  tx_pin: GPIO14
+  rx_pin: GPIO13
+
+climate:
+  - platform: cn105
+    id: ac
+    name: "Air Conditioner"
+    update_interval: 2s
+    visual:
+      min_temperature: 16
+      max_temperature: 31
+    remote_temperature_timeout: 30min
+    supports:
+      dual_setpoint: true
+
+    # Sensors
+    compressor_frequency_sensor:
+      name: AC Compressor Frequency
+      id: ac_compressor_frequency
+    input_power_sensor:
+      name: AC Input Power
+      id: ac_input_power
+    kwh_sensor:
+      name: AC Energy
+      id: ac_energy
+    outside_air_temperature_sensor:
+      name: AC Outside Temperature
+      id: ac_outside_temperature
+    stage_sensor:
+      name: AC Stage
+      id: ac_stage
+    sub_mode_sensor:
+      name: AC Sub Mode
+      id: ac_sub_mode
+    auto_sub_mode_sensor:
+      name: AC Auto Sub Mode
+      id: ac_auto_sub_mode
+
+    # Binary sensors
+    isee_sensor:
+      name: AC iSee
+      id: ac_isee
+
+    # Selects (vane control)
+    vertical_vane_select:
+      name: AC Vertical Vane
+      id: ac_vertical_vane
+    horizontal_vane_select:
+      name: AC Horizontal Vane
+      id: ac_horizontal_vane
+
+    # Switches
+    night_mode_switch:
+      name: AC Night Mode
+      id: ac_night_mode
+    air_purifier_switch:
+      name: AC Air Purifier
+      id: ac_air_purifier
+
+
+# Diagnostics (UART health)
+sensor:
+  - platform: template
+    name: AC UART Connected
+    id: ac_uart_connected
+    entity_category: DIAGNOSTIC
+    lambda: |-
+      return (bool) id(ac).isUARTConnected_;
+    update_interval: 30s
+
+  - platform: template
+    name: AC Complete Cycles
+    id: ac_complete_cycles
+    entity_category: DIAGNOSTIC
+    accuracy_decimals: 0
+    lambda: |-
+      return (unsigned long) id(ac).nbCompleteCycles_;
+    update_interval: 60s
+
+  - platform: template
+    name: AC Total Cycles
+    id: ac_total_cycles
+    entity_category: DIAGNOSTIC
+    accuracy_decimals: 0
+    lambda: |-
+      return (unsigned long) id(ac).nbCycles_;
+    update_interval: 60s

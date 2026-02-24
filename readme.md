@@ -15,6 +15,7 @@ ansible-playbook site.yml --check --diff     # Dry run
 
 - `ansible/` — All Ansible automation (roles, inventory, playbooks)
 - `docs/` — Network architecture, VLANs, IP map, service documentation
+- `esphome/` — ESPHome device configurations (compiled and flashed to microcontrollers)
 
 ## Documentation
 
