@@ -39,16 +39,16 @@ The ESP32-CAM is powered directly from the CN105 5V rail. No voltage regulator o
 **First flash (USB):**
 
 ```bash
-pip install esphome
+brew install esphome
 esphome run airconditioner.yaml
 ```
 
-The ESP32-CAM requires bridging IO0 to GND (or holding the BOOT button) when powering on to enter flash mode. Release after upload starts.
+The ESP32-CAM requires bridging IO0 to GND to enter download mode. Hold the bridge, press RST, then run the upload command. Remove the bridge after flashing completes.
 
 **Subsequent updates (OTA):**
 
 ```bash
-esphome run airconditioner.yaml --device <IP_ADDRESS>
+esphome run airconditioner.yaml --device 192.168.1.99
 ```
 
 #### Installation
@@ -62,11 +62,16 @@ esphome run airconditioner.yaml --device <IP_ADDRESS>
 
 #### Home Assistant Integration
 
-The device auto-discovers in Home Assistant via the ESPHome API. No manual configuration needed — the climate entity appears automatically.
+The device auto-discovers in Home Assistant via the ESPHome API. No manual configuration needed. Exposed entities:
 
-#### Known Issues
+- **Climate:** heat/cool/auto/dry/fan with dual setpoint support
+- **Sensors:** compressor frequency, input power, energy (kWh), outside temperature, stage, sub mode, auto sub mode
+- **Binary sensor:** iSee (AI sensing)
+- **Selects:** vertical vane, horizontal vane
+- **Switches:** night mode, air purifier
+- **Diagnostics:** UART connected, complete/total comm cycles
 
-- ESPHome 2025.8.0+ has a known UART cold-boot bug with this component. Pin to 2025.7.5 if you hit connection issues after power loss.
+A web server is available at `http://airconditioner.local` (or the device IP) for debugging without Home Assistant.
 
 #### References
 
@@ -76,5 +81,5 @@ The device auto-discovers in Home Assistant via the ESPHome API. No manual confi
 ## Setup
 
 1. Copy `secrets.yaml.example` to `secrets.yaml` and fill in your values
-2. Install ESPHome: `pip install esphome`
+2. Install ESPHome: `brew install esphome`
 3. Flash the device: `esphome run <config>.yaml`
