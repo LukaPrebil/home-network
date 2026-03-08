@@ -133,17 +133,23 @@ This section contains the specific details required for the automated setup and 
 
 ### Static IP Address Map
 
-| Device/Role | Hostname | VLAN | Static IP Address |
-| :--- | :--- | :--- | :--- |
-| **Omada Router** | `gateway` | N/A | `192.168.10.1`, `192.168.20.1`, etc. |
-| **Minisforum N5 Pro** | `n5p` | 30 (Servers) | `192.168.30.2` |
-| **TrueNAS VM** | `tn-storage` | 30 (Servers) | `192.168.30.3` |
-| **Docker Host VM** | `containers` | 30 (Servers) | `192.168.30.4` |
-| **Traefik LXC** | `traefik` | 60 (Public) | `192.168.60.2` |
-| **Raspberry Pi 4** | `rpi4` | 30 (Servers) | `192.168.30.5` |
-| **Home Assistant VM** | `haos` | 30 (Servers) | `192.168.30.7` |
-| **Immich LXC** | `immich` | 30 (Servers) | `192.168.30.8` |
-| **Desktop PC** | `desktop-pc` | 20 (Trusted) | `192.168.20.2` |
+The network currently runs on a flat `192.168.1.0/24` subnet. The VLAN architecture in Section 4 is the planned target — see "Planned" below.
+
+| Device/Role | Hostname | IP Address |
+| :--- | :--- | :--- |
+| **Home Router** | `gateway` | `192.168.1.1` |
+| **Minisforum N5 Pro** | `n5p` | `192.168.1.128` |
+| **Raspberry Pi 4** | `rpi4` | `192.168.1.110` |
+| **Docker Host VM** | `containers` | `192.168.1.140` |
+| **Immich LXC** | `immich` | `192.168.1.141` |
+| **Traefik LXC** | `traefik` | `192.168.1.142` |
+| **Omada Controller LXC** | `omada` | `192.168.1.143` |
+| **Home Assistant VM** | `haos` | `192.168.1.144` |
+| **AdGuard LXC** | `adguard` | `192.168.1.145` |
+| **Monitoring LXC** | `monitoring` | `192.168.1.146` |
+| **Plex LXC** | `plex` | `192.168.1.147` |
+| **TrueNAS VM** | `tn-storage` | `192.168.1.150` |
+| **Desktop PC** | `desktop-pc` | DHCP |
 
 ### Automation Configuration
 
@@ -159,15 +165,7 @@ This section contains the specific details required for the automated setup and 
 
 ### Current Network State
 
-**Temporary Configuration (During Build-Out):**
-- Network: `192.168.1.0/24` (existing home network)
-- N5 Pro (Proxmox): `192.168.1.128`
-- TrueNAS VM: `192.168.1.150` (DHCP)
-- Router: Not yet deployed (using existing home router at `192.168.1.1`)
-- VLANs: Not yet active (waiting for Omada router deployment)
-- All services accessible on temporary IPs until VLAN migration
-
-**Note:** The network is currently in a transitional state. Once the Omada router is deployed, we will migrate to the VLAN architecture defined in Section 4.
+The network runs on a flat `192.168.1.0/24` subnet using the existing home router at `192.168.1.1`. All services are accessible on their assigned IPs listed in Section 6. The VLAN architecture defined in Section 4 is the planned target — migration will happen when the Omada ER707-M2 router is deployed.
 
 ### Completed Tasks
 
@@ -227,19 +225,16 @@ This section contains the specific details required for the automated setup and 
   - `configure-truenas.yml` - Configures TrueNAS storage (ZFS, NFS, iSCSI, Proxmox integration)
 - ✅ TrueNAS API integration via midclt (JSON-RPC)
 
-### Not Started
-
 #### Hardware
-- ⏳ Omada ER707-M2 Router (not yet deployed)
 - ✅ Raspberry Pi 4 (Docker services + Secondary DNS)
 
 #### Virtual Machines & LXCs
 - ✅ TrueNAS Scale VM (192.168.1.150)
-- ✅ Home Assistant OS VM (192.168.1.144) - **PRODUCTION**
+- ✅ Home Assistant OS VM (192.168.1.144)
 - ✅ Docker Host VM (192.168.1.140)
-- ✅ Traefik LXC (192.168.1.142) - **PRODUCTION**
+- ✅ Traefik LXC (192.168.1.142)
 - ✅ Immich LXC (192.168.1.141)
-- ✅ Omada Controller LXC (192.168.1.143) - **PRODUCTION**
+- ✅ Omada Controller LXC (192.168.1.143)
 - ✅ Plex LXC (192.168.1.147)
 - ✅ Cloud-init template playbook
 - ✅ Docker Host VM provisioning playbook
@@ -250,21 +245,22 @@ This section contains the specific details required for the automated setup and 
 - ✅ Media services (Plex + Jellyfin on plex LXC)
 - ✅ *Arr suite (Sonarr, Radarr, Prowlarr on containers VM)
 - ✅ Immich (photo management with GPU acceleration)
-- ✅ **Traefik Reverse Proxy** (serving 5 public services with Let's Encrypt)
-- ✅ **Omada SDN Controller** (managing network infrastructure)
-- ✅ **Monitoring Stack** (Prometheus + Grafana + Loki)
-- ✅ **ATProto PDS** (self-hosted Bluesky PDS at pds.lukapg.dev, iSCSI storage from TrueNAS, Cloudflare-proxied, DNS TXT handle verification)
+- ✅ Traefik Reverse Proxy (serving 5 public services with Let's Encrypt)
+- ✅ Omada SDN Controller (managing network infrastructure)
+- ✅ Monitoring Stack (Prometheus + Grafana + Loki)
+- ✅ ATProto PDS (self-hosted Bluesky PDS at pds.lukapg.dev, iSCSI storage from TrueNAS, Cloudflare-proxied, DNS TXT handle verification)
 
-#### Network Migration
+### Planned
+
+#### Hardware
+- ⏳ Omada ER707-M2 Router (not yet deployed)
+
+#### Network Migration (blocked on router deployment)
 - ⏳ Deploy Omada router
 - ⏳ Configure VLANs on router
 - ⏳ Migrate Proxmox host to VLAN 30
 - ⏳ Configure firewall rules
 - ⏳ Set up inter-VLAN routing
-
-### Next Steps
-
-1. **Plan Network Migration:** Prepare for transition to VLAN architecture when Omada router arrives
 
 ---
 

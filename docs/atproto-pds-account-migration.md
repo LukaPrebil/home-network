@@ -1,5 +1,7 @@
 # ATProto PDS Account Migration Guide
 
+> **Rule:** Use the `goat` CLI (`brew install goat`) for all PDS operations — account creation, invite codes, migration, etc. Do NOT use `pdsadmin.sh` or raw curl/XRPC calls.
+
 This guide covers migrating an existing Bluesky account from `bsky.social` (or any other PDS) to the self-hosted PDS at `pds.lukapg.dev` using the official `goat` CLI tool.
 
 ## Prerequisites

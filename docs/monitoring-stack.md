@@ -1,90 +1,70 @@
-# Homelab Observability Stack Implementation Plan
+# Homelab Observability Stack
 
-## 1. Overview
+## Overview
 
-**Goal:** Deploy a comprehensive, automated monitoring and logging stack for the entire homelab using Grafana, Prometheus, and Loki.
+The monitoring and logging stack runs on the `monitoring` LXC (192.168.1.146), deployed via Docker Compose and managed by the `monitoring-stack` Ansible role.
 
-**Host Machine:** The core stack will run on the `containers` VM (`192.168.30.4`).
-**Deployment Method:** All components of the stack (Grafana, Prometheus, Loki, etc.) will be deployed via Docker Compose.
-**Automation:** The entire setup, including component deployment and target configuration, must be managed by Ansible roles.
-**Access:** The Grafana web UI will be exposed via Traefik.
+**Components:**
+- **Grafana** — visualization dashboards (port 3000, exposed via Traefik)
+- **Prometheus** — metrics database (port 9090, 30-day retention)
+- **Loki** — log aggregation database (port 3100, 30-day retention)
+- **cAdvisor** — Docker container metrics (port 8080)
+- **Proxmox Exporter** — pulls metrics from the Proxmox API (port 9221)
+- **Omada Exporter** — pulls metrics from the Omada Controller API (port 9202)
+- **Speedtest Exporter** — Ookla bandwidth tests at 30-minute intervals (port 9469)
 
----
-## 2. Core Stack Deployment
-
-An Ansible role named `monitoring-stack` should be created to deploy the following services on the `containers` VM.
-
-* **Services:**
-    * **Grafana:** The main visualization dashboard.
-    * **Prometheus:** The metrics database.
-    * **Loki:** The log aggregation database.
-    * **cAdvisor:** For Docker container metrics.
-    * **Proxmox Exporter:** To pull metrics from the Proxmox API.
-    * **Omada Exporter:** To pull metrics from the Omada Controller API.
-* **Volumes:** All services must use persistent volumes mapped to `/srv/docker/` (e.g., `/srv/docker/grafana`, `/srv/docker/prometheus`).
-* **Networking:** Grafana should be exposed via Traefik. The Docker Compose file must include the necessary labels to route `grafana.yourdomain.com`.
+**Volumes:** persistent data stored under `/srv/docker/` (grafana, prometheus, loki).
 
 ---
-## 3. Prometheus Configuration
 
-Prometheus must be configured to scrape the following targets. This should be managed via an Ansible template (`prometheus.yml.j2`). All API keys and passwords must be sourced from the Ansible Vault (`secrets.yml`).
+## Prometheus Scrape Targets
 
-| Target System | Exporter Required | Deployed On | Scrape Target (Endpoint) |
+Configured via Ansible template (`prometheus.yml.j2`). All API keys/passwords sourced from Ansible Vault.
+
+| Target | Exporter | Deployed On | Scrape Endpoint |
 | :--- | :--- | :--- | :--- |
-| **Proxmox Host** (`n5p`) | `prometheus-pve-exporter` | `containers` VM (Docker) | `http://<exporter_ip>:9221/pve` |
-| **TrueNAS VM** (`tn-storage`)| Built-in | TrueNAS (Enabled in UI) | `http://192.168.30.3:9100/metrics` (TBC) |
-| **All Linux Hosts** (VMs, LXCs, RPi's) | `node_exporter` | All target hosts | `http://<host_ip>:9100/metrics` |
-| **Docker Containers** | `cAdvisor` | `containers` VM (Docker) | `http://cadvisor:8080/metrics` |
-| **Omada Controller** (`omada-lxc`) | `omada_exporter` | `containers` VM (Docker) | `http://<exporter_ip>:9202/metrics` |
-| **Traefik Proxy** | Built-in | `containers` VM (Docker) | `http://traefik:8080/metrics` (Enabled in config) |
+| Proxmox Host (`n5p`) | `prometheus-pve-exporter` | monitoring LXC (Docker) | `proxmox-exporter:9221` |
+| All Linux Hosts | `node_exporter` | Each target host (native binary) | `<host_ip>:9100` |
+| Docker Containers | `cAdvisor` | monitoring LXC (Docker) | `cadvisor:8080` |
+| Omada Controller | `omada_exporter` | monitoring LXC (Docker) | `omada-exporter:9202` |
+| Traefik Proxy | Built-in | traefik LXC | `<traefik_ip>:8082` |
+| Grafana Alloy agents | Built-in | Each target host (native binary) | `<host_ip>:12345` |
+| Internet Bandwidth | `speedtest-exporter` | monitoring LXC (Docker) | `speedtest-exporter:9469` |
+| TrueNAS (`tn-storage`) | Built-in | TrueNAS (enable in UI) | *Not yet enabled* |
+
+**Note:** `node_exporter` targets are dynamically generated from the `monitoring_agents` inventory group via Jinja2 templating.
 
 ---
-## 4. Log Aggregation (Loki) Configuration
 
-Log collection will be handled by `promtail`.
+## Log Aggregation (Loki + Alloy)
 
-* **Ansible Role:** A new role, `promtail`, should be created to deploy and configure `promtail` on all relevant hosts (Proxmox host, all VMs, and all LXCs).
-* **Target Logs to Collect:**
-    * **Proxmox Host (`n5p`):**
-        * `/var/log/syslog`
-        * `/var/log/auth.log`
-        * `/var/log/daemon.log`
-    * **All VMs/LXCs:**
-        * `/var/log/syslog`
-    * **Traefik:**
-        * Access logs
-        * Application logs
-    * **Immich, Plex, etc.:**
-        * Any relevant application log files.
+Log collection is handled by **Grafana Alloy** (native binary), deployed via the `alloy` Ansible role on all hosts in the `monitoring_agents` group.
+
+Alloy replaced the originally planned `promtail` agent. It ships logs to Loki and also exposes its own metrics for Prometheus scraping on port 12345.
 
 ---
-## 5. Grafana Setup
 
-The Grafana instance should be configured by the Ansible role with the following:
+## Grafana
 
-* **Data Sources:**
-    * Auto-provision the **Prometheus** data source.
-    * Auto-provision the **Loki** data source.
-* **Dashboards:**
-    * The role should automatically import a set of standard community dashboards. The "definition of done" is having a functional dashboard for each key service.
-    * **Host Monitoring:** "Node Exporter Full" (e.g., ID `1860`) for all Linux hosts.
-    * **Proxmox:** A dashboard for Proxmox VE (e.g., ID `10347`).
-    * **TrueNAS:** A dashboard for TrueNAS SCALE.
-    * **Docker:** A dashboard for `cAdvisor` metrics.
-    * **Network:** An `omada_exporter` dashboard.
-    * **Logs:** A dashboard for log exploration with Loki.
+The Grafana instance is auto-provisioned by the Ansible role with:
+
+**Data Sources** (provisioned via YAML templates):
+- Prometheus
+- Loki
+
+**Dashboards:**
+- **Host Monitoring**: Node Exporter Full (ID `1860`) for all Linux hosts
+- **Proxmox**: Proxmox VE dashboard (ID `10347`)
+- **Docker**: cAdvisor metrics dashboard
+- **Network**: Omada Exporter dashboard
+- **Logs**: Loki log exploration dashboard
 
 ---
-## 6. Ansible Implementation Strategy
 
-The agent should create the following new roles:
+## Ansible Roles
 
-1.  **`monitoring-stack`:**
-    * **Target:** `containers` VM.
-    * **Tasks:** Deploys the core Docker stack (Grafana, Prometheus, Loki, cAdvisor, PVE Exporter, Omada Exporter). Manages the `prometheus.yml` configuration file via a template.
-2.  **`node-exporter`:**
-    * **Target:** All Linux hosts (`n5p`, `rpi4`, all VMs/LXCs).
-    * **Tasks:** Installs and enables the `node_exporter` service.
-3.  **`promtail`:**
-    * **Target:** All Linux hosts.
-    * **Tasks:** Installs and configures the `promtail` service to ship the correct logs to Loki.
+| Role | Target Hosts | Description |
+|------|-------------|-------------|
+| `monitoring-stack` | `monitoring` LXC | Core Docker stack (Grafana, Prometheus, Loki, cAdvisor, exporters) |
+| `node-exporter` | All `monitoring_agents` | Native binary install of `node_exporter` — no Docker |
+| `alloy` | All `monitoring_agents` | Native binary install of Grafana Alloy log/metrics agent |
