@@ -198,6 +198,26 @@ http:
         - proxy-headers
         - security-headers
 
+    # ATProto PDS (Personal Data Server)
+    # Handles are verified via DNS TXT records (not wildcard subdomains)
+    # so only pds.lukapg.dev needs routing — no *.pds.lukapg.dev needed.
+    # This allows Cloudflare proxy (orange cloud) to hide the origin IP.
+    pds-secure:
+      rule: "Host(`pds.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: pds
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - proxy-headers
+        - security-headers
+        - rate-limit
+
 {% endif %}
 
   # Services - backend targets
@@ -249,6 +269,12 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.1.140:8010"
+        passHostHeader: true
+
+    pds:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.140:3000"
         passHostHeader: true
 {% endif %}
 
