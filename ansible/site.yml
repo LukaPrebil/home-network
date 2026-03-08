@@ -11,6 +11,7 @@
 #   ansible-playbook site.yml --tags monitoring-agents   # Node Exporter + Alloy
 #   ansible-playbook site.yml --tags paperless-ngx       # Paperless-ngx document management
 #   ansible-playbook site.yml --tags pds                  # ATProto PDS
+#   ansible-playbook site.yml --tags ha-mcp              # Home Assistant MCP server
 #   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
 #   ansible-playbook site.yml --limit immich             # Everything for Immich host
 #   ansible-playbook site.yml --limit 'all:!tn-storage'  # Skip TrueNAS (no apt)
@@ -192,6 +193,17 @@
   roles:
     - docker
     - pds
+
+- name: Deploy Home Assistant MCP server
+  hosts: containers
+  become: true
+  tags:
+    - ha-mcp
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - ha-mcp
 
 - name: Deploy container services (Uptime Kuma, DDNS, OctoEverywhere)
   hosts: containers
