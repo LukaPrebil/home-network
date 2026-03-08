@@ -1,0 +1,54 @@
+---
+# Deploy and manage ATProto PDS with Docker Compose
+
+- name: Ensure traefik network exists
+  community.docker.docker_network:
+    name: "{{ pds_docker_network }}"
+    state: present
+
+- name: Deploy PDS environment file
+  ansible.builtin.template:
+    src: pds.env.j2
+    dest: "{{ pds_base_dir }}/pds.env"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  notify: Restart PDS
+
+- name: Deploy Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ pds_base_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart PDS
+
+- name: Pull and start PDS service
+  community.docker.docker_compose_v2:
+    project_src: "{{ pds_base_dir }}"
+    pull: "always"
+    state: present
+  register: pds_deploy
+  when: pds_service_state != 'stopped'
+
+- name: Wait for PDS to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ pds_port }}/xrpc/_health"
+    method: GET
+    status_code: 200
+  register: pds_health
+  until: pds_health.status == 200
+  retries: 12
+  delay: 10
+  changed_when: false
+  when: pds_service_state == 'started'
+
+- name: Display PDS deployment status
+  ansible.builtin.debug:
+    msg:
+      - "ATProto PDS deployment complete!"
+      - "State: {{ pds_service_state }}"
+      - "Health: http://{{ ansible_host }}:{{ pds_port }}/xrpc/_health"
+      - "Public URL: https://{{ pds_hostname }}"
+  when: pds_service_state == 'started'

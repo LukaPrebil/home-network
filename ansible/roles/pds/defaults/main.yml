@@ -1,0 +1,46 @@
+---
+# ATProto PDS (Personal Data Server) default configuration
+
+# Version pinning
+pds_version: "0.4.208"
+
+# Docker image
+pds_image: "ghcr.io/bluesky-social/pds:{{ pds_version }}"
+pds_container_name: "pds"
+
+# Directories
+# Compose file and env file on NFS-backed /srv/docker (consistent with other services)
+pds_base_dir: "/srv/docker/pds"
+# Data directory on iSCSI mount (NOT NFS — PDS uses SQLite which requires POSIX file locking)
+pds_data_dir: "/mnt/pds"
+pds_blocks_dir: "{{ pds_data_dir }}/blocks"
+
+# Network configuration
+pds_port: 3000
+pds_docker_network: "traefik"
+
+# PDS hostname (public domain for this PDS instance)
+pds_hostname: "pds.lukapg.dev"
+
+# ATProto federation endpoints
+pds_did_plc_url: "https://plc.directory"
+pds_bsky_app_view_url: "https://api.bsky.app"
+pds_bsky_app_view_did: "did:web:api.bsky.app"
+pds_report_service_url: "https://mod.bsky.app"
+pds_report_service_did: "did:plc:ar7c4by46qjdydhdevvrndac"
+pds_crawlers: "https://bsky.network"
+
+# Blob upload limit (100MB in bytes)
+pds_blob_upload_limit: 104857600
+
+# Access control
+pds_invite_required: true
+pds_rate_limits_enabled: true
+
+# iSCSI configuration
+pds_iscsi_target_ip: "{{ truenas_nfs_server }}"
+pds_iscsi_target_iqn: "iqn.2005-10.org.freenas.ctl:pds"
+pds_iscsi_mount_point: "/mnt/pds"
+
+# Service state
+pds_service_state: "started"

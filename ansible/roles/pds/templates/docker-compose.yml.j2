@@ -1,0 +1,29 @@
+---
+# Docker Compose file for ATProto PDS (Personal Data Server)
+# Caddy and Watchtower from the official PDS stack are not included:
+# - Traefik handles TLS termination and reverse proxy
+# - Ansible handles version management
+
+services:
+  pds:
+    image: {{ pds_image }}
+    container_name: {{ pds_container_name }}
+    restart: unless-stopped
+    ports:
+      - "{{ pds_port }}:3000"
+    networks:
+      - {{ pds_docker_network }}
+    volumes:
+      - {{ pds_data_dir }}:/pds
+    env_file:
+      - {{ pds_base_dir }}/pds.env
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/xrpc/_health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  {{ pds_docker_network }}:
+    external: true

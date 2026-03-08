@@ -1,0 +1,20 @@
+---
+# Main tasks file for ATProto PDS role
+
+- name: Include iSCSI client setup tasks
+  ansible.builtin.include_tasks: iscsi.yml
+  tags:
+    - pds
+    - iscsi
+
+- name: Include directory setup tasks
+  ansible.builtin.include_tasks: directories.yml
+  tags:
+    - pds
+    - directories
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - pds
+    - deploy
