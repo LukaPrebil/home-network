@@ -19,5 +19,5 @@ ansible-playbook site.yml --check --diff     # Dry run
 
 ## Documentation
 
-- **[Architecture & Network Docs](docs/readme.md)** — Hardware, VLANs, IP assignments, implementation status
+- **[Architecture & Network Docs](docs/network-architecture.md)** — Hardware, VLANs, IP assignments, implementation status
 - **[CLAUDE.md](CLAUDE.md)** — AI agent instructions and project conventions

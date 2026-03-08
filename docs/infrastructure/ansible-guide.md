@@ -1,6 +1,15 @@
 # Ansible Reference Guide
 
-Detailed reference for role creation, deployment patterns, and infrastructure operations. For core conventions and quick-start commands, see [CLAUDE.md](../CLAUDE.md).
+Detailed reference for role creation, deployment patterns, and infrastructure operations. For core conventions and quick-start commands, see [CLAUDE.md](../../CLAUDE.md).
+
+## Prerequisites
+
+```bash
+brew install ansible
+ansible-galaxy collection install community.general community.docker ansible.posix
+```
+
+SSH access to all managed hosts must be configured with key-based auth. The shared key is `~/.ssh/homelab_ansible` (except rpi4, which uses `~/.ssh/id_ed25519`).
 
 ## Project Structure
 
@@ -115,6 +124,18 @@ vault_database_password: "actual-secret"
 
 # In role defaults or group_vars (plaintext reference)
 db_password: "{{ vault_database_password }}"
+```
+
+**Initial setup** (one-time):
+```bash
+echo "your-vault-password" > .vault_pass && chmod 600 .vault_pass
+ansible-vault encrypt secrets.yml
+```
+
+**Managing secrets**:
+```bash
+ansible-vault edit secrets.yml    # Edit encrypted file
+ansible-vault view secrets.yml    # View without editing
 ```
 
 **Dollar sign escaping**: Docker Compose env vars containing `$` must be escaped for Docker's interpolation:
