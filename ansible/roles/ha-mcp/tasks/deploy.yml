@@ -1,0 +1,47 @@
+---
+- name: Deploy ha-mcp environment file
+  ansible.builtin.template:
+    src: ha-mcp.env.j2
+    dest: "{{ ha_mcp_base_dir }}/ha-mcp.env"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  notify: Restart ha-mcp
+
+- name: Deploy ha-mcp Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ ha_mcp_base_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart ha-mcp
+
+- name: Pull ha-mcp Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ ha_mcp_base_dir }}"
+    pull: "always"
+  register: ha_mcp_pull
+
+- name: Start ha-mcp service
+  community.docker.docker_compose_v2:
+    project_src: "{{ ha_mcp_base_dir }}"
+    state: present
+  register: ha_mcp_deploy
+  when: ha_mcp_service_state != 'stopped'
+
+- name: Wait for ha-mcp to be ready
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: "{{ ha_mcp_port }}"
+    timeout: 60
+    delay: 5
+  when: ha_mcp_service_state == 'started'
+
+- name: Display ha-mcp deployment status
+  ansible.builtin.debug:
+    msg:
+      - "ha-mcp deployment complete!"
+      - "State: {{ ha_mcp_service_state }}"
+      - "Access ha-mcp at: http://{{ ansible_host }}:{{ ha_mcp_port }}/mcp"
+  when: ha_mcp_service_state == 'started'

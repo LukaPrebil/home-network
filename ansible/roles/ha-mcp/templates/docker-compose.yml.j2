@@ -1,0 +1,20 @@
+services:
+  ha-mcp:
+    image: {{ ha_mcp_image }}
+    container_name: {{ ha_mcp_container_name }}
+    command: ha-mcp-web
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "{{ ansible_host }}:{{ ha_mcp_port }}:8086"
+    env_file:
+      - {{ ha_mcp_base_dir }}/ha-mcp.env
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8086/mcp"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "autoheal=true"

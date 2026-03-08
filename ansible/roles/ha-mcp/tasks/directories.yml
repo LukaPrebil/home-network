@@ -1,0 +1,8 @@
+---
+- name: Create ha-mcp base directory
+  ansible.builtin.file:
+    path: "{{ ha_mcp_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
