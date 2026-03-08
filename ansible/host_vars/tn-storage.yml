@@ -162,3 +162,16 @@ nfs_shares:
       - async  # Better performance for media streaming
       - no_subtree_check
       - no_root_squash  # Plex and arr containers need root access
+
+# iSCSI Configuration
+# Used for services that require POSIX file locking (e.g., SQLite)
+# where NFS is not suitable
+iscsi_zvols:
+  - name: "{{ zfs_pool_name }}/pds"
+    volsize: 21474836480  # 20 GiB in bytes
+    description: "ATProto PDS data (SQLite + blobs)"
+    compression: lz4
+    target_name: "pds"
+    # TrueNAS initiators field requires iSCSI Qualified Names (IQNs), not IP addresses
+    allowed_initiators:
+      - "iqn.2004-10.com.ubuntu:01:8297a10ca"  # containers VM

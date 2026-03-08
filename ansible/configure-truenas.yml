@@ -141,6 +141,171 @@
       ansible.builtin.debug:
         msg: "NFS service enabled and {{ nfs_shares_created.results | selectattr('changed', 'equalto', true) | list | length }} shares created"
 
+- name: Configure iSCSI targets for block storage
+  hosts: tn-storage
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: Skip iSCSI configuration if no zvols defined
+      ansible.builtin.meta: end_play
+      when: iscsi_zvols is not defined or iscsi_zvols | length == 0
+
+    - name: Enable iSCSI service
+      ansible.builtin.shell:
+        cmd: 'midclt call service.update iscsitarget ''{"enable": true}'''
+      register: iscsi_enabled
+      changed_when: iscsi_enabled.stdout != "null"
+
+    - name: Start iSCSI service
+      ansible.builtin.shell:
+        cmd: midclt call service.start iscsitarget
+      register: iscsi_started
+      failed_when: false
+      changed_when: iscsi_started.stdout == "true"
+
+    - name: Get existing datasets and zvols
+      ansible.builtin.shell:
+        cmd: midclt call pool.dataset.query | jq -r '.[].name'
+      register: existing_datasets
+      changed_when: false
+
+    - name: Create ZFS zvols for iSCSI
+      ansible.builtin.shell:
+        cmd: |
+          midclt call pool.dataset.create '{
+            "name": "{{ item.name }}",
+            "type": "VOLUME",
+            "volsize": {{ item.volsize }},
+            "compression": "{{ item.compression | upper }}",
+            "comments": "{{ item.description }}"
+          }'
+      loop: "{{ iscsi_zvols }}"
+      when: item.name not in existing_datasets.stdout_lines
+      register: zvols_created
+
+    - name: Display zvol creation results
+      ansible.builtin.debug:
+        msg: "zvol '{{ item.item.name }}' {{ 'created' if item is changed else 'already exists' }}"
+      loop: "{{ zvols_created.results }}"
+      when: zvols_created.results is defined
+
+    - name: Check existing iSCSI portals
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.portal.query | jq -r '.[].id'
+      register: existing_portals
+      changed_when: false
+
+    - name: Create iSCSI portal (listen on all interfaces)
+      ansible.builtin.shell:
+        cmd: |
+          midclt call iscsi.portal.create '{
+            "listen": [{"ip": "0.0.0.0"}],
+            "comment": "Default iSCSI portal"
+          }'
+      register: portal_created
+      when: existing_portals.stdout_lines | length == 0
+
+    - name: Get iSCSI portal ID
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.portal.query | jq -r '.[0].id'
+      register: portal_id
+      changed_when: false
+
+    - name: Get existing iSCSI targets
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.target.query | jq -r '.[].name'
+      register: existing_targets
+      changed_when: false
+
+    - name: Create iSCSI initiator groups for new targets
+      ansible.builtin.shell:
+        cmd: |
+          midclt call iscsi.initiator.create '{
+            "initiators": {{ item.allowed_initiators | to_json }},
+            "comment": "{{ item.target_name }} initiators"
+          }'
+      loop: "{{ iscsi_zvols }}"
+      when: item.target_name not in existing_targets.stdout_lines
+
+    - name: Get all initiator group IDs by comment
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.initiator.query | jq -r '.[] | select(.comment == "{{ item.target_name }} initiators") | .id'
+      loop: "{{ iscsi_zvols }}"
+      register: initiator_ids_by_name
+      changed_when: false
+
+    - name: Create iSCSI targets
+      ansible.builtin.shell:
+        cmd: |
+          midclt call iscsi.target.create '{
+            "name": "{{ item.target_name }}",
+            "groups": [{"portal": {{ portal_id.stdout }}, "initiator": {{ initiator_ids_by_name.results[idx].stdout }}}]
+          }'
+      loop: "{{ iscsi_zvols }}"
+      loop_control:
+        index_var: idx
+      when: item.target_name not in existing_targets.stdout_lines
+
+    - name: Get existing iSCSI extents
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.extent.query | jq -r '.[].name'
+      register: existing_extents
+      changed_when: false
+
+    - name: Create iSCSI extents
+      ansible.builtin.shell:
+        cmd: |
+          midclt call iscsi.extent.create '{
+            "name": "{{ item.target_name }}",
+            "type": "DISK",
+            "disk": "zvol/{{ item.name }}",
+            "comment": "{{ item.description }}"
+          }'
+      loop: "{{ iscsi_zvols }}"
+      when: item.target_name not in existing_extents.stdout_lines
+      register: extents_created
+
+    - name: Get existing target-extent associations
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.targetextent.query | jq -r '.[].target'
+      register: existing_associations
+      changed_when: false
+
+    - name: Get target IDs for association
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.target.query | jq -r '.[] | select(.name == "{{ item.target_name }}") | .id'
+      loop: "{{ iscsi_zvols }}"
+      register: target_ids
+      changed_when: false
+
+    - name: Get extent IDs for association
+      ansible.builtin.shell:
+        cmd: midclt call iscsi.extent.query | jq -r '.[] | select(.name == "{{ item.target_name }}") | .id'
+      loop: "{{ iscsi_zvols }}"
+      register: extent_ids
+      changed_when: false
+
+    - name: Create target-extent associations
+      ansible.builtin.shell:
+        cmd: |
+          midclt call iscsi.targetextent.create '{
+            "target": {{ target_ids.results[idx].stdout }},
+            "extent": {{ extent_ids.results[idx].stdout }},
+            "lunid": 0
+          }'
+      loop: "{{ iscsi_zvols }}"
+      loop_control:
+        index_var: idx
+      when: target_ids.results[idx].stdout not in existing_associations.stdout_lines
+      register: associations_created
+
+    - name: Display iSCSI configuration status
+      ansible.builtin.debug:
+        msg:
+          - "iSCSI service enabled"
+          - "Configured targets: {{ iscsi_zvols | map(attribute='target_name') | list }}"
+          - "Portal ID: {{ portal_id.stdout }}"
+
 - name: Add TrueNAS storage to Proxmox
   hosts: n5p
   become: true
