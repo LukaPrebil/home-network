@@ -160,6 +160,51 @@ labels:
   - "traefik.http.routers.myservice.middlewares=security-headers@file,rate-limit@file"
 ```
 
+## Advanced: Static File Provider Routing (Non-Docker Services)
+
+For services running on a different host (not co-located with Traefik), use the **static file provider** instead of Docker labels. Routes are defined in `roles/traefik/templates/dynamic.yml.j2`.
+
+### Example: ATProto PDS with Wildcard Subdomain Routing
+
+The PDS requires two routers — one for the main hostname and one for user handle subdomains:
+
+```yaml
+# In dynamic.yml.j2 (routers section)
+routers:
+  # ATProto PDS — single hostname, no wildcard subdomains needed.
+  # Handles are verified via DNS TXT records (_atproto.<domain>),
+  # so only pds.lukapg.dev needs routing. This allows Cloudflare
+  # proxy (orange cloud) to hide the origin IP.
+  pds-secure:
+    rule: "Host(`pds.lukapg.dev`)"
+    entryPoints:
+      - websecure
+    service: pds
+    tls:
+      certResolver: letsencrypt
+      domains:
+        - main: "lukapg.dev"
+          sans:
+            - "*.lukapg.dev"
+    middlewares:
+      - proxy-headers
+      - rate-limit
+
+# In dynamic.yml.j2 (services section)
+services:
+  pds:
+    loadBalancer:
+      servers:
+        - url: "http://192.168.1.140:3000"
+      passHostHeader: true  # Critical: PDS uses Host header for handle resolution
+```
+
+**Key points for static routing:**
+- `passHostHeader: true` is essential when the backend uses the Host header for routing (e.g., multi-tenant services)
+- Handles use DNS TXT verification (`_atproto.<domain>` TXT `did=did:plc:...`) — no wildcard subdomain routing needed
+- `pds.lukapg.dev` is proxied through Cloudflare (orange cloud) since `*.lukapg.dev` is covered by free Universal SSL
+- WebSocket connections (like ATProto's firehose) are proxied natively — no extra middleware needed
+
 ## Troubleshooting
 
 ### Service not accessible

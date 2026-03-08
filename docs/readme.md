@@ -109,7 +109,7 @@ graph TD
 * **Key VMs & Services:**
     * **Home Assistant OS VM:** A dedicated VM for the core smart home controller. See details below.
     * **TrueNAS Scale VM:** Manages ZFS storage pools and provides network shares.
-    * **Docker Host VM:** Hosts containerized services like AdGuard Home, the \*Arr suite, etc.
+    * **Docker Host VM:** Hosts containerized services like AdGuard Home, the \*Arr suite, ATProto PDS, etc.
     * **Traefik LXC:** An isolated LXC container for the Traefik reverse proxy in the public-facing VLAN.
     * **Dedicated VMs/LXCs:** For resource-intensive applications like Immich and Plex/Jellyfin.
 
@@ -210,6 +210,9 @@ This section contains the specific details required for the automated setup and 
   - `tank/media` (no quota) - Media files
   - `tank/backups` (no quota) - System backups
 - ✅ NFS shares configured and exported
+- ✅ iSCSI target configured:
+  - `tank/pds` (20GB zvol) - ATProto PDS block storage (SQLite requires POSIX locking, incompatible with NFS)
+  - Backup: use ZFS snapshots on TrueNAS (`zfs snapshot tank/pds@<label>`) — zvols inherit ZFS snapshot/replication capabilities
 - ✅ Integrated with Proxmox storage backends
 
 #### Ansible Configuration
@@ -221,7 +224,7 @@ This section contains the specific details required for the automated setup and 
 - ✅ Playbooks fully automated and idempotent:
   - `site.yml` - Main playbook (configures Proxmox host)
   - `provision-truenas.yml` - Provisions TrueNAS VM
-  - `configure-truenas.yml` - Configures TrueNAS storage (ZFS, NFS, Proxmox integration)
+  - `configure-truenas.yml` - Configures TrueNAS storage (ZFS, NFS, iSCSI, Proxmox integration)
 - ✅ TrueNAS API integration via midclt (JSON-RPC)
 
 ### Not Started
@@ -250,6 +253,7 @@ This section contains the specific details required for the automated setup and 
 - ✅ **Traefik Reverse Proxy** (serving 5 public services with Let's Encrypt)
 - ✅ **Omada SDN Controller** (managing network infrastructure)
 - ✅ **Monitoring Stack** (Prometheus + Grafana + Loki)
+- ✅ **ATProto PDS** (self-hosted Bluesky PDS at pds.lukapg.dev, iSCSI storage from TrueNAS, Cloudflare-proxied, DNS TXT handle verification)
 
 #### Network Migration
 - ⏳ Deploy Omada router
