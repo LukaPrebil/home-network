@@ -1,44 +1,66 @@
 # Automated Blinds
 
-Five automations that manage window blinds based on sunrise/sunset and window open/close events.
+Three automations that manage window blinds based on sun position, motion, and window open/close events.
 
 ## Automations
 
 | Entity | Purpose |
 |--------|---------|
-| `automation.close_blinds_in_luka_s_room` | Close blinds at sunset +1h |
-| `automation.open_covers_in_luka_s_room` | Open blinds at sunrise +1.5h |
-| `automation.close_blinds_in_upstairs_bathroom` | Close blinds at sunset |
-| `automation.open_blinds_in_upstairs_bathroom` | Open blinds at sunrise +1h |
+| `automation.luka_s_room_blinds` | Open on wake-up or sun fallback, close at sunset +1h |
+| `automation.upstairs_bathroom_blinds` | Open at sun elevation 5°, close at sunset |
 | `automation.window_ventilation_control` | Tilt blinds when window opens, restore on close |
 
-## Sun-Based Schedules
+## Luka's Room
 
-### Luka's Room
-
-```
-Close: sunset + 1 hour
-  → Condition: window sensor reports NOT open (skip if window is open)
-  → Action: cover.close_cover for area luka_s_room
-
-Open: sunrise + 1.5 hours
-  → No conditions
-  → Action: cover.open_cover for area luka_s_room
-```
-
-The close automation checks a window sensor — if the window is open, blinds stay up to avoid trapping the window behind the blind.
-
-### Upstairs Bathroom
+Single automation with three trigger paths using `choose`:
 
 ```
-Close: sunset (no offset)
-  → Action: cover.close_cover for area bathroo_upstairs
+Sensors:
+  motion: binary_sensor.motion_sensor_aqara_p1_occupancy (Aqara P1)
+  sun:    sun.sun (elevation attribute)
+  window: binary_sensor.myggbett_door_window_sensor_door_4
+  blind:  cover.blinds_cover (area: luka_s_room)
 
-Open: sunrise + 1 hour
-  → Action: cover.open_cover for area bathroo_upstairs
+Morning — wake-up open:
+  → Trigger: motion detected
+  → Conditions: after 06:30, before 12:00, sun elevation > 0°, blind position < 50%
+  → Action: open cover
+
+Morning — fallback open:
+  → Trigger: sun elevation crosses above 10°
+  → Conditions: after 06:30, blind position < 50%
+  → Action: open cover
+
+Evening — close:
+  → Trigger: sunset + 1 hour
+  → Condition: window sensor NOT open
+  → Action: close cover
 ```
 
-No conditions on either. The area ID `bathroo_upstairs` is a typo in HA config (missing "m").
+The wake-up trigger opens blinds as soon as you start moving in the morning — no fixed schedule to get wrong. The elevation > 0° guard prevents nighttime bathroom trips from opening blinds. The `position < 50` check (instead of `state: closed`) handles the case where the ventilation automation has tilted the blind to +3%.
+
+The fallback ensures blinds still open if nobody's home or the motion sensor misses the wake-up.
+
+Consolidated from two previous automations (`close_blinds_in_luka_s_room` + `open_covers_in_luka_s_room`).
+
+## Upstairs Bathroom
+
+Single automation with two trigger paths:
+
+```
+Morning — open:
+  → Trigger: sun elevation crosses above 5°
+  → Conditions: after 06:00, before 12:00
+  → Action: open cover for area bathroo_upstairs
+
+Evening — close:
+  → Trigger: sunset
+  → Action: close cover for area bathroo_upstairs
+```
+
+Uses sun elevation instead of fixed sunrise offset — adapts naturally to seasons. The area ID `bathroo_upstairs` is a typo in HA config (missing "m").
+
+Consolidated from two previous automations (`close_blinds_in_upstairs_bathroom` + `open_blinds_in_upstairs_bathroom`).
 
 ## Window Ventilation Control
 
@@ -51,7 +73,7 @@ Window opened (and blind position < 98%):
   → Tilt blind open by +3% (capped at 100%)
 
 Window closed:
-  → If nighttime (after sunset+1h or before sunrise+1.5h): fully close blind
+  → If nighttime (sun elevation < 0°): fully close blind
   → Else if blind already > 95%: do nothing
   → Else: restore saved scene snapshot
 ```
@@ -59,4 +81,4 @@ Window closed:
 Uses a `window_map` variable to map window sensors to blinds. Currently only one mapping:
 - `binary_sensor.myggbett_door_window_sensor_door_4` → `cover.tz3000_wptayaqr_ts130f_cover`
 
-The parallel mode (max 10) supports future expansion to multiple windows. The +3% tilt allows airflow without fully opening the blind.
+The parallel mode (max 10) supports future expansion to multiple windows. The +3% tilt allows airflow without fully opening the blind. Nighttime is defined as sun below horizon (`elevation < 0`), consistent with the blinds automation.
