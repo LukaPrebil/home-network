@@ -18,7 +18,7 @@ Notifies home users to open windows when the living room air quality monitor rep
 ## Flow
 
 ```
-Trigger: air quality changes to poor / very_poor / extremely_poor
+Trigger: air quality stays poor / very_poor / extremely_poor for 5 minutes
   → Conditions:
       - Humidity ventilation notification is NOT active (avoid double-nag)
       - Air quality notification is NOT already active
@@ -30,9 +30,9 @@ Every 2 minutes (while boolean is on + air quality still poor+):
   → Re-send notification with updated CO2/PM2.5 values (same tag = in-place update)
 
 Clear triggers (any of):
-  → Air quality improves to good / moderate / fair
-  → User taps "Urejeno" (AIR_QUALITY_DONE action)
-  → User swipes notification away (mobile_app_notification_cleared)
+  → Air quality stays good / moderate / fair for 5 minutes
+  → User taps "Urejeno" (AIR_QUALITY_DONE action) — instant
+  → User swipes notification away (mobile_app_notification_cleared) — instant
 
 Clear actions:
   → Turn off input_boolean
@@ -40,6 +40,10 @@ Clear actions:
   → If user-initiated dismiss (tap/swipe): set snooze to now + 2 hours
   → If natural improvement: no snooze set
 ```
+
+## Debouncing
+
+Both the trigger and clear automations use `for: "00:05:00"` on their state triggers. The sensor oscillates rapidly at the good/poor boundary (366 transitions in 7 days, many lasting 10–30 seconds). Without debouncing, each bounce fires or clears the notification, creating spam. The 5-minute `for` duration filters out noise while remaining responsive to real air quality changes.
 
 ## Notification
 
