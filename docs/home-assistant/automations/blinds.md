@@ -19,7 +19,7 @@ Sensors:
   motion: binary_sensor.motion_sensor_aqara_p1_occupancy (Aqara P1)
   sun:    sun.sun (elevation attribute)
   window: binary_sensor.myggbett_door_window_sensor_door_4
-  blind:  cover.blinds_cover (area: luka_s_room)
+  blind:  cover.tz3000_wptayaqr_ts130f_cover (area: luka_s_room)
 
 Morning — wake-up open:
   → Trigger: motion detected
