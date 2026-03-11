@@ -195,9 +195,10 @@ When moving your mapped numbers from the scanner tool into Home Assistant YAML, 
 
 ### A. The Environment & Target
 
-* **Target IP:** `192.168.1.50` (or ask the user to confirm the Elfin EW11's IP).
+* **Target IP:** `192.168.1.160` (Elfin EW11's IP on the home network).
 * **Target Port:** `502` (Modbus TCP).
-* **Dependency:** You will need to install the `pymodbus` library in the user's local environment or virtual environment.
+* **Dependency:** `pymodbus` 3.12+ is installed in `.venv/` — use `.venv/bin/python3`.
+* **Board:** Custom Carel OEM (CODE B02563), requires **PCOS004850 BMS card** for Modbus slave access. See `docs/hardware/orca-modbus-findings.md` for full investigation notes.
 * **Hardware Quirk:** The Carel board is slow. Ensure your Modbus timeout settings are generous (at least 2-3 seconds) and do not poll too aggressively, or the Elfin bridge will drop packets.
 
 ### B. Your Task: The "Diff" Script
