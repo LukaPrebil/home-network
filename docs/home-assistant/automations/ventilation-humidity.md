@@ -10,8 +10,9 @@ Notifies home users to open windows when indoor humidity is high and outdoor con
 | `automation.update_ventilation_notification` | Automation | Re-sends every 2 min for live update |
 | `automation.clear_ventilation_notification` | Automation | Clears on improvement, tap, or swipe |
 | `input_boolean.ventilation_reminder_active` | Helper | Tracks whether notification is active |
-| `binary_sensor.good_to_ventilate` | Sensor | Outdoor conditions favorable for ventilation |
-| `sensor.average_humidity` | Sensor | Average indoor humidity |
+| `binary_sensor.good_to_ventilate` | Template binary sensor | Outdoor dewpoint < indoor dewpoint (with fallback) |
+| `sensor.inside_dewpoint` | Template sensor | Indoor dewpoint calculated from average temp/humidity |
+| `sensor.average_humidity` | Template sensor | Average indoor humidity |
 
 ## Flow
 
@@ -42,6 +43,30 @@ Clear actions:
 - **Message**: Current humidity percentage with call to action
 - **Features**: `live_update: true`, `persistent: true`, `sticky: "true"`, `alert_once: true`
 - **Action button**: "Urejeno" (MARK_DONE)
+
+## Good to Ventilate Sensor
+
+`binary_sensor.good_to_ventilate` ("Lahko zračimo") is a template binary sensor that compares outdoor dewpoint against indoor dewpoint. When outdoor dewpoint is lower, opening windows will help reduce indoor moisture.
+
+**Template logic (with fallback):**
+
+```jinja2
+{% set arso = states('sensor.letalisce_jozeta_pucnika_ljubljana_dew_point') %}
+{% set metno = state_attr('weather.forecast_home', 'dew_point') %}
+{% set inside = states('sensor.inside_dewpoint') | float %}
+{% if arso not in ['unknown', 'unavailable'] %}
+  {{ arso | float < inside }}
+{% elif metno is not none %}
+  {{ metno | float < inside }}
+{% endif %}
+```
+
+**Data sources (in priority order):**
+
+1. **ARSO** (`sensor.letalisce_jozeta_pucnika_ljubljana_dew_point`) — Slovenian weather agency, preferred when available
+2. **Met.no** (`weather.forecast_home` → `dew_point` attribute) — Norwegian weather service, used as fallback
+
+If both sources are unavailable, the template renders empty and the sensor becomes unavailable, which is correct — the ventilation automations will not fire without valid data.
 
 ## Notes
 
