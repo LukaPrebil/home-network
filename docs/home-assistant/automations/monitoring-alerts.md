@@ -1,6 +1,6 @@
 # Monitoring & Alert Notifications
 
-Three automations that send notifications for system and device events.
+Three admin-only automations that notify Luka of system and device events. These intentionally use direct notify services (not `script.notify_home_users_dynamic`) since they are instance administration alerts, not household notifications.
 
 ## Automations
 
@@ -26,12 +26,12 @@ Uses a community blueprint that scans all battery sensors automatically. Only no
 ```
 Trigger: sensor.fdm_print_status changes from "printing" to "pausing"
 Condition: sensor.fdm_remaining_layers > 0
-Action: notify.notify to device_tracker.luka_s_s24
+Action: notify.mobile_app_sm_s926b (Luka's phone)
 Title: "3D Printer Alert: Filament!"
 Message: "The printer has paused the print. It might be out of filament."
 ```
 
-Only fires when the printer pauses mid-print (remaining layers > 0), distinguishing a filament issue from a normal print completion.
+Only fires when the printer pauses mid-print (remaining layers > 0), distinguishing a filament issue from a normal print completion. Notifies Luka only.
 
 ## Proxmox Update Notification
 
