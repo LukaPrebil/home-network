@@ -36,12 +36,12 @@ Only fires when the printer pauses mid-print (remaining layers > 0), distinguish
 ## Proxmox Update Notification
 
 ```
-Triggers:
-  → Binary sensor update on Proxmox device
-  → sensor.node_n5p_total_updates goes above 0
-Action: persistent_notification with ID "pve_n5p_updates_available"
-Title: "Update Proxmox"
-Message: "{count} updates available" with link to http://n5p.lan:8006/
+Trigger: sensor.node_n5p_total_updates state change (ignores unavailable/unknown)
+Actions (choose):
+  → updates > 0: persistent_notification.create with ID "pve_n5p_updates_available"
+    Title: "Update Proxmox"
+    Message: "{count} updates available" with link to node update page
+  → updates = 0: persistent_notification.dismiss with ID "pve_n5p_updates_available"
 ```
 
-Uses a persistent notification (in-HA notification, not push) with a fixed `notification_id` so it gets replaced on each trigger rather than stacking. Links directly to the Proxmox web UI.
+Uses a persistent notification (in-HA, not push) with a fixed `notification_id`. The `state` trigger fires on every count change, so the notification updates in-place when new updates appear. Automatically dismisses when the node is fully updated. Links to the node's update page (`https://n5p.lan:8006/#v1:0:=node%2Fn5p:4:31::::::`).
