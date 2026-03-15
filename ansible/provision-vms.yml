@@ -203,6 +203,14 @@
       loop_control:
         label: "{{ item.name }} - {{ item.disk_size | default('no resize') }}"
 
+    - name: Set startup order for VMs
+      ansible.builtin.shell:
+        cmd: qm set {{ vm_vmid_map[item.name] }} --startup {{ item.startup }}
+      when: item.startup is defined
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - {{ item.startup | default('no startup order') }}"
+
     - name: Start all new VMs
       ansible.builtin.shell:
         cmd: qm start {{ vm_vmid_map[item.name] }}

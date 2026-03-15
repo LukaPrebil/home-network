@@ -29,6 +29,7 @@ lxc_containers:
       - fuse=1     # Required for FUSE filesystems
       - mknod=1    # Required for NFS mounts
     onboot: true  # Start on Proxmox boot
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough configuration for AMD Radeon 880M/890M iGPU
     gpu_passthrough: true  # Enable GPU passthrough for hardware transcoding
     gpu_device: /dev/dri  # AMD iGPU device (card0 + renderD128)
@@ -55,6 +56,7 @@ lxc_containers:
       - keyctl=1   # Required for systemd
       - fuse=1     # Required for FUSE filesystems
     onboot: true  # Start on Proxmox boot
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough not needed for reverse proxy
     gpu_passthrough: false
     # NFS storage not needed for reverse proxy (stores config locally)
@@ -78,6 +80,7 @@ lxc_containers:
     features:
       - keyctl=1   # Required for systemd
     onboot: true  # Start on Proxmox boot
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # No Docker needed (native .deb installation)
     gpu_passthrough: false
     nfs_docker_volumes: false
@@ -103,6 +106,7 @@ lxc_containers:
       - fuse=1     # Required for FUSE filesystems
       - mknod=1    # Required for device access
     onboot: true  # Start on Proxmox boot - critical service
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # No Docker needed (native binary installation)
     gpu_passthrough: false
     nfs_docker_volumes: false
@@ -128,6 +132,7 @@ lxc_containers:
       - fuse=1     # Required for FUSE filesystems
       - mknod=1    # Required for NFS mounts
     onboot: true  # Start on Proxmox boot - critical infrastructure
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough not needed for monitoring
     gpu_passthrough: false
     # NFS storage for metrics and logs data
@@ -154,6 +159,7 @@ lxc_containers:
       - fuse=1     # Required for FUSE filesystems
       - mknod=1    # Required for NFS mounts
     onboot: true  # Start on Proxmox boot
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough for hardware transcoding (AMD 890M)
     gpu_passthrough: true
     gpu_device: /dev/dri  # AMD iGPU device (card0 + renderD128)

@@ -12,6 +12,7 @@ vms_to_create:
     memory: 8192  # 8GB
     disk_size: "+40G"  # Increase disk by 40GB (total 50GB)
     storage: truenas-vms
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     description: "Docker Host VM - runs containerized services"
 
   # Example VM definitions (uncomment and customize as needed)

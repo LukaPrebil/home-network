@@ -91,6 +91,7 @@
           --ostype l26
           --scsihw virtio-scsi-single
           --onboot 1
+          --startup order=1,up=120
           --tablet 0
           --agent enabled=1
       register: vm_create
