@@ -55,14 +55,16 @@ Uses a persistent notification (in-HA, not push) with a fixed `notification_id`.
 
 ```
 Trigger: time_pattern every 30 minutes
-Condition: template checks if any binary_sensor.nevarnost_plesni_* is on
+Condition: template checks if any binary_sensor.nevarnost_plesni_* has been on for >2 hours (last_changed filter)
 Actions (choose):
-  → rooms at risk: push notification via script.notify_home_users_dynamic
+  → rooms at sustained risk: push notification via script.notify_home_users_dynamic
     Title: "Nevarnost plesni"
     Message: lists rooms at risk + actionable advice (ventilate, check furniture, bathroom exhaust)
     Tag: mold_risk (live update, sticky, alert_once)
   → no risk + notification was active: clear_notification + turn off input_boolean.mold_risk_active
 ```
+
+The 2-hour threshold filters transient humidity spikes from showers and cooking, which typically dissipate within 30–90 minutes. Only sustained condensation risk triggers a notification.
 
 ### How it works
 
