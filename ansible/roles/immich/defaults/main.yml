@@ -1,8 +1,8 @@
 ---
 # Immich role default variables
 
-# Immich version (use specific version for ROCm compatibility)
-immich_version: "v2.5.6"
+# Immich version
+immich_version: "v2.6.1"
 
 # Immich directories
 immich_base_dir: "/opt/immich"
@@ -38,10 +38,17 @@ immich_log_level: "log"  # log, verbose, debug, warn, error
 # Hardware acceleration
 immich_enable_hw_accel: true  # Master switch for any GPU acceleration
 immich_enable_vaapi: true     # VA-API for video transcoding (works)
-immich_enable_rocm: true      # ROCm for ML inference (requires custom image with ROCm 6.4.4 for gfx1150)
+immich_enable_rocm: true      # ROCm for ML inference (official v2.6.0 image uses ROCm 7.2 + MIGraphX)
 immich_gpu_devices:
   - /dev/dri/card0
   - /dev/dri/renderD128
+
+# ROCm configuration
+# Set to true to use the custom-built ROCm image (rollback to v2.5.6 + ROCm 6.4.4)
+immich_use_custom_rocm_image: false
+# HSA GFX version override for GPU compatibility (empty = use native gfx1150 support)
+# Set to "11.0.2" if the official ROCm 7.2 image doesn't work with gfx1150
+immich_hsa_override: ""
 
 # VA-API packages for AMD GPU hardware transcoding
 vaapi_packages:

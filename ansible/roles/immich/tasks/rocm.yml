@@ -1,5 +1,5 @@
 ---
-# Install ROCm 7.0.2 from AMD repositories for GPU acceleration
+# Install ROCm 7.2 from AMD repositories for GPU acceleration
 
 - name: Remove old ROCm packages from Ubuntu repos
   ansible.builtin.apt:
@@ -9,15 +9,15 @@
     state: absent
     purge: yes
 
-- name: Download AMD GPU install package for ROCm 7.0.2
+- name: Download AMD GPU install package for ROCm 7.2
   ansible.builtin.get_url:
-    url: https://repo.radeon.com/amdgpu-install/7.0.2/ubuntu/noble/amdgpu-install_7.0.2.70002-1_all.deb
-    dest: /tmp/amdgpu-install_7.0.2.70002-1_all.deb
+    url: https://repo.radeon.com/amdgpu-install/7.2/ubuntu/noble/amdgpu-install_7.2.70200-1_all.deb
+    dest: /tmp/amdgpu-install_7.2.70200-1_all.deb
     mode: '0644'
 
 - name: Install AMD GPU package manager
   ansible.builtin.apt:
-    deb: /tmp/amdgpu-install_7.0.2.70002-1_all.deb
+    deb: /tmp/amdgpu-install_7.2.70200-1_all.deb
     state: present
 
 - name: Update apt cache after adding AMD repos
@@ -36,13 +36,14 @@
     name:
       - rocm-hip-runtime
       - rocminfo
+      - rocprofiler-register  # Required by rocminfo in ROCm 7.2 (not auto-pulled by rocm-hip-runtime)
     state: present
   # Note: Using rocm-hip-runtime instead of full 'rocm' package to save space
   # This includes the HSA runtime and ROCm tools needed for inference
 
 - name: Clean up AMD GPU install package
   ansible.builtin.file:
-    path: /tmp/amdgpu-install_7.0.2.70002-1_all.deb
+    path: /tmp/amdgpu-install_7.2.70200-1_all.deb
     state: absent
 
 - name: Test ROCm installation

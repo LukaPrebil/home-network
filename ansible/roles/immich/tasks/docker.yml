@@ -37,7 +37,7 @@
     src: Dockerfile.j2
     dest: "{{ immich_base_dir }}/Dockerfile"
     mode: '0644'
-  when: immich_enable_rocm
+  when: immich_enable_rocm and immich_use_custom_rocm_image
   register: dockerfile_deployed
 
 - name: Build custom Immich ML image with ROCm 6.4.4
@@ -49,14 +49,14 @@
       path: "{{ immich_base_dir }}"
       dockerfile: Dockerfile
     force_source: "{{ dockerfile_deployed is changed }}"
-  when: immich_enable_rocm
+  when: immich_enable_rocm and immich_use_custom_rocm_image
   register: custom_image_build
 
 - name: Display custom image build status
   ansible.builtin.debug:
     msg: "Custom ROCm image built successfully: immich-ml-rocm-custom:{{ immich_version }}"
   when:
-    - immich_enable_rocm
+    - immich_enable_rocm and immich_use_custom_rocm_image
     - custom_image_build is changed
 
 - name: Deploy Immich docker-compose.yml
