@@ -35,11 +35,7 @@ services:
 
   immich-machine-learning:
     container_name: immich_machine_learning
-{% if immich_enable_rocm and immich_use_custom_rocm_image %}
-    # Rollback: custom-built image with ROCm 6.4.4 for gfx1150 support
-    image: immich-ml-rocm-custom:${IMMICH_VERSION}
-{% elif immich_enable_rocm %}
-    # Official ROCm 7.2 image with MIGraphX backend
+{% if immich_enable_rocm %}
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION}-rocm
 {% else %}
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}

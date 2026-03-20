@@ -44,8 +44,6 @@ immich_gpu_devices:
   - /dev/dri/renderD128
 
 # ROCm configuration
-# Set to true to use the custom-built ROCm image (rollback to v2.5.6 + ROCm 6.4.4)
-immich_use_custom_rocm_image: false
 # HSA GFX version override for GPU compatibility (empty = use native gfx1150 support)
 # Set to "11.0.2" if the official ROCm 7.2 image doesn't work with gfx1150
 immich_hsa_override: ""
