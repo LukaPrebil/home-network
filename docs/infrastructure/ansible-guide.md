@@ -160,3 +160,43 @@ Provisioning playbooks (`provision-*.yml`) follow a strict multi-play pattern:
 4. **Play 4 — Configure**: apply roles (`common`, `docker`, service roles)
 
 These stay as separate playbooks — they are one-time operations, not part of `site.yml`.
+
+## PostgreSQL Major Version Upgrades (Docker)
+
+Major PostgreSQL upgrades (e.g., 14→18) require a full dump and restore — the data files are not compatible across major versions.
+
+### Procedure
+
+1. **Dump**: `docker exec -t <container> pg_dumpall --clean --if-exists --username=<user> | gzip > dump.sql.gz`
+2. **Stop the stack**: `docker compose down`
+3. **Preserve old data**: `mv database/ database-old-backup/` and create a fresh empty `database/`
+4. **Update the image tag** and volume mount (PG18 changed PGDATA — see below), then deploy
+5. **Restore**: pipe the dump into `psql` with the `search_path` fix
+
+### Restore command
+
+```bash
+gunzip < dump.sql.gz \
+  | sed "s/SELECT pg_catalog.set_config('search_path', '', false);/SELECT pg_catalog.set_config('search_path', 'public, vectors', true);/g" \
+  | docker exec -i <container> psql --username=<user> --dbname=postgres
+```
+
+**`--dbname=postgres` is critical.** Without it, psql connects to the database matching the username (e.g., `immich`). The dump contains `DROP DATABASE immich;` which silently fails if psql is connected to that same database — the restore appears to succeed but all tables end up empty.
+
+### PG18 volume mount change
+
+PostgreSQL 18 changed PGDATA from `/var/lib/postgresql/data` to `/var/lib/postgresql/18/docker`. Update the Docker volume mount accordingly:
+
+```yaml
+# PG14
+- /path/to/data:/var/lib/postgresql/data
+
+# PG18
+- /path/to/data:/var/lib/postgresql
+```
+
+### Immich-specific notes
+
+- The `sed` fixes `pg_dumpall` resetting `search_path` to empty, which breaks Immich
+- The Immich PG image switched from pgvecto.rs to pgvector — if the dump contains `CREATE EXTENSION vectors` it will error harmlessly on PG18
+- Immich v2.5.5+ is required for reliable backup/restore
