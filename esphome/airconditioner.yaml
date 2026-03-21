@@ -97,8 +97,36 @@ climate:
       id: ac_air_purifier
 
 
-# Diagnostics (UART health)
+# Remote temperature — uses average of conditioned rooms instead of AC's internal sensor
 sensor:
+  - platform: homeassistant
+    name: AC Remote Temperature
+    id: ac_remote_temperature
+    entity_id: sensor.ac_average_temperature
+    device_class: temperature
+    unit_of_measurement: "°C"
+    filters:
+      - clamp:
+          min_value: 1
+          max_value: 40
+          ignore_out_of_range: true
+      - throttle: 30s
+    on_value:
+      then:
+        - lambda: 'id(ac).set_remote_temperature(x);'
+
+# Diagnostics
+  - platform: wifi_signal
+    name: AC WiFi Signal
+    id: ac_wifi_signal
+    entity_category: DIAGNOSTIC
+    update_interval: 60s
+
+  - platform: uptime
+    name: AC Uptime
+    id: ac_uptime
+    entity_category: DIAGNOSTIC
+    update_interval: 60s
   - platform: template
     name: AC UART Connected
     id: ac_uart_connected
