@@ -21,6 +21,7 @@ captive_portal:
 
 logger:
   level: INFO
+  baud_rate: 0  # Disable hardware UART logger — GPIO1/GPIO3 used for CN105
 
 api:
   encryption:
@@ -36,8 +37,8 @@ external_components:
 uart:
   id: HP_UART
   baud_rate: 2400
-  tx_pin: GPIO14
-  rx_pin: GPIO13
+  tx_pin: GPIO1
+  rx_pin: GPIO3
 
 climate:
   - platform: cn105

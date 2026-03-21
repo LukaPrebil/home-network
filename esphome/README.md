@@ -26,13 +26,13 @@ CN105 Pin        ESP32-CAM Header
 1 (12V)          not connected
 2 (GND)    -->   GND
 3 (5V)     -->   5V
-4 (TX)     -->   IO13 (RX)
-5 (RX)     -->   IO14 (TX)
+4 (TX)     -->   U0R (GPIO3, RX)
+5 (RX)     -->   U0T (GPIO1, TX)
 ```
 
 The ESP32-CAM is powered directly from the CN105 5V rail. No voltage regulator or level shifter is needed — the 5V supply from the CN105 connector is sufficient and the ESP32 GPIO pins tolerate the 5V logic levels from the heat pump's UART.
 
-**Pin choice:** GPIO14 (TX) and GPIO13 (RX) are used instead of the default GPIO16/GPIO17 because those pins are occupied by PSRAM on the ESP32-CAM. GPIO14/GPIO13 are clean — no strapping pin issues, no conflicts when the SD card slot is unused.
+**Pin choice:** GPIO1 (TX) and GPIO3 (RX) are the dedicated UART0 pins. The hardware serial logger is disabled (`baud_rate: 0`) to free these pins for CN105. GPIO14/GPIO13 were tried first but the on-board SD card slot loads those signal lines, preventing reliable UART communication. GPIO16/GPIO17 are occupied by PSRAM.
 
 #### Flashing
 
