@@ -31,6 +31,11 @@ Vhod, Pisarna, Utility (usually closed), Lopa, Vrt (outside)
 | `automation.ac_away_mode_widen_setpoints_when_everyone_leaves` | Widen setpoints and adjust fan when everyone leaves |
 | `automation.ac_away_mode_restore_setpoints_when_someone_arrives` | Restore saved setpoints and fan when first person arrives |
 | `automation.ac_monthly_filter_cleaning_reminder` | Monthly filter cleaning reminder (1st of month) |
+| `automation.ac_sync_air_purifier_enabled_toggle` | Sync `input_boolean.air_purifier_enabled` to the real switch |
+| `automation.ac_recover_air_purifier_after_unexpected_off` | Re-enable purifier after unexpected off (10s delay) |
+| `automation.ac_enable_purifier_and_night_mode_on_ac_start` | Enable purifier + night mode (if nighttime) when AC starts |
+| `automation.ac_enable_night_mode_at_22_00` | Enable night mode at 22:00 if AC is running |
+| `automation.ac_disable_night_mode_at_07_00` | Disable night mode at 07:00 (unconditional) |
 
 ## Away Mode
 
@@ -69,6 +74,30 @@ Actions:
 - `input_number.ac_saved_target_low` — saved heating setpoint (16–31°C)
 - `input_select.ac_saved_fan_mode` — saved fan mode (auto/quiet/low/medium/middle/high)
 
+## Air Purifier Auto-On
+
+The air purifier (`switch.air_conditioner_ac_air_purifier`) can turn off unexpectedly during ESPHome reboots, HA restarts, or power cycles. To keep it reliably on, `input_boolean.air_purifier_enabled` acts as the source of truth for the user's desired purifier state. The raw switch is hidden from the dashboard — users toggle the boolean instead.
+
+### How it works
+
+1. **Sync**: When the boolean changes, the automation syncs the real switch (only turns on if AC is running)
+2. **Recovery**: If the switch goes off but the boolean says on and AC is running, the switch is turned back on after 10 seconds
+3. **AC start**: When the AC transitions from off to any running state, the purifier is enabled (if boolean is on)
+
+### Helpers
+
+- `input_boolean.air_purifier_enabled` — user's desired purifier state (default: on, icon: `mdi:air-purifier`)
+
+## Night Mode Schedule
+
+Night mode (`switch.air_conditioner_ac_night_mode`) is automated on a 22:00–07:00 schedule when the AC is running. No recovery mechanism — if the user toggles it off during the night, it stays off until the next scheduled trigger.
+
+### Schedule
+
+- **22:00**: Enable night mode (condition: AC is not off)
+- **07:00**: Disable night mode (unconditional — cleans up state even if AC was turned off)
+- **AC starts during 22:00–07:00**: Night mode is enabled as part of the AC-start automation (same automation that handles purifier catch-up)
+
 ## Filter Cleaning Reminder
 
 ```
@@ -88,6 +117,6 @@ Sends to all users at home via the shared notification script, plus creates a pe
 Dedicated dashboard at `/air-conditioner` ("Klimatska naprava") with:
 - Native HA thermostat card (climate control + mode buttons)
 - Mushroom select cards (vertical/horizontal vane control — inline dropdowns)
-- Native tile cards (night mode, air purifier switches)
+- Native tile cards (night mode, air purifier enabled boolean — raw switch is hidden)
 
 Available as a homescreen shortcut on iPhone/Android via the HA Companion App.
