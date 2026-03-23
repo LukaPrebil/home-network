@@ -42,6 +42,7 @@ Clear actions:
 - **Title**: "Visoka vlaga"
 - **Message**: Current humidity percentage with call to action
 - **Features**: `live_update: true`, `persistent: true`, `sticky: "true"`, `alert_once: true`
+- **Deep link**: `/climate` (climate dashboard with per-room temperature and humidity)
 - **Action button**: "Urejeno" (MARK_DONE)
 
 ## Good to Ventilate Sensor

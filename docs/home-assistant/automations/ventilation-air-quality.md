@@ -18,8 +18,11 @@ Notifies home users to open windows when the living room air quality monitor rep
 ## Flow
 
 ```
-Trigger: air quality stays poor / very_poor / extremely_poor for 5 minutes
+Triggers (either):
+  1. State change: air quality stays poor / very_poor / extremely_poor for 5 minutes
+  2. Periodic recheck: every 30 minutes (catches post-snooze re-notification)
   → Conditions:
+      - Air quality has been poor / very_poor / extremely_poor for ≥5 minutes
       - Humidity ventilation notification is NOT active (avoid double-nag)
       - Air quality notification is NOT already active
       - Snooze has expired (now > air_quality_snooze_until)
@@ -57,6 +60,7 @@ Both the trigger and clear automations use `for: "00:05:00"` on their state trig
   Prosim, odpri okna za 5 minut.
   ```
 - **Features**: `live_update: true`, `persistent: true`, `sticky: "true"`, `alert_once: true`
+- **Deep link**: `/air-quality` (hidden air quality dashboard with Alpstuga + ARSO data)
 - **Action button**: "Urejeno" (AIR_QUALITY_DONE)
 
 ## Reference Values
@@ -73,6 +77,8 @@ Based on 30-day sensor history and health guidelines:
 When the user dismisses the notification (tap or swipe) while air quality is still poor, a 2-hour snooze prevents the notification from immediately re-triggering. This avoids spam when the user acknowledges but can't ventilate right now.
 
 Natural air quality improvement does NOT set the snooze — the system is ready to notify again immediately if air quality degrades.
+
+A periodic recheck (every 30 minutes) ensures re-notification after snooze expires, even if air quality has been continuously poor with no state change. The 5-minute `for` condition on the air quality state prevents false triggers during boundary oscillation.
 
 ## Mutual Exclusion
 

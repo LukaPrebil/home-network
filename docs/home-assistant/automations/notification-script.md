@@ -59,6 +59,44 @@ Loops through a defined list of users, checks if they are home, and sends a noti
       tag: my_alert_tag
 ```
 
+## Notification Channels
+
+All notifications use Android notification channels for organized alert behavior. Channels are created on first use and their importance is **locked by the OS** — only per-notification lowering is possible.
+
+| Channel | Importance | Color | Used By |
+|---------|-----------|-------|---------|
+| `Laundry` | `default` | `#03A9F4` (blue) | Washer/dryer start (lowered to `low`) and done notifications |
+| `Ventilation` | `default` | `#4CAF50` (green) | Humidity and air quality alerts |
+| `Maintenance` | `default` | `#FF9800` (orange) | AC filter (lowered to `low`), battery (lowered to `low`), 3D printer |
+| `Monitoring` | `default` | `#F44336` (red) | Mold risk alerts |
+
+### Standard notification data keys
+
+All notifications should include these keys in `data`:
+
+```yaml
+data:
+  tag: unique_tag               # Required: for updates/clearing
+  channel: "Channel Name"       # Android notification channel
+  group: category_name          # Visual grouping in notification shade
+  color: "#hex"                 # Accent color
+  notification_icon: "mdi:icon" # Status bar icon
+  visibility: public            # Lock screen: public/private/secret
+```
+
+### Status bar icons
+
+| Notification | Icon |
+|---|---|
+| Washer | `mdi:washing-machine` |
+| Dryer | `mdi:tumble-dryer` |
+| Humidity | `mdi:water-percent` |
+| Air quality | `mdi:molecule-co2` |
+| AC filter | `mdi:air-conditioner` |
+| Mold risk | `mdi:alert-circle` |
+| Low battery | `mdi:battery-alert` |
+| 3D printer | `mdi:printer-3d` |
+
 ## Live Update Notification Pattern
 
 For automations that need live-updating notifications, use these `data` keys:
@@ -70,8 +108,20 @@ data:
   persistent: true          # Prevents swipe dismiss (Android 13 and below)
   sticky: "true"            # String, not boolean — prevents dismiss on tap
   alert_once: true          # Only buzz on first send, silent on updates
-  url: /lovelace/home       # Deep link when tapped
+  url: /climate             # Deep link when tapped (see conventions below)
   actions:                  # Action buttons
     - action: ACTION_ID
       title: Button Label
 ```
+
+## Notification Deep Link Conventions
+
+Every notification should include a `url` field in `data` that links to the most relevant page when tapped:
+
+| Notification category | `url` value | Target |
+|---|---|---|
+| Laundry (washer/dryer) | `/home/areas-utility` | Utility area view on Home dashboard |
+| Humidity / ventilation | `/climate` | Climate dashboard (per-room temp/humidity) |
+| Air quality (CO2/PM2.5) | `/air-quality` | Hidden air quality dashboard (Alpstuga + ARSO) |
+| Mold risk | `/climate` | Climate dashboard |
+| AC filter | `/air-conditioner/0` | AC dashboard |

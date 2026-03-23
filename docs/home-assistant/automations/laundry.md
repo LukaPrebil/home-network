@@ -1,6 +1,6 @@
 # Laundry State Machine
 
-Six automations and a WLED notification script that track washing machine and dryer cycles through a three-state machine: Off → Running → Unemptied → Off.
+Six automations and a WLED notification script that track washing machine and dryer cycles through a three-state machine: Off → Running → Unemptied → Off. Push notifications use `script.notify_home_users_dynamic` (home-only delivery, clear support).
 
 ## Entities
 
@@ -8,14 +8,23 @@ Six automations and a WLED notification script that track washing machine and dr
 |--------|------|---------|
 | `input_select.washing_machine_state` | Helper | Washing machine state (Off / Running / Unemptied) |
 | `input_select.dryer_state` | Helper | Dryer state (Off / Running / Unemptied) |
+| `input_datetime.washing_machine_cycle_start` | Helper | Records when washer cycle started (for duration) |
+| `input_datetime.dryer_cycle_start` | Helper | Records when dryer cycle started (duration fallback) |
 | `automation.helper_set_washing_machine_status_to_running` | Automation | Detect wash cycle start |
-| `automation.new_automation` | Automation | Detect dryer cycle start |
+| `automation.helper_set_dryer_status_to_running` | Automation | Detect dryer cycle start |
 | `automation.helper_set_washing_machine_status_to_unemptied` | Automation | Detect wash cycle end |
 | `automation.helper_set_dryer_status_to_unemptied` | Automation | Detect dryer cycle end |
 | `automation.helper_set_washing_machine_status_to_off` | Automation | Mark washer emptied |
 | `automation.helper_set_dryer_status_to_off` | Automation | Mark dryer emptied |
 | `script.wled_refresh_all_notifications` | Script | Update WLED strip with active notifications |
 | `automation.kitchen_counter_full_light_switch` | Automation | Refresh WLED when kitchen switch toggles |
+
+## Notification Tags
+
+| Machine | Tag | Purpose |
+|---------|-----|---------|
+| Washing machine | `washing_machine_cycle` | Shared by start and done notifications (done replaces start in-place) |
+| Dryer | `dryer_cycle` | Same pattern |
 
 ## State Machine
 
@@ -33,7 +42,10 @@ Condition: state must be "Off" or "Unemptied" (handles re-start mid-cycle).
 
 Actions:
 - Set `input_select` to "Running"
-- Send push notification ("Pralni stroj je začel cikel" / "Sušilni stroj je začel cikel")
+- Record cycle start time in `input_datetime`
+- Silent push notification via `script.notify_home_users_dynamic` (channel: `Laundry`, importance: `low`):
+  - **Washer**: "Cikel pranja se je začel." (tag: `washing_machine_cycle`)
+  - **Dryer**: "Cikel sušenja se je začel (Program)." with translated Slovenian program name and predicted end time from `sensor.tumble_dryer_remaining_time` (tag: `dryer_cycle`)
 - Call `script.wled_refresh_all_notifications`
 
 ### Running → Unemptied
@@ -45,6 +57,11 @@ Condition: state must be "Running".
 
 Actions:
 - Set `input_select` to "Unemptied"
+- Push notification via `script.notify_home_users_dynamic` (replaces the start notification via same tag):
+  - **Washer**: "Pranje končano! Trajanje: X min." (duration computed from `input_datetime`)
+  - **Dryer**: "Sušenje končano! Program: Bombaž. Trajanje: X min." (translated program, duration from Miele `elapsed_time` sensor with `input_datetime` fallback)
+  - Sticky, persistent, alert_once, chronometer (shows count-up timer)
+  - Action button: "Izpraznjeno ✓" (`EMPTY_WASHING_MACHINE` / `EMPTY_DRYER`)
 - Call `script.wled_refresh_all_notifications` (WLED shows notification color)
 
 ### Unemptied → Off
@@ -60,7 +77,12 @@ Actions:
 
 Actions:
 - Set `input_select` to "Off"
+- Clear push notification via `script.notify_home_users_dynamic` (`clear_notification` with tag)
 - Call `script.wled_refresh_all_notifications` (WLED clears notification)
+
+## Dryer Program Translation
+
+The dryer `sensor.tumble_dryer_program` returns English enum values (e.g., `cottons`, `minimum_iron`). A Jinja2 translation map converts these to Slovenian in both start and done notifications (e.g., "Bombaž", "Minimalno likanje"). Unknown programs fall back to title-cased English.
 
 ## WLED Notification Display
 
@@ -80,6 +102,8 @@ The `automation.kitchen_counter_full_light_switch` triggers `wled_refresh_all_no
 
 ## Notes
 
-- The dryer has richer integration via `sensor.tumble_dryer` (likely a smart appliance integration) in addition to power monitoring
+- The dryer has richer integration via Miele (`sensor.tumble_dryer`) in addition to power monitoring — provides program name, elapsed time, remaining time, and energy data
 - The dryer door sensor provides automatic "emptied" detection — no button press needed if you just open the door
-- `automation.new_automation` is the dryer "Running" automation — the entity ID was never renamed from the HA default
+- All 6 automations have label `push_notification`, are assigned to area `utility`, and hidden from auto-generated dashboards
+- Notifications use channel `Laundry` (blue `#03A9F4`), group `laundry`, with `mdi:washing-machine` / `mdi:tumble-dryer` status bar icons
+- All laundry notifications deep-link to `/home/areas-utility` (Utility area view) when tapped
