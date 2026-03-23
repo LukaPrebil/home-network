@@ -2,11 +2,11 @@
 # Jellyfin role default variables
 
 # Jellyfin version
-jellyfin_version: "latest"  # Can pin to specific version if needed
+jellyfin_version: "10.11.6"
 
 # Base directories
-jellyfin_base_dir: "/mnt/plex-apps"  # NFS mount point for app configs (shared with Plex)
-jellyfin_media_dir: "/mnt/plex-bulk"  # NFS mount point for media library (shared with Plex)
+jellyfin_base_dir: "/mnt/plex-apps"  # NFS mount point for app configs
+jellyfin_media_dir: "/mnt/plex-bulk"  # NFS mount point for media library
 jellyfin_config_dir: "{{ jellyfin_base_dir }}/jellyfin"
 jellyfin_cache_dir: "{{ jellyfin_config_dir }}/cache"
 
@@ -16,10 +16,10 @@ jellyfin_compose_file: "{{ jellyfin_compose_dir }}/docker-compose.yml"
 
 # Jellyfin configuration
 jellyfin_port: 8096  # Main Jellyfin HTTP port
-jellyfin_https_port: 8920  # HTTPS port (optional)
+jellyfin_https_port: 8920  # HTTPS port
 jellyfin_network: "host"  # Use host networking for best compatibility and DLNA
 
-# Media library structure on plex-bulk (shared with Plex)
+# Media library structure on plex-bulk
 jellyfin_movies_dir: "{{ jellyfin_media_dir }}/movies"
 jellyfin_tv_dir: "{{ jellyfin_media_dir }}/tv"
 jellyfin_downloads_dir: "{{ jellyfin_media_dir }}/downloads"

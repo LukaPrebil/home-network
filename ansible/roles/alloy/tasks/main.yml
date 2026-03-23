@@ -62,12 +62,52 @@
     - monitoring
     - logging
 
+- name: Check installed Alloy version
+  ansible.builtin.command: "{{ alloy_install_dir }}/alloy --version"
+  register: alloy_installed_version
+  changed_when: false
+  failed_when: false
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Determine if Alloy upgrade is needed
+  ansible.builtin.set_fact:
+    alloy_needs_upgrade: "{{ alloy_installed_version.rc != 0 or ('v' + alloy_version) not in (alloy_installed_version.stdout | default('')) }}"
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Stop Alloy service before upgrade
+  ansible.builtin.systemd:
+    name: alloy
+    state: stopped
+  when: alloy_needs_upgrade | bool
+  failed_when: false
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Remove old Alloy binary
+  ansible.builtin.file:
+    path: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
+    state: absent
+  when: alloy_needs_upgrade | bool
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
 - name: Download Alloy binary
   ansible.builtin.unarchive:
     src: "{{ alloy_binary_url }}"
     dest: "{{ alloy_install_dir }}"
     remote_src: yes
     creates: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
+  notify: Restart Alloy
   tags:
     - alloy
     - monitoring

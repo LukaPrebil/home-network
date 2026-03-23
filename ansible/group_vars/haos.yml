@@ -8,9 +8,9 @@ haos_vm:
   node: "n5p"
 
   # Home Assistant OS version
-  version: "16.2"
-  image_filename: "haos_ova-16.2.qcow2"
-  image_url: "https://github.com/home-assistant/operating-system/releases/download/16.2/haos_ova-16.2.qcow2.xz"
+  version: "17.1"
+  image_filename: "haos_ova-17.1.qcow2"
+  image_url: "https://github.com/home-assistant/operating-system/releases/download/17.1/haos_ova-17.1.qcow2.xz"
 
   # Network configuration (temporary flat network)
   vlan_id: null  # No VLAN until router is deployed (flat network for now)

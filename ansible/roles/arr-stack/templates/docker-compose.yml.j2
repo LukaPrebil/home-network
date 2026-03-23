@@ -100,20 +100,18 @@ services:
       - PGID={{ arr_pgid }}
       - WEBUI_PORT=8080
 
-  overseerr:
-    image: linuxserver/overseerr:{{ overseerr_version }}
-    container_name: overseerr
+  seerr:
+    image: seerr/seerr:{{ seerr_version }}
+    container_name: seerr
     restart: unless-stopped
     networks:
       - {{ arr_docker_network }}
     ports:
-      - "{{ overseerr_port }}:5055"
+      - "{{ seerr_port }}:5055"
     volumes:
-      - {{ overseerr_config_dir }}:/config
+      - {{ seerr_config_dir }}:/app/config
     environment:
       - TZ={{ arr_timezone }}
-      - PUID={{ arr_puid }}
-      - PGID={{ arr_pgid }}
 
 networks:
   {{ arr_docker_network }}:

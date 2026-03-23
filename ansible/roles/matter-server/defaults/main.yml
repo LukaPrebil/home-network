@@ -2,8 +2,8 @@
 # Python Matter Server Role - Default Configuration
 
 # Docker images
-matter_server_image: "ghcr.io/home-assistant-libs/python-matter-server"
-matter_server_version: "stable"
+matter_server_image: "ghcr.io/matter-js/python-matter-server"
+matter_server_version: "8.1.2"
 
 # Container names
 matter_server_container_name: "matter-server"

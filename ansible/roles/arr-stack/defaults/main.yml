@@ -2,13 +2,13 @@
 # Arr Stack role default variables
 
 # Component versions (using linuxserver.io images)
-prowlarr_version: "latest"
-sonarr_version: "latest"
-radarr_version: "latest"
-bazarr_version: "latest"
-qbittorrent_version: "latest"
-overseerr_version: "latest"
-flaresolverr_version: "latest"
+prowlarr_version: "version-2.3.0.5236"
+sonarr_version: "version-4.0.17.2952"
+radarr_version: "version-6.0.4.10291"
+bazarr_version: "version-v1.5.6"
+qbittorrent_version: "5.1.4"
+seerr_version: "v3.1.0"
+flaresolverr_version: "v3.4.6"
 
 # Base directories
 arr_base_dir: "/srv/docker"  # NFS mount for configs (docker-volumes on TrueNAS)
@@ -20,7 +20,7 @@ sonarr_config_dir: "{{ arr_base_dir }}/sonarr"
 radarr_config_dir: "{{ arr_base_dir }}/radarr"
 bazarr_config_dir: "{{ arr_base_dir }}/bazarr"
 qbittorrent_config_dir: "{{ arr_base_dir }}/qbittorrent"
-overseerr_config_dir: "{{ arr_base_dir }}/overseerr"
+seerr_config_dir: "{{ arr_base_dir }}/overseerr"
 
 # Docker Compose configuration
 arr_compose_dir: "/opt/arr-stack"
@@ -33,7 +33,7 @@ radarr_port: 7878
 bazarr_port: 6767
 qbittorrent_port_web: 8080
 qbittorrent_port_bt: 6881
-overseerr_port: 5055
+seerr_port: 5055
 flaresolverr_port: 8191
 
 # Media library structure

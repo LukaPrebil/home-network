@@ -147,17 +147,16 @@
     - docker
     - matter-server
 
-- name: Deploy Plex and Jellyfin media servers
-  hosts: plex_hosts
+- name: Deploy Jellyfin media server
+  hosts: media_hosts
   become: true
   tags:
-    - plex
+    - jellyfin
     - media
   vars_files:
     - secrets.yml
   roles:
     - docker
-    - plex
     - jellyfin
 
 - name: Deploy Arr Stack (Sonarr, Radarr, Prowlarr)

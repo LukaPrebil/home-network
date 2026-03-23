@@ -6,7 +6,7 @@ uptime_kuma_base_dir: "/srv/docker/uptime-kuma"
 uptime_kuma_data_dir: "{{ uptime_kuma_base_dir }}/data"
 
 # Docker image
-uptime_kuma_image: "louislam/uptime-kuma:latest"
+uptime_kuma_image: "louislam/uptime-kuma:2.2.1"
 uptime_kuma_container_name: "uptime-kuma"
 
 # Network configuration

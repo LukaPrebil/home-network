@@ -29,7 +29,7 @@
       - Radarr: http://{{ ansible_host }}:{{ radarr_port }}
       - Bazarr: http://{{ ansible_host }}:{{ bazarr_port }}
       - qBittorrent: http://{{ ansible_host }}:{{ qbittorrent_port_web }}
-      - Overseerr: http://{{ ansible_host }}:{{ overseerr_port }}
+      - Seerr: http://{{ ansible_host }}:{{ seerr_port }}
   tags:
     - arr-stack
     - deploy

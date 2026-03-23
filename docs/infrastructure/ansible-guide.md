@@ -41,8 +41,7 @@ ansible/
 │   ├── node-exporter/        # Native binary install (no Docker)
 │   ├── alloy/                # Grafana Alloy agent (native binary)
 │   ├── adguard/              # AdGuard Home DNS (native binary on LXC, Docker on rpi4)
-│   ├── plex/                 # Plex Media Server (Compose)
-│   ├── jellyfin/             # Jellyfin (Compose, same host as Plex)
+│   ├── jellyfin/             # Jellyfin Media Server (Compose)
 │   ├── arr-stack/            # Sonarr, Radarr, Prowlarr (Compose)
 │   ├── omada-controller/     # TP-Link Omada SDN (native .deb install)
 │   ├── autoheal/             # Auto-restart unhealthy containers (Compose)
@@ -66,9 +65,9 @@ all
 ├── proxmox_hosts        → n5p
 ├── truenas_hosts        → tn-storage
 ├── docker_hosts         → containers, rpi4
-├── lxc_containers       → immich, traefik, omada, adguard, monitoring, plex
+├── lxc_containers       → immich, traefik, omada, adguard, monitoring, media
 ├── haos_hosts           → haos (not SSH-managed)
-├── plex_hosts           → plex
+├── media_hosts          → media
 ├── arr_stack_hosts      → containers
 ├── monitoring_hosts     → monitoring
 ├── adguard_hosts        → adguard, rpi4

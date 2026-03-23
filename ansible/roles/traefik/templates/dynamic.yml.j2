@@ -152,21 +152,6 @@ http:
         - proxy-headers
         - security-headers
 
-    # Plex Media Server
-    plex-secure:
-      rule: "Host(`plex.{{ traefik_domain | default('lukapg.dev') }}`)"
-      entryPoints:
-        - websecure
-      service: plex
-      tls:
-        certResolver: letsencrypt
-        domains:
-          - main: "{{ traefik_domain }}"
-            sans:
-              - "*.{{ traefik_domain }}"
-      middlewares:
-        - proxy-headers
-
     # Jellyfin Media Server
     jellyfin-secure:
       rule: "Host(`jellyfin.{{ traefik_domain | default('lukapg.dev') }}`)"
@@ -251,12 +236,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://192.168.1.146:3000"
-        passHostHeader: true
-
-    plex:
-      loadBalancer:
-        servers:
-          - url: "http://192.168.1.147:32400"
         passHostHeader: true
 
     jellyfin:

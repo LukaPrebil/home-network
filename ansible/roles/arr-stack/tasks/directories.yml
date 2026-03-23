@@ -21,7 +21,7 @@
     - "{{ radarr_config_dir }}"
     - "{{ bazarr_config_dir }}"
     - "{{ qbittorrent_config_dir }}"
-    - "{{ overseerr_config_dir }}"
+    - "{{ seerr_config_dir }}"
   tags:
     - arr-stack
     - setup

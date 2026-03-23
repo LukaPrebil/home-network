@@ -2,7 +2,7 @@
 # Traefik role default variables
 
 # Traefik version
-traefik_version: "v3.6.8"
+traefik_version: "v3.6.11"
 
 # Traefik directories
 traefik_base_dir: "/opt/traefik"

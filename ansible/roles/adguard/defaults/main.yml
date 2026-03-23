@@ -2,7 +2,7 @@
 # AdGuard Home role defaults
 
 # Installation
-adguard_version: "v0.107.72"
+adguard_version: "v0.107.73"
 adguard_install_dir: "/opt/adguardhome"
 adguard_work_dir: "/var/lib/adguardhome"
 adguard_config_dir: "/etc/adguardhome"
