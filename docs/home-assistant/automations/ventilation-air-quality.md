@@ -60,7 +60,7 @@ Both the trigger and clear automations use `for: "00:05:00"` on their state trig
   Prosim, odpri okna za 5 minut.
   ```
 - **Features**: `live_update: true`, `persistent: true`, `sticky: "true"`, `alert_once: true`
-- **Deep link**: `/air-quality` (hidden air quality dashboard with Alpstuga + ARSO data)
+- **Deep link**: `clickAction: /air-quality` (hidden air quality dashboard with Alpstuga + ARSO data)
 - **Action button**: "Urejeno" (AIR_QUALITY_DONE)
 
 ## Reference Values

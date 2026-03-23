@@ -108,7 +108,7 @@ data:
   persistent: true          # Prevents swipe dismiss (Android 13 and below)
   sticky: "true"            # String, not boolean — prevents dismiss on tap
   alert_once: true          # Only buzz on first send, silent on updates
-  url: /climate             # Deep link when tapped (see conventions below)
+  clickAction: /climate     # Deep link when tapped (see conventions below)
   actions:                  # Action buttons
     - action: ACTION_ID
       title: Button Label
@@ -116,9 +116,9 @@ data:
 
 ## Notification Deep Link Conventions
 
-Every notification should include a `url` field in `data` that links to the most relevant page when tapped:
+Every notification should include a `clickAction` field in `data` that links to the most relevant page when tapped. Note: `url` does NOT work on Android — use `clickAction` instead.
 
-| Notification category | `url` value | Target |
+| Notification category | `clickAction` value | Target |
 |---|---|---|
 | Laundry (washer/dryer) | `/home/areas-utility` | Utility area view on Home dashboard |
 | Humidity / ventilation | `/climate` | Climate dashboard (per-room temp/humidity) |
