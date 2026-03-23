@@ -201,10 +201,35 @@ Threshold (Th) depends on protocol activation value and BMS_EXTENSION setting.
 - Bit 0: Stop bits (0=2 stop, 1=1 stop)
 - Bits 4-5: Parity (00=none, 01=even, 10=odd)
 
-## Next Steps
+## BMS Card Installation Results (2026-03-18)
 
-1. Install PCOS004850 into the 8-pin BMS slot
-2. Switch Elfin wiring from J10 to BMS card RS485 terminals
-3. Set Elfin back to `Modbus` protocol mode (19200, 8, 1, None)
-4. Use `modbus_diff.py` to hunt registers with known display values
-5. Map the full register table and build HA configuration
+### What was done
+
+1. Installed PCOS004850 into the 8-pin BMS slot
+2. Wired Elfin EW11 to BMS card RS485 terminals (-, +, GND)
+3. Power cycled heat pump after installation
+
+### Testing performed
+
+- Full slave ID sweep (1-247) at **19200 baud** — no response
+- Full slave ID sweep (1-247) at **9600 baud** — no response
+- Slave IDs 0-3 at **4800 baud** — no response
+- Slave IDs 0-3 at **2400 baud** — no response
+- Elfin TCP connection works fine in all tests (issue is RS-485 side)
+- Elfin confirmed in Modbus protocol mode (was initially in transparent mode from J10 work)
+
+### Conclusion
+
+The Orca DUO firmware (B02563) does **not** initialize `COM_PROTOCOL_BMS` on the BMS serial port. The PCOS004850 card is physically installed and wired correctly, but the firmware never enables the Modbus slave protocol on it. No combination of baud rate or slave address produces a response.
+
+### Service menu access
+
+- Service password: **0001** (unlocks basic service parameters)
+- No BMS/Modbus/Serial parameters found in the service menu
+- Manufacturer/factory password unknown — tried 22, 66, 1315, 0121, 0100, 1234, 0000 — none worked
+
+### Next Steps
+
+1. **Call Orca Energija (080 23 24)** — ask if firmware supports BMS Modbus, request manufacturer password or firmware update
+2. If Orca can't help: investigate **Moja Orca cloud API** as alternative integration path
+3. If BMS gets enabled: set Elfin to 19200/8/1/None/Modbus, use `modbus_diff.py` to hunt registers
