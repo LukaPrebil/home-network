@@ -1,6 +1,12 @@
 ---
 # Main tasks file for Uptime Kuma role
 
+- name: Include iSCSI client setup tasks
+  ansible.builtin.include_tasks: iscsi.yml
+  tags:
+    - uptime-kuma
+    - iscsi
+
 - name: Include directory setup tasks
   ansible.builtin.include_tasks: directories.yml
   tags:

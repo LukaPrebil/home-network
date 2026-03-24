@@ -175,3 +175,10 @@ iscsi_zvols:
     # TrueNAS initiators field requires iSCSI Qualified Names (IQNs), not IP addresses
     allowed_initiators:
       - "iqn.2004-10.com.ubuntu:01:8297a10ca"  # containers VM
+  - name: "{{ zfs_pool_name }}/uptime-kuma"
+    volsize: 5368709120  # 5 GiB in bytes
+    description: "Uptime Kuma data (SQLite)"
+    compression: lz4
+    target_name: "uptime-kuma"
+    allowed_initiators:
+      - "iqn.2004-10.com.ubuntu:01:8297a10ca"  # containers VM

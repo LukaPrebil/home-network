@@ -47,7 +47,7 @@ ansible/
 │   ├── autoheal/             # Auto-restart unhealthy containers (Compose)
 │   ├── otbr/                 # OpenThread Border Router (Compose)
 │   ├── matter-server/        # Python Matter Server (Compose)
-│   ├── uptime-kuma/          # Uptime monitoring (Compose)
+│   ├── uptime-kuma/          # Uptime monitoring (Compose, iSCSI storage from TrueNAS)
 │   ├── ddns-updater/         # Dynamic DNS (Compose)
 │   ├── pds/                  # ATProto PDS (Compose, iSCSI storage from TrueNAS)
 │   ├── ha-mcp/               # Home Assistant MCP server (Compose)
@@ -111,7 +111,7 @@ Role structure: `tasks/main.yml` includes subtasks (`directories.yml`, `deploy.y
 
 **Native binary installs** (no Docker): AdGuard Home on LXC, node-exporter, Alloy, Omada Controller (.deb).
 
-**iSCSI storage** (instead of NFS): For services that use SQLite or require POSIX file locking, use iSCSI zvols from TrueNAS instead of NFS. The PDS role demonstrates this pattern — zvol defined in `host_vars/tn-storage.yml`, iSCSI target created via `configure-truenas.yml`, client setup in `roles/pds/tasks/iscsi.yml`, data mounted at `/mnt/<service>`.
+**iSCSI storage** (instead of NFS): For services that use SQLite or require POSIX file locking, use iSCSI zvols from TrueNAS instead of NFS. The PDS and Uptime Kuma roles demonstrate this pattern — zvol defined in `host_vars/tn-storage.yml`, iSCSI target created via `configure-truenas.yml`, client setup in `roles/<service>/tasks/iscsi.yml`, data mounted at `/mnt/<service>`. Compose files stay on NFS at `/srv/docker/<service>/`.
 
 ## Secrets
 

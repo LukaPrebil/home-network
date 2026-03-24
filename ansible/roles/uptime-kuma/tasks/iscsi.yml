@@ -1,0 +1,89 @@
+---
+# iSCSI client setup for Uptime Kuma data volume
+# Connects to TrueNAS iSCSI target and mounts the zvol
+# Uptime Kuma 2.x uses SQLite which requires POSIX file locking (not supported on NFS)
+
+- name: Install open-iscsi package
+  ansible.builtin.apt:
+    name: open-iscsi
+    state: present
+    update_cache: true
+
+- name: Enable and start iscsid service
+  ansible.builtin.systemd:
+    name: iscsid
+    enabled: true
+    state: started
+
+- name: Ensure iSCSI lock directory exists
+  ansible.builtin.file:
+    path: /run/lock/iscsi
+    state: directory
+    mode: '0755'
+
+- name: Discover iSCSI targets on TrueNAS
+  ansible.builtin.command:
+    cmd: iscsiadm -m discovery -t sendtargets -p {{ uptime_kuma_iscsi_target_ip }}
+  register: iscsi_discovery
+  changed_when: false
+  failed_when: iscsi_discovery.rc != 0
+
+- name: Check if iSCSI session already exists
+  ansible.builtin.command:
+    cmd: iscsiadm -m session
+  register: iscsi_sessions
+  changed_when: false
+  failed_when: false
+
+- name: Login to iSCSI target
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ uptime_kuma_iscsi_target_iqn }} --portal {{ uptime_kuma_iscsi_target_ip }} --login
+  when: uptime_kuma_iscsi_target_iqn not in (iscsi_sessions.stdout | default(''))
+  register: iscsi_login
+
+- name: Configure iSCSI node for automatic login on boot
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ uptime_kuma_iscsi_target_iqn }} --portal {{ uptime_kuma_iscsi_target_ip }} -o update -n node.startup -v automatic
+  changed_when: false
+
+- name: Wait for iSCSI device to appear
+  ansible.builtin.shell:
+    cmd: ls /dev/disk/by-path/*{{ uptime_kuma_iscsi_target_iqn }}*lun-0 2>/dev/null
+  register: iscsi_device_wait
+  until: iscsi_device_wait.rc == 0
+  retries: 6
+  delay: 5
+  changed_when: false
+  when: iscsi_login is changed
+
+- name: Resolve iSCSI disk device path via target IQN
+  ansible.builtin.shell:
+    cmd: readlink -f /dev/disk/by-path/*{{ uptime_kuma_iscsi_target_iqn }}*lun-0
+  register: iscsi_device
+  changed_when: false
+
+- name: Check if filesystem exists on iSCSI device
+  ansible.builtin.command:
+    cmd: blkid {{ iscsi_device.stdout }}
+  register: blkid_result
+  changed_when: false
+  failed_when: false
+
+- name: Format iSCSI device with ext4
+  ansible.builtin.command:
+    cmd: mkfs.ext4 -L kuma-data {{ iscsi_device.stdout }}
+  when: blkid_result.rc != 0
+
+- name: Create mount point
+  ansible.builtin.file:
+    path: "{{ uptime_kuma_iscsi_mount_point }}"
+    state: directory
+    mode: '0755'
+
+- name: Mount iSCSI volume via fstab
+  ansible.posix.mount:
+    path: "{{ uptime_kuma_iscsi_mount_point }}"
+    src: "LABEL=kuma-data"
+    fstype: ext4
+    opts: _netdev,defaults
+    state: mounted
