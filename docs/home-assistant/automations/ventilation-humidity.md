@@ -18,7 +18,7 @@ Notifies home users to open windows when indoor humidity is high and outdoor con
 
 ```
 Trigger: 07:30 / 12:30 / 19:30 OR binary_sensor.good_to_ventilate turns on
-  → Conditions: good_to_ventilate=on, AC off/fan_only, humidity > 50%
+  → Conditions: good_to_ventilate=on, AC off/fan_only/heat, humidity > 50%
   → Send sticky live-update notification via script.notify_home_users_dynamic
   → Turn on input_boolean.ventilation_reminder_active
 
