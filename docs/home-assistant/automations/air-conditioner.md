@@ -106,11 +106,12 @@ Actions:
   → Push notification via script.notify_home_users_dynamic
     Title: "Klimatska naprava"
     Message: "Čas je za mesečno čiščenje filtra klimatske naprave."
+    + Every 3rd month (Mar, Jun, Sep, Dec): appends Plasma Quad Plus cleaning reminder
     Tag: ac_filter_reminder (sticky, deep links to /air-conditioner/0)
   → persistent_notification.create with ID "ac_filter_reminder"
 ```
 
-Sends to all users at home via the shared notification script, plus creates a persistent notification in HA visible to anyone who opens the dashboard. Monthly cadence covers both runtime dust and settling dust when the unit is off.
+Sends to all users at home via the shared notification script, plus creates a persistent notification in HA visible to anyone who opens the dashboard. Monthly cadence covers both runtime dust and settling dust when the unit is off. Every 3rd month the message also reminds to clean the Plasma Quad Plus filter (remove, vacuum, or soak in lukewarm water with mild detergent).
 
 ## Dashboard
 
