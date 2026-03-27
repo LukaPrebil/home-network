@@ -2,7 +2,7 @@
 # Immich role default variables
 
 # Immich version
-immich_version: "v2.6.1"
+immich_version: "v2.6.3"
 
 # Immich directories
 immich_base_dir: "/opt/immich"
@@ -24,7 +24,8 @@ immich_external_libraries:
 immich_compose_file: "{{ immich_base_dir }}/docker-compose.yml"
 immich_env_file: "{{ immich_base_dir }}/.env"
 
-# Database configuratio
+# Database configuration
+immich_postgres_image: "ghcr.io/immich-app/postgres:18-vectorchord0.5.3-pgvector0.8.1"
 immich_db_name: "immich"
 immich_db_user: "immich"
 immich_db_hostname: "immich_postgres"
