@@ -136,6 +136,16 @@ labels:
 
 The Traefik role includes several pre-configured middlewares in `dynamic.yml`:
 
+### Security Middleware Chain (applied to all public routes)
+
+When `traefik_cloudflare_real_ip_enabled` and `traefik_crowdsec_enabled` are true (default for the traefik host), all public routes in `dynamic.yml.j2` automatically get:
+
+1. **cloudflare-real-ip** — traefik-warp plugin, extracts real client IP from Cloudflare proxy headers
+2. **crowdsec** — CrowdSec bouncer plugin (stream mode), blocks IPs flagged by CrowdSec engine or community blocklists
+3. Per-route middlewares (proxy-headers, security-headers, rate-limit)
+
+This chain is built via a Jinja2 namespace variable (`_ns.security_mw`) at the top of the template.
+
 ### Security Headers
 ```yaml
 labels:
@@ -143,6 +153,7 @@ labels:
 ```
 
 ### Rate Limiting
+Applied to all public routes. Config: 100 req/min average, 50 burst.
 ```yaml
 labels:
   - "traefik.http.routers.myservice.middlewares=rate-limit@file"
@@ -159,6 +170,13 @@ labels:
 labels:
   - "traefik.http.routers.myservice.middlewares=security-headers@file,rate-limit@file"
 ```
+
+### LAN-Only Services
+
+The Traefik dashboard is not publicly routed. It is accessible only via LAN:
+- Traefik dashboard: `http://traefik.lan:8080` (`192.168.1.142:8080`)
+
+The `.lan` domain is configured as an AdGuard DNS rewrite in `roles/adguard/defaults/main.yml`.
 
 ## Advanced: Static File Provider Routing (Non-Docker Services)
 

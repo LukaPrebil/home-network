@@ -150,8 +150,6 @@ http:
         - security-headers
         - rate-limit
 
-    # Glances — LAN-only (removed from public exposure, access via direct IP)
-
     # Immich Photo Management
     immich-secure:
       rule: "Host(`photos.{{ traefik_domain | default('lukapg.dev') }}`)"
@@ -271,11 +269,7 @@ http:
           - url: "http://192.168.1.140:3001"
         passHostHeader: true
 
-    glances:
-      loadBalancer:
-        servers:
-          - url: "http://192.168.1.110:61208"
-        passHostHeader: true
+
 
     immich:
       loadBalancer:
