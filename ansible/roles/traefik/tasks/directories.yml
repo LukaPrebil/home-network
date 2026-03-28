@@ -25,6 +25,15 @@
     group: root
     mode: '0755'
 
+- name: Create Traefik logs directory
+  ansible.builtin.file:
+    path: "{{ traefik_logs_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: traefik_access_logs | default(true)
+
 - name: Create ACME storage file with correct permissions
   ansible.builtin.file:
     path: "{{ traefik_acme_storage }}"

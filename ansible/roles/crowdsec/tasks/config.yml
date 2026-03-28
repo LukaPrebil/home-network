@@ -1,0 +1,29 @@
+---
+# Deploy CrowdSec configuration files
+
+- name: Deploy CrowdSec Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ crowdsec_compose_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart CrowdSec
+
+- name: Deploy CrowdSec config overlay (Prometheus metrics)
+  ansible.builtin.template:
+    src: config.yaml.local.j2
+    dest: "{{ crowdsec_config_dir }}/config.yaml.local"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart CrowdSec
+
+- name: Deploy Traefik log acquisition config
+  ansible.builtin.template:
+    src: acquis-traefik.yaml.j2
+    dest: "{{ crowdsec_config_dir }}/acquis.d/traefik.yaml"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart CrowdSec

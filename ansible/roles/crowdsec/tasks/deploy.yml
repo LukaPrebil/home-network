@@ -1,0 +1,34 @@
+---
+# Deploy and manage CrowdSec with Docker Compose
+
+- name: Pull CrowdSec Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ crowdsec_base_dir }}"
+    pull: "always"
+  register: crowdsec_pull
+
+- name: Start CrowdSec service
+  community.docker.docker_compose_v2:
+    project_src: "{{ crowdsec_base_dir }}"
+    state: present
+  register: crowdsec_deploy
+
+- name: Wait for CrowdSec LAPI to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ crowdsec_lapi_port }}/health"
+    method: GET
+    status_code: 200
+  register: crowdsec_health
+  until: crowdsec_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+
+- name: Display CrowdSec deployment status
+  ansible.builtin.debug:
+    msg:
+      - "CrowdSec is now running!"
+      - "LAPI: http://localhost:{{ crowdsec_lapi_port }}"
+      - "Check metrics: docker exec {{ crowdsec_container_name }} cscli metrics"
+      - "List decisions: docker exec {{ crowdsec_container_name }} cscli decisions list"
+      - "List bouncers: docker exec {{ crowdsec_container_name }} cscli bouncers list"

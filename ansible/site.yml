@@ -12,6 +12,7 @@
 #   ansible-playbook site.yml --tags paperless-ngx       # Paperless-ngx document management
 #   ansible-playbook site.yml --tags pds                  # ATProto PDS
 #   ansible-playbook site.yml --tags ha-mcp              # Home Assistant MCP server
+#   ansible-playbook site.yml --tags crowdsec             # CrowdSec intrusion detection
 #   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
 #   ansible-playbook site.yml --limit immich             # Everything for Immich host
 #   ansible-playbook site.yml --limit 'all:!tn-storage'  # Skip TrueNAS (no apt)
@@ -41,6 +42,7 @@
   become: true
   tags:
     - node-exporter
+    - monitoring
     - monitoring-agents
   vars_files:
     - secrets.yml
@@ -52,6 +54,7 @@
   become: true
   tags:
     - alloy
+    - monitoring
     - monitoring-agents
   vars_files:
     - secrets.yml
@@ -77,6 +80,17 @@
   roles:
     - docker
     - monitoring-stack
+
+- name: Deploy CrowdSec intrusion detection
+  hosts: traefik
+  become: true
+  tags:
+    - crowdsec
+  vars_files:
+    - secrets.yml
+  roles:
+    - docker
+    - crowdsec
 
 - name: Deploy Traefik reverse proxy
   hosts: traefik

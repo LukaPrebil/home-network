@@ -63,6 +63,13 @@ scrape_configs:
         labels:
           instance: 'traefik'
 
+  # CrowdSec intrusion detection metrics
+  - job_name: 'crowdsec'
+    static_configs:
+      - targets: ['{{ hostvars['traefik']['ansible_host'] }}:6060']
+        labels:
+          instance: 'crowdsec'
+
   # TrueNAS built-in metrics (manual - enable in TrueNAS UI)
   # Uncomment when TrueNAS metrics are enabled
   # - job_name: 'truenas'

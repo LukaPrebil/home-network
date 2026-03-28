@@ -12,11 +12,9 @@ This document outlines potential future projects to further improve the resilien
 * **How it Fits:** Can be deployed as a container on the `containers` VM and managed with an Ansible role. Your DDNS service will provide a stable endpoint for the connection.
 
 ---
-## 2. Intrusion Detection & Prevention
+## ~~2. Intrusion Detection & Prevention~~ (Completed)
 
-* **Why:** To automatically protect your public-facing services (behind Traefik) from malicious actors, scanners, and bots.
-* **Recommended Tool:** **CrowdSec**.
-* **How it Fits:** CrowdSec acts as a modern, collaborative fail2ban. It runs as a container, reads logs from your other services (like Traefik), and detects malicious patterns. When an attacker is identified, CrowdSec automatically blocks their IP address via a firewall rule. It also shares that IP with a central community blocklist, protecting you from threats identified by other users.
+Deployed — see `ansible/roles/crowdsec/` and the CrowdSec section in `docs/network-architecture.md`.
 
 ---
 ## 3. Ansible Role Testing

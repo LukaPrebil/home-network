@@ -1,0 +1,37 @@
+---
+# CrowdSec default configuration
+
+# Directories
+crowdsec_base_dir: "/opt/crowdsec"
+crowdsec_config_dir: "{{ crowdsec_base_dir }}/config"
+crowdsec_data_dir: "{{ crowdsec_base_dir }}/data"
+
+# Docker image
+crowdsec_image: "crowdsecurity/crowdsec:v1.7.6"
+crowdsec_container_name: "crowdsec"
+
+# Docker Compose
+crowdsec_compose_file: "{{ crowdsec_base_dir }}/docker-compose.yml"
+
+# LAPI host port (exposed on localhost only for cscli access from host)
+# Note: internal container port is always 8080; this maps the host-side port
+# Default changed from 8080 to avoid conflict with Traefik dashboard
+crowdsec_lapi_port: 9090
+
+# Prometheus metrics port (exposed for Prometheus scraping)
+crowdsec_metrics_port: 6060
+
+# Collections to install on first start
+# crowdsecurity/traefik includes: traefik log parser + base HTTP attack scenarios
+crowdsec_collections:
+  - "crowdsecurity/traefik"
+
+# Bouncer API key (pre-registered on first start via BOUNCER_KEY_traefik env var)
+# Must match traefik_crowdsec_bouncer_key — set both in host_vars, vault-encrypted
+crowdsec_bouncer_key: ""
+
+# Traefik log path on host (bind-mounted read-only into CrowdSec)
+crowdsec_traefik_logs_dir: "/opt/traefik/logs"
+
+# Docker network (must match Traefik's network for LAPI connectivity)
+crowdsec_docker_network: "traefik"

@@ -1,0 +1,9 @@
+---
+# CrowdSec acquisition config for Traefik access logs
+# This file is managed by Ansible - do not edit manually
+
+source: file
+filenames:
+  - /var/log/traefik/access.log
+labels:
+  type: traefik

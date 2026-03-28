@@ -52,3 +52,15 @@ traefik_metrics_prometheus: true
 traefik_metrics_add_entrypoints_labels: true
 traefik_metrics_add_routers_labels: false  # Can be verbose, enable if needed
 traefik_metrics_add_services_labels: true
+
+# Cloudflare real IP plugin (traefik-warp)
+traefik_cloudflare_real_ip_enabled: false  # Enable in host_vars for Cloudflare-proxied setups
+traefik_warp_version: "v1.1.5"
+
+# CrowdSec bouncer plugin
+traefik_crowdsec_enabled: false  # Enable in host_vars alongside CrowdSec role
+traefik_crowdsec_bouncer_version: "v1.5.1"
+traefik_crowdsec_bouncer_key: ""  # Set in host_vars, vault-encrypted
+
+# Logs directory (used when CrowdSec is enabled for shared access log volume)
+traefik_logs_dir: "{{ traefik_base_dir }}/logs"

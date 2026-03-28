@@ -17,3 +17,13 @@ traefik_cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token }}"
 
 # Domain configuration
 traefik_domain: "lukapg.dev"  # Used in dynamic.yml.j2 for all subdomains
+
+# Cloudflare real IP extraction (ha.lukapg.dev is Cloudflare-proxied)
+traefik_cloudflare_real_ip_enabled: true
+
+# CrowdSec bouncer integration
+traefik_crowdsec_enabled: true
+traefik_crowdsec_bouncer_key: "{{ vault_crowdsec_bouncer_key }}"
+
+# CrowdSec engine (same bouncer key for pre-registration)
+crowdsec_bouncer_key: "{{ vault_crowdsec_bouncer_key }}"

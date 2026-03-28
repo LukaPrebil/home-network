@@ -32,6 +32,10 @@ services:
       # ACME certificates
       - {{ traefik_acme_storage }}:/acme.json
 {% endif %}
+{% if traefik_access_logs | default(true) %}
+      # Access logs (file-based for CrowdSec and log analysis)
+      - {{ traefik_logs_dir }}:/var/log/traefik
+{% endif %}
       # Docker socket (read-only)
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -47,7 +51,11 @@ services:
       - "traefik.http.routers.traefik-dashboard.service=api@internal"
       - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
       - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+{% if traefik_crowdsec_enabled | default(false) %}
+      - "traefik.http.routers.traefik-dashboard.middlewares=crowdsec@file,security-headers@file"
+{% else %}
       - "traefik.http.routers.traefik-dashboard.middlewares=security-headers@file"
+{% endif %}
 {% endif %}
 
 networks:

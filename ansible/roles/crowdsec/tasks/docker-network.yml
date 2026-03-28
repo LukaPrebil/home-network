@@ -1,0 +1,7 @@
+---
+# Ensure the Docker network exists for CrowdSec <-> Traefik communication
+
+- name: Ensure Docker network exists
+  community.docker.docker_network:
+    name: "{{ crowdsec_docker_network }}"
+    state: present

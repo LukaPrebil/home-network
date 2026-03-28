@@ -1,0 +1,29 @@
+---
+# Docker Compose file for CrowdSec
+
+services:
+  crowdsec:
+    image: {{ crowdsec_image }}
+    container_name: {{ crowdsec_container_name }}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - {{ crowdsec_docker_network }}
+    ports:
+      - "127.0.0.1:{{ crowdsec_lapi_port }}:8080"
+      - "{{ crowdsec_metrics_port }}:6060"
+    environment:
+      - TZ={{ timezone | default('UTC') }}
+      - COLLECTIONS={{ crowdsec_collections | join(' ') }}
+      - BOUNCER_KEY_traefik={{ crowdsec_bouncer_key }}
+    volumes:
+      # CrowdSec persistent config and data
+      - {{ crowdsec_config_dir }}:/etc/crowdsec
+      - {{ crowdsec_data_dir }}:/var/lib/crowdsec/data
+      # Traefik access logs (read-only)
+      - {{ crowdsec_traefik_logs_dir }}:/var/log/traefik:ro
+
+networks:
+  {{ crowdsec_docker_network }}:
+    external: true

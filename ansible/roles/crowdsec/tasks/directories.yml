@@ -1,0 +1,15 @@
+---
+# Create required directories for CrowdSec
+
+- name: Create CrowdSec directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ crowdsec_base_dir }}"
+    - "{{ crowdsec_config_dir }}"
+    - "{{ crowdsec_config_dir }}/acquis.d"
+    - "{{ crowdsec_data_dir }}"

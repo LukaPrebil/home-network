@@ -54,6 +54,39 @@ http:
         scheme: https
         permanent: true
 
+{% if traefik_cloudflare_real_ip_enabled | default(false) %}
+    # Cloudflare real client IP extraction (traefik-warp plugin)
+    # Auto-fetches Cloudflare IP ranges and extracts real client IP
+    cloudflare-real-ip:
+      plugin:
+        traefikwarp:
+          provider: cloudflare
+          trustIp:
+            cloudflare:
+              - "192.168.1.0/24"
+{% endif %}
+
+{% if traefik_crowdsec_enabled | default(false) %}
+    # CrowdSec bouncer — blocks IPs flagged by CrowdSec engine
+    crowdsec:
+      plugin:
+        crowdsec:
+          enabled: true
+          crowdsecMode: stream
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: "crowdsec:8080"
+          crowdsecLapiKey: "{{ traefik_crowdsec_bouncer_key }}"
+{% endif %}
+
+{# Build security middleware chain applied to all public routes #}
+{% set _ns = namespace(security_mw = []) %}
+{% if traefik_cloudflare_real_ip_enabled | default(false) %}
+{%   set _ns.security_mw = _ns.security_mw + ['cloudflare-real-ip'] %}
+{% endif %}
+{% if traefik_crowdsec_enabled | default(false) %}
+{%   set _ns.security_mw = _ns.security_mw + ['crowdsec'] %}
+{% endif %}
+
   # Routers - HTTPS only (HTTP will auto-redirect)
   routers:
 {% if traefik_acme_enabled | default(false) %}
@@ -70,8 +103,12 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
         - security-headers
+        - rate-limit
 
     # Uptime Kuma (kuma subdomain)
     kuma-secure:
@@ -86,6 +123,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
         - security-headers
 
@@ -102,6 +142,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
         - security-headers
 
@@ -118,6 +161,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - security-headers
 
     # Immich Photo Management
@@ -133,6 +179,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
         - security-headers
 
@@ -149,6 +198,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
         - security-headers
 
@@ -165,6 +217,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
 
     # Paperless-ngx Document Management
@@ -180,6 +235,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
         - security-headers
 
@@ -199,6 +257,9 @@ http:
             sans:
               - "*.{{ traefik_domain }}"
       middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
         - proxy-headers
         - security-headers
         - rate-limit
