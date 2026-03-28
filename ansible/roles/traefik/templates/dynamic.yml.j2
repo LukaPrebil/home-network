@@ -128,6 +128,7 @@ http:
 {% endfor %}
         - proxy-headers
         - security-headers
+        - rate-limit
 
     # Uptime Kuma (status subdomain - same backend)
     status-secure:
@@ -147,24 +148,9 @@ http:
 {% endfor %}
         - proxy-headers
         - security-headers
+        - rate-limit
 
-    # Glances
-    glances-secure:
-      rule: "Host(`glances.{{ traefik_domain | default('lukapg.dev') }}`)"
-      entryPoints:
-        - websecure
-      service: glances
-      tls:
-        certResolver: letsencrypt
-        domains:
-          - main: "{{ traefik_domain }}"
-            sans:
-              - "*.{{ traefik_domain }}"
-      middlewares:
-{% for mw in _ns.security_mw %}
-        - {{ mw }}
-{% endfor %}
-        - security-headers
+    # Glances — LAN-only (removed from public exposure, access via direct IP)
 
     # Immich Photo Management
     immich-secure:
@@ -184,6 +170,7 @@ http:
 {% endfor %}
         - proxy-headers
         - security-headers
+        - rate-limit
 
     # Grafana Monitoring
     grafana-secure:
@@ -203,6 +190,7 @@ http:
 {% endfor %}
         - proxy-headers
         - security-headers
+        - rate-limit
 
     # Jellyfin Media Server
     jellyfin-secure:
@@ -221,6 +209,7 @@ http:
         - {{ mw }}
 {% endfor %}
         - proxy-headers
+        - rate-limit
 
     # Paperless-ngx Document Management
     paperless-secure:
@@ -240,6 +229,7 @@ http:
 {% endfor %}
         - proxy-headers
         - security-headers
+        - rate-limit
 
     # ATProto PDS (Personal Data Server)
     # Handles are verified via DNS TXT records (not wildcard subdomains)

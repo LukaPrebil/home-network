@@ -43,20 +43,8 @@ services:
 {% if traefik_acme_challenge_type | default('http') == 'dns' %}
       - CF_DNS_API_TOKEN={{ traefik_cloudflare_dns_api_token }}
 {% endif %}
-{% if traefik_acme_enabled %}
-    labels:
-      # Dashboard router via Docker provider
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.{{ traefik_domain | default('example.com') }}`)"
-      - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
-      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
-{% if traefik_crowdsec_enabled | default(false) %}
-      - "traefik.http.routers.traefik-dashboard.middlewares=crowdsec@file,security-headers@file"
-{% else %}
-      - "traefik.http.routers.traefik-dashboard.middlewares=security-headers@file"
-{% endif %}
-{% endif %}
+    # Dashboard: LAN-only via http://{{ ansible_host | default('localhost') }}:{{ traefik_dashboard_port }}
+    # Removed from public exposure — no Docker labels for public routing
 
 networks:
   {{ traefik_docker_network }}:
