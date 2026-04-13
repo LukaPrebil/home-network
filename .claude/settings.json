@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CC_EDITED_FILES\" | grep -qE \"\\.ya?ml$\"; then cd /Users/luka/code/home-network/ansible && ansible-lint --nocolor 2>&1; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
