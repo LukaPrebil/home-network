@@ -1,0 +1,30 @@
+---
+# Grafana alerting notification policies
+# Managed by Ansible - do not edit manually
+
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: Telegram
+    group_by:
+      - grafana_folder
+      - alertname
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      # Critical alerts: notify immediately, repeat every hour
+      - receiver: Telegram
+        matchers:
+          - severity = critical
+        group_wait: 10s
+        repeat_interval: 1h
+        continue: false
+      # Warning alerts: batch, repeat every 6 hours
+      - receiver: Telegram
+        matchers:
+          - severity = warning
+        group_wait: 1m
+        repeat_interval: 6h
+        continue: false

@@ -4,9 +4,17 @@
 
 apiVersion: 1
 
+# Remove old datasources (without explicit UIDs) before re-creating with stable UIDs
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: Loki
+    orgId: 1
+
 datasources:
   - name: Prometheus
     type: prometheus
+    uid: prometheus
     access: proxy
     url: http://prometheus:{{ prometheus_port }}
     isDefault: true
@@ -17,6 +25,7 @@ datasources:
 
   - name: Loki
     type: loki
+    uid: loki
     access: proxy
     url: http://loki:{{ loki_port }}
     isDefault: false

@@ -1,0 +1,22 @@
+---
+# Grafana alerting contact points
+# Managed by Ansible - do not edit manually
+
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: Telegram
+    receivers:
+      - uid: telegram-homelab
+        type: telegram
+        settings:
+          botToken: "{{ grafana_telegram_bot_token }}"
+          chatId: "{{ grafana_telegram_chat_id }}"
+          parseMode: HTML
+{% raw %}
+          message: |
+            {{ template "telegram.title" . }}
+            {{ template "telegram.message" . }}
+{% endraw %}
+        disableResolveMessage: false

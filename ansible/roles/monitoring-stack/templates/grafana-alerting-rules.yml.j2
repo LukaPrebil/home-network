@@ -1,0 +1,1193 @@
+---
+# Grafana alerting rules
+# Managed by Ansible - do not edit manually
+
+apiVersion: 1
+
+# Remove rules that were previously provisioned but are no longer wanted
+deleteRules:
+  - orgId: 1
+    uid: alert-traefik-latency
+
+groups:
+  # ============================================================
+  # Host Health (node-exporter metrics)
+  # ============================================================
+  - orgId: 1
+    name: Host Health
+    folder: Alerts
+    interval: 1m
+    rules:
+
+      # 1. High CPU usage — > 85% for 5 min
+      - uid: alert-high-cpu
+        title: High CPU Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="node-exporter"}[5m])) * 100)
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "CPU usage above 85% on {{ '{{' }} $labels.instance {{ '}}' }}"
+          description: "CPU usage has been above 85% for 5 minutes on {{ '{{' }} $labels.instance {{ '}}' }}."
+        labels:
+          severity: warning
+
+      # 2. High memory usage — available < 10% for 5 min
+      - uid: alert-high-memory
+        title: High Memory Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: (1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})) * 100
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 90
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Memory usage above 90% on {{ '{{' }} $labels.instance {{ '}}' }}"
+          description: "Available memory is below 10% on {{ '{{' }} $labels.instance {{ '}}' }}."
+        labels:
+          severity: warning
+
+      # 3a. Disk space low — warning >85%
+      - uid: alert-disk-warning
+        title: Disk Space Low (Warning)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: (1 - node_filesystem_avail_bytes{job="node-exporter",mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{job="node-exporter",mountpoint="/",fstype!="tmpfs"}) * 100
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Disk usage above 85% on {{ '{{' }} $labels.instance {{ '}}' }}"
+          description: "Root filesystem is {{ '{{' }} $values.B.Value {{ '}}' }}% full on {{ '{{' }} $labels.instance {{ '}}' }}."
+        labels:
+          severity: warning
+
+      # 3b. Disk space low — critical >95%
+      - uid: alert-disk-critical
+        title: Disk Space Low (Critical)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: (1 - node_filesystem_avail_bytes{job="node-exporter",mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{job="node-exporter",mountpoint="/",fstype!="tmpfs"}) * 100
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 95
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "CRITICAL: Disk usage above 95% on {{ '{{' }} $labels.instance {{ '}}' }}"
+          description: "Root filesystem is {{ '{{' }} $values.B.Value {{ '}}' }}% full on {{ '{{' }} $labels.instance {{ '}}' }}. Immediate action required."
+        labels:
+          severity: critical
+
+      # 4. System load high — load5 > CPU count for 10 min
+      - uid: alert-high-load
+        title: High System Load
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: node_load5{job="node-exporter"} / count without(cpu, mode) (node_cpu_seconds_total{job="node-exporter",mode="idle"})
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: "System load high on {{ '{{' }} $labels.instance {{ '}}' }}"
+          description: "Load average (5m) exceeds CPU count on {{ '{{' }} $labels.instance {{ '}}' }} for over 10 minutes."
+        labels:
+          severity: warning
+
+  # ============================================================
+  # Proxmox Hypervisor
+  # ============================================================
+  - orgId: 1
+    name: Proxmox
+    folder: Alerts
+    interval: 1m
+    rules:
+
+      # 5. Proxmox host high CPU
+      - uid: alert-proxmox-cpu
+        title: Proxmox Host High CPU
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="node-exporter",type="proxmox"}[5m])) * 100)
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Proxmox host CPU above 80%"
+          description: "Proxmox hypervisor CPU usage is above 80% for 5 minutes. Check VM/LXC resource allocation."
+        labels:
+          severity: critical
+
+  # ============================================================
+  # Docker Containers (cAdvisor metrics)
+  # ============================================================
+  - orgId: 1
+    name: Docker Containers
+    folder: Alerts
+    interval: 1m
+    rules:
+
+      # 6. Container restart loop — > 3 restarts in 15 min
+      - uid: alert-container-restart
+        title: Container Restart Loop
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: changes(container_start_time_seconds{job="cadvisor",container!="",container!="POD"}[15m])
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 3
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Container {{ '{{' }} $labels.container {{ '}}' }} is in a restart loop"
+          description: "Container {{ '{{' }} $labels.container {{ '}}' }} has restarted more than 3 times in the last 15 minutes."
+        labels:
+          severity: critical
+
+      # 7. Container high memory — > 90% of its limit
+      - uid: alert-container-memory
+        title: Container High Memory
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: (container_memory_working_set_bytes{job="cadvisor",container!="",container!="POD"} / container_spec_memory_limit_bytes{job="cadvisor",container!="",container!="POD"} * 100) and container_spec_memory_limit_bytes{job="cadvisor",container!="",container!="POD"} > 0
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 90
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Container {{ '{{' }} $labels.container {{ '}}' }} memory above 90%"
+          description: "Container {{ '{{' }} $labels.container {{ '}}' }} is using more than 90% of its memory limit."
+        labels:
+          severity: warning
+
+      # 8. Container OOM events
+      - uid: alert-container-oom
+        title: Container OOM Kill
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: increase(container_oom_events_total{job="cadvisor",container!="",container!="POD"}[5m])
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "OOM kill in container {{ '{{' }} $labels.container {{ '}}' }}"
+          description: "Container {{ '{{' }} $labels.container {{ '}}' }} experienced an OOM kill event."
+        labels:
+          severity: critical
+
+  # ============================================================
+  # Traefik & Network
+  # ============================================================
+  - orgId: 1
+    name: Traefik & Network
+    folder: Alerts
+    interval: 1m
+    rules:
+
+      # 9. High 5xx error rate
+      - uid: alert-traefik-5xx
+        title: Traefik 5xx Errors
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(increase(traefik_service_requests_total{code=~"5.."}[5m])) by (service)
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Traefik 5xx errors on {{ '{{' }} $labels.service {{ '}}' }}"
+          description: "Service {{ '{{' }} $labels.service {{ '}}' }} returned more than 5 server errors in the last 5 minutes."
+        labels:
+          severity: warning
+
+      # 10. TLS certificate expiring — < 14 days
+      - uid: alert-tls-expiry
+        title: TLS Certificate Expiring Soon
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: (traefik_tls_certs_not_after - time()) / 86400
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 14
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 1h
+        annotations:
+          summary: "TLS certificate expiring in {{ '{{' }} $values.B.Value {{ '}}' }} days"
+          description: "Certificate for {{ '{{' }} $labels.sans {{ '}}' }} expires in less than 14 days. Check Let's Encrypt renewal."
+        labels:
+          severity: critical
+
+      # 12. Internet download speed degraded — < 800 Mbps
+      - uid: alert-speed-download
+        title: Internet Download Speed Degraded
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 7200
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: speedtest_download_bytes{job="speedtest"} / 125000
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 800
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Download speed below 800 Mbps"
+          description: "Internet download speed is {{ '{{' }} $values.B.Value {{ '}}' }} Mbps (threshold: 800 Mbps)."
+        labels:
+          severity: warning
+
+      # 13. Internet upload speed degraded — < 200 Mbps
+      - uid: alert-speed-upload
+        title: Internet Upload Speed Degraded
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 7200
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: speedtest_upload_bytes{job="speedtest"} / 125000
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 200
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Upload speed below 200 Mbps"
+          description: "Internet upload speed is {{ '{{' }} $values.B.Value {{ '}}' }} Mbps (threshold: 200 Mbps)."
+        labels:
+          severity: warning
+
+      # 14. High latency — ping > 80ms sustained
+      # speedtest_latency_seconds is already in ms despite the name
+      - uid: alert-speed-latency
+        title: Internet High Latency
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 7200
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: speedtest_latency_seconds{job="speedtest"}
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Internet latency above 80 ms"
+          description: "Ping latency is {{ '{{' }} $values.B.Value {{ '}}' }} ms (threshold: 80 ms)."
+        labels:
+          severity: warning
+
+  # ============================================================
+  # CrowdSec Security
+  # ============================================================
+  - orgId: 1
+    name: CrowdSec Security
+    folder: Alerts
+    interval: 2m
+    rules:
+
+      # 15. Spike in blocked IPs — large net increase in active decisions
+      # cs_active_decisions is a gauge; normal churn is +-50/hr, spike would be +2000
+      - uid: alert-crowdsec-decisions
+        title: CrowdSec Decision Spike
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(delta(cs_active_decisions[1h]))
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 2000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "CrowdSec blocked IP spike"
+          description: "More than 2000 net new decisions added in the last hour. Possible targeted attack."
+        labels:
+          severity: warning
+
+      # 16. Bucket overflow surge — unusual scenario triggers
+      - uid: alert-crowdsec-overflow
+        title: CrowdSec Scenario Overflow Surge
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(increase(cs_bucket_overflowed_total[1h]))
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 100
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "CrowdSec bucket overflow surge"
+          description: "More than 100 scenario overflows in the last hour. Review CrowdSec dashboard for attack patterns."
+        labels:
+          severity: warning
+
+  # ============================================================
+  # Loki Log-Based Alerts
+  # ============================================================
+  - orgId: 1
+    name: Log Alerts
+    folder: Alerts
+    interval: 2m
+    rules:
+
+      # 17. Error log spike — high rate of error-level logs
+      - uid: alert-log-errors
+        title: Error Log Spike
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              expr: sum by (hostname) (count_over_time({job=~"system|docker"} |~ "(?i)(error|err|fatal|panic|critical)" !~ "(?i)(404|no error)" [5m]))
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              queryType: range
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 50
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Error log spike on {{ '{{' }} $labels.hostname {{ '}}' }}"
+          description: "More than 50 error-level log lines in 5 minutes on {{ '{{' }} $labels.hostname {{ '}}' }}."
+        labels:
+          severity: warning
+
+      # 18. Service crash patterns — OOM, segfault, panic
+      - uid: alert-log-crash
+        title: Service Crash Detected
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              expr: sum by (hostname) (count_over_time({job=~"system|docker"} |~ "(?i)(out of memory|oom-kill|segfault|panic:|killed process)" [5m]))
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              queryType: range
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Crash detected on {{ '{{' }} $labels.hostname {{ '}}' }}"
+          description: "OOM kill, segfault, or panic detected in logs on {{ '{{' }} $labels.hostname {{ '}}' }}."
+        labels:
+          severity: critical
+
+      # 19. Auth failure spike — brute force indicator
+      - uid: alert-log-auth
+        title: Authentication Failure Spike
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              expr: sum by (hostname) (count_over_time({job="system"} |~ "(?i)(failed password|authentication failure|invalid user|refused connect)" [5m]))
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              queryType: range
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 10
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Auth failure spike on {{ '{{' }} $labels.hostname {{ '}}' }}"
+          description: "More than 10 authentication failures in 5 minutes on {{ '{{' }} $labels.hostname {{ '}}' }}. Possible brute force attack."
+        labels:
+          severity: warning
+
+  # ============================================================
+  # Monitoring Meta-Health
+  # ============================================================
+  - orgId: 1
+    name: Monitoring Health
+    folder: Alerts
+    interval: 5m
+    rules:
+
+      # 20. Prometheus storage filling — > 80% of monitoring disk used
+      - uid: alert-prometheus-storage
+        title: Prometheus Storage Filling
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: (1 - node_filesystem_avail_bytes{instance="monitoring",mountpoint="/"} / node_filesystem_size_bytes{instance="monitoring",mountpoint="/"}) * 100
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: "Monitoring disk usage above 80%"
+          description: "The monitoring LXC root filesystem is {{ '{{' }} $values.B.Value {{ '}}' }}% full. Prometheus and Loki data may need pruning."
+        labels:
+          severity: warning
+
+      # 21. Loki ingestion errors
+      - uid: alert-loki-errors
+        title: Loki Ingestion Errors
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              expr: sum(count_over_time({container="loki"} |~ "(?i)(error|failed to flush|context deadline exceeded)" [5m]))
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              queryType: range
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 10
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Loki ingestion errors detected"
+          description: "More than 10 error log lines from Loki container in 5 minutes. Log pipeline may be degraded."
+        labels:
+          severity: warning

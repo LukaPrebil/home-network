@@ -21,6 +21,7 @@
     - grafana/provisioning/datasources
     - grafana/provisioning/dashboards
     - grafana/provisioning/dashboards/definitions
+    - grafana/provisioning/alerting
     - prometheus
     - prometheus/config
     - loki
@@ -42,6 +43,7 @@
     - "{{ grafana_data_dir }}/provisioning/datasources"
     - "{{ grafana_data_dir }}/provisioning/dashboards"
     - "{{ grafana_data_dir }}/provisioning/dashboards/definitions"
+    - "{{ grafana_data_dir }}/provisioning/alerting"
     - "{{ prometheus_data_dir }}"
     - "{{ prometheus_config_dir }}"
     - "{{ loki_data_dir }}"

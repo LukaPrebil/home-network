@@ -1,0 +1,29 @@
+{% raw %}
+---
+# Grafana alerting message templates
+# Managed by Ansible - do not edit manually
+
+apiVersion: 1
+
+templates:
+  - orgId: 1
+    name: telegram-homelab
+    template: |
+      {{ define "telegram.title" -}}
+      {{ if gt (len .Alerts.Firing) 0 }}🔴 {{ len .Alerts.Firing }} firing{{ end }}
+      {{- if gt (len .Alerts.Resolved) 0 }}{{ if gt (len .Alerts.Firing) 0 }}, {{ end }}🟢 {{ len .Alerts.Resolved }} resolved{{ end }}
+      {{- end }}
+
+      {{ define "telegram.message" -}}
+      {{ range .Alerts.Firing -}}
+      <b>🔴 {{ .Labels.alertname }}</b>
+      {{ if .Annotations.summary }}{{ .Annotations.summary }}{{ end }}
+      {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+      Severity: {{ .Labels.severity }}
+      {{ end -}}
+      {{ range .Alerts.Resolved -}}
+      <b>🟢 {{ .Labels.alertname }}</b>
+      {{ if .Annotations.summary }}{{ .Annotations.summary }}{{ end }}
+      {{ end -}}
+      {{ end }}
+{% endraw %}

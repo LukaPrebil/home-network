@@ -79,3 +79,51 @@
   tags:
     - monitoring-stack
     - config
+
+- name: Deploy Grafana alerting message templates
+  ansible.builtin.template:
+    src: grafana-alerting-templates.yml.j2
+    dest: "{{ grafana_data_dir }}/provisioning/alerting/templates.yml"
+    mode: '0644'
+  notify: Restart Monitoring Stack
+  tags:
+    - monitoring-stack
+    - config
+    - grafana
+    - alerting
+
+- name: Deploy Grafana alerting contact points
+  ansible.builtin.template:
+    src: grafana-alerting-contact-points.yml.j2
+    dest: "{{ grafana_data_dir }}/provisioning/alerting/contact-points.yml"
+    mode: '0644'
+  notify: Restart Monitoring Stack
+  tags:
+    - monitoring-stack
+    - config
+    - grafana
+    - alerting
+
+- name: Deploy Grafana alerting notification policies
+  ansible.builtin.template:
+    src: grafana-alerting-notification-policies.yml.j2
+    dest: "{{ grafana_data_dir }}/provisioning/alerting/notification-policies.yml"
+    mode: '0644'
+  notify: Restart Monitoring Stack
+  tags:
+    - monitoring-stack
+    - config
+    - grafana
+    - alerting
+
+- name: Deploy Grafana alerting rules
+  ansible.builtin.template:
+    src: grafana-alerting-rules.yml.j2
+    dest: "{{ grafana_data_dir }}/provisioning/alerting/rules.yml"
+    mode: '0644'
+  notify: Restart Monitoring Stack
+  tags:
+    - monitoring-stack
+    - config
+    - grafana
+    - alerting

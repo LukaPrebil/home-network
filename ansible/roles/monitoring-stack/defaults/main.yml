@@ -64,3 +64,7 @@ speedtest_exporter_port: 9469
 speedtest_server_ids: "11367,19034"
 speedtest_scrape_interval: "30m"  # Easy to change to 60m
 speedtest_scrape_timeout: "300s"  # 5 min timeout for multiple server tests
+
+# Telegram alerting
+grafana_telegram_bot_token: "{{ vault_grafana_telegram_bot_token }}"
+grafana_telegram_chat_id: "{{ vault_grafana_telegram_chat_id }}"
