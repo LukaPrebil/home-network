@@ -11,7 +11,7 @@ services:
     env_file:
       - {{ ha_mcp_base_dir }}/ha-mcp.env
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8086/mcp"]
+      test: ["CMD", "python3", "-c", "import urllib.request as u,json; u.urlopen(u.Request('http://localhost:8086/mcp', data=json.dumps({'jsonrpc':'2.0','method':'initialize','id':1,'params':{'protocolVersion':'2024-11-05','capabilities':{},'clientInfo':{'name':'healthcheck','version':'1.0'}}}).encode(), headers={'Content-Type':'application/json','Accept':'application/json, text/event-stream'}))"]
       interval: 30s
       timeout: 5s
       retries: 3
