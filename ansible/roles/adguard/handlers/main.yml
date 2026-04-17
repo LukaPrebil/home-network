@@ -5,4 +5,4 @@
   ansible.builtin.systemd:
     name: AdGuardHome
     state: restarted
-    daemon_reload: yes
+    daemon_reload: true

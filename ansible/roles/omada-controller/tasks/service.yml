@@ -6,7 +6,7 @@
     name: tpeap
     state: "{{ omada_service_state }}"
     # Don't enable service (it's a generated unit that can't be enabled)
-    daemon_reload: yes
+    daemon_reload: true
 
 - name: Wait for Omada Controller to be ready
   ansible.builtin.wait_for:

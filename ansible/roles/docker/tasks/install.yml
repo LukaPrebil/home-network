@@ -10,7 +10,7 @@
       - gnupg
       - lsb-release
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Set Docker repository URL based on OS
   ansible.builtin.set_fact:
@@ -56,14 +56,14 @@
       - docker-buildx-plugin
       - docker-compose-plugin
     state: present
-    update_cache: yes
+    update_cache: true
   notify: Restart Docker
 
 - name: Ensure Docker service is started and enabled
   ansible.builtin.systemd:
     name: docker
     state: started
-    enabled: yes
+    enabled: true
 
 - name: Install Python Docker SDK and dependencies for Ansible modules
   ansible.builtin.apt:
@@ -72,4 +72,4 @@
       - python3-docker  # Docker SDK for Python (from Ubuntu repos)
       - python3-requests  # Required by community.docker modules
     state: present
-    update_cache: yes
+    update_cache: true

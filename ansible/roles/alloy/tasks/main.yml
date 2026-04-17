@@ -20,7 +20,7 @@
       - unzip
       - curl
     state: present
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
   tags:
     - alloy
@@ -105,7 +105,7 @@
   ansible.builtin.unarchive:
     src: "{{ alloy_binary_url }}"
     dest: "{{ alloy_install_dir }}"
-    remote_src: yes
+    remote_src: true
     creates: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
   notify: Restart Alloy
   tags:
@@ -162,9 +162,9 @@
 - name: Enable and start Alloy service
   ansible.builtin.systemd:
     name: alloy
-    enabled: yes
+    enabled: true
     state: started
-    daemon_reload: yes
+    daemon_reload: true
   tags:
     - alloy
     - monitoring

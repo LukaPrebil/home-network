@@ -5,7 +5,7 @@
   ansible.builtin.apt:
     name: apache2-utils
     state: present
-    update_cache: yes
+    update_cache: true
   when: vault_adguard_username is defined and vault_adguard_password is defined
 
 - name: Generate bcrypt hash for AdGuard password using htpasswd

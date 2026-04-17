@@ -3,7 +3,7 @@
 
 - name: Update apt cache
   ansible.builtin.apt:
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
 
 - name: Install required packages
@@ -52,13 +52,13 @@
   ansible.builtin.lineinfile:
     path: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
     line: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/{{ mongodb_version }} multiverse"
-    create: yes
+    create: true
     mode: '0644'
   when: not mongodb_repo_check.stat.exists
 
 - name: Update apt cache after adding MongoDB repository
   ansible.builtin.apt:
-    update_cache: yes
+    update_cache: true
   when: not mongodb_repo_check.stat.exists
 
 - name: Install MongoDB
@@ -71,4 +71,4 @@
   ansible.builtin.systemd:
     name: mongod
     state: started
-    enabled: yes
+    enabled: true

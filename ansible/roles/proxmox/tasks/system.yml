@@ -20,4 +20,4 @@
     replace: "if (false) {"
   notify: Restart pveproxy
   when: ansible_facts['distribution'] == 'Debian'
-  ignore_errors: true
+  failed_when: false  # file may be absent after PVE upgrades; nag-removal is best-effort

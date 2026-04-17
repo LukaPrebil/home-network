@@ -1,0 +1,12 @@
+---
+# Yamllint config consumed by ansible-lint.
+# Matches ansible-lint's built-in defaults except for a wider line-length
+# (playbooks contain long Jinja expressions and apt sources lines that
+# break worse when wrapped).
+extends: relaxed
+
+rules:
+  line-length:
+    max: 300
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true

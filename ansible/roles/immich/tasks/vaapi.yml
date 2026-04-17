@@ -3,7 +3,7 @@
 
 - name: Update apt cache
   ansible.builtin.apt:
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
 
 - name: Install VA-API packages for AMD GPU
@@ -15,19 +15,19 @@
   ansible.builtin.user:
     name: root
     groups: video
-    append: yes
+    append: true
 
 - name: Add root user to render group for GPU access
   ansible.builtin.user:
     name: root
     groups: render
-    append: yes
+    append: true
 
 - name: Add root user to kvm group for ROCm/KFD access
   ansible.builtin.user:
     name: root
     groups: kvm
-    append: yes
+    append: true
   # Note: The kvm group (GID 993 in container) maps to render group on host
   # This is needed for /dev/kfd access for ROCm
 

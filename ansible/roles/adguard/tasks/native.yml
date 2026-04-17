@@ -7,7 +7,7 @@
       - curl
       - ca-certificates
     state: present
-    update_cache: yes
+    update_cache: true
 
 - name: Stop systemd-resolved (conflicts with AdGuard on port 53)
   ansible.builtin.systemd:
@@ -78,7 +78,7 @@
   ansible.builtin.unarchive:
     src: "/tmp/adguardhome.tar.gz"
     dest: "/tmp"
-    remote_src: yes
+    remote_src: true
   when: adguard_needs_install
 
 - name: Move AdGuard Home binary to install directory
@@ -86,7 +86,7 @@
     src: "/tmp/AdGuardHome/AdGuardHome"
     dest: "{{ adguard_install_dir }}/AdGuardHome"
     mode: '0755'
-    remote_src: yes
+    remote_src: true
   when: adguard_needs_install
   notify: Restart AdGuard Home
 
@@ -103,7 +103,7 @@
   ansible.builtin.apt:
     name: apache2-utils
     state: present
-    update_cache: yes
+    update_cache: true
   when: vault_adguard_username is defined and vault_adguard_password is defined
 
 - name: Generate bcrypt hash for AdGuard password using htpasswd
@@ -134,4 +134,4 @@
     name: AdGuardHome
     enabled: "{{ adguard_service_enabled }}"
     state: "{{ adguard_service_state }}"
-    daemon_reload: yes
+    daemon_reload: true

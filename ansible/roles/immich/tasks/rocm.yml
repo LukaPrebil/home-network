@@ -7,7 +7,7 @@
       - rocminfo
       - libhsa-runtime64-1
     state: absent
-    purge: yes
+    purge: true
 
 - name: Download AMD GPU install package for ROCm 7.2
   ansible.builtin.get_url:
@@ -22,7 +22,7 @@
 
 - name: Update apt cache after adding AMD repos
   ansible.builtin.apt:
-    update_cache: yes
+    update_cache: true
 
 - name: Install ROCm prerequisites
   ansible.builtin.apt:
