@@ -55,15 +55,19 @@ monitoring_stack_domain: "{{ domain | default('home.local') }}"
 monitoring_stack_grafana_subdomain: "grafana"
 
 # Speedtest Exporter configuration (Ookla)
-monitoring_stack_speedtest_exporter_version: "latest"
+# Image is abandoned upstream (last push 2024-09-05). Pinned to the current
+# working digest so Docker Hub tag drift / deletion can't break us.
+# To unpin: switch to a maintained fork and rewrite dashboards (metric names differ).
+monitoring_stack_speedtest_exporter_digest: "sha256:143d88cac32ecb4fbfc7a3af14ac740de487fe09a7d891826e1ffda662473113"
 monitoring_stack_speedtest_exporter_port: 9469
 # Server IDs (comma-separated for multiple servers):
 #   Slovenia: 41998 (Telekom), 11367 (T-2), 53146 (Telemach), 54112 (A1)
 #   Frankfurt: 19034 (Vodafone), 54504 (Deutsche Glasfaser), 32298 (SYNLINQ)
-# Using T-2 Slovenia (inter-ISP) + Vodafone Frankfurt (general internet)
-monitoring_stack_speedtest_server_ids: "11367,19034"
-monitoring_stack_speedtest_scrape_interval: "30m"  # Easy to change to 60m
-monitoring_stack_speedtest_scrape_timeout: "300s"  # 5 min timeout for multiple server tests
+# Using T-2 Slovenia only — 19034 (Vodafone Frankfurt) never produced data
+# under the billimek exporter; dropped to stop claiming what we don't measure.
+monitoring_stack_speedtest_server_ids: "11367"
+monitoring_stack_speedtest_scrape_interval: "30m"
+monitoring_stack_speedtest_scrape_timeout: "300s"
 
 # Telegram alerting
 monitoring_stack_grafana_telegram_bot_token: "{{ vault_grafana_telegram_bot_token }}"

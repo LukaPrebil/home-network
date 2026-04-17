@@ -110,7 +110,7 @@ services:
       - OMADA_INSECURE=true
 
   speedtest-exporter:
-    image: billimek/prometheus-speedtest-exporter:{{ monitoring_stack_speedtest_exporter_version }}
+    image: billimek/prometheus-speedtest-exporter@{{ monitoring_stack_speedtest_exporter_digest }}
     container_name: speedtest-exporter
     restart: unless-stopped
     networks:
