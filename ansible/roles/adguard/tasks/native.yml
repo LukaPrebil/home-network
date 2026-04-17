@@ -108,7 +108,10 @@
 
 - name: Generate bcrypt hash for AdGuard password using htpasswd
   ansible.builtin.shell:
-    cmd: "htpasswd -nbB -C 10 '{{ vault_adguard_username }}' '{{ vault_adguard_password }}' | cut -d: -f2"
+    cmd: |
+      set -o pipefail
+      htpasswd -nbB -C 10 '{{ vault_adguard_username }}' '{{ vault_adguard_password }}' | cut -d: -f2
+    executable: /bin/bash
   register: adguard_password_hash
   changed_when: false
   no_log: true

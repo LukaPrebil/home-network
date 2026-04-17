@@ -79,7 +79,10 @@
 
     - name: Check which VMs already exist
       ansible.builtin.shell:
-        cmd: "qm list | grep -w '{{ item.name }}' || true"
+        cmd: |
+          set -o pipefail
+          qm list | grep -w '{{ item.name }}' || true
+        executable: /bin/bash
       register: existing_vms_check
       changed_when: false
       loop: "{{ vms_to_create }}"
@@ -127,7 +130,10 @@
 
     - name: Get actual VMIDs for cloned VMs
       ansible.builtin.shell:
-        cmd: "qm list | grep -w '{{ item.name }}' | awk '{print $1}'"
+        cmd: |
+          set -o pipefail
+          qm list | grep -w '{{ item.name }}' | awk '{print $1}'
+        executable: /bin/bash
       register: vmid_results
       changed_when: false
       loop: "{{ vms_to_provision }}"

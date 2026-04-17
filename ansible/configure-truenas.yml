@@ -9,7 +9,10 @@
   tasks:
     - name: Get disk device names for NVMe drives
       ansible.builtin.shell:
-        cmd: midclt call disk.query | jq -r '.[] | select(.name | startswith("nvme")) | .devname'
+        cmd: |
+          set -o pipefail
+          midclt call disk.query | jq -r '.[] | select(.name | startswith("nvme")) | .devname'
+        executable: /bin/bash
       register: nvme_devnames
       changed_when: false
 
@@ -19,7 +22,10 @@
 
     - name: Check if pool already exists
       ansible.builtin.shell:
-        cmd: midclt call pool.query | jq -r '.[].name'
+        cmd: |
+          set -o pipefail
+          midclt call pool.query | jq -r '.[].name'
+        executable: /bin/bash
       register: existing_pools
       changed_when: false
 
@@ -60,7 +66,10 @@
   tasks:
     - name: Get existing datasets
       ansible.builtin.shell:
-        cmd: midclt call pool.dataset.query | jq -r '.[].name'
+        cmd: |
+          set -o pipefail
+          midclt call pool.dataset.query | jq -r '.[].name'
+        executable: /bin/bash
       register: existing_datasets
       changed_when: false
 
@@ -119,7 +128,10 @@
 
     - name: Get existing NFS shares
       ansible.builtin.shell:
-        cmd: midclt call sharing.nfs.query | jq -r '.[].path'
+        cmd: |
+          set -o pipefail
+          midclt call sharing.nfs.query | jq -r '.[].path'
+        executable: /bin/bash
       register: existing_nfs_shares
       changed_when: false
 
@@ -165,7 +177,10 @@
 
     - name: Get existing datasets and zvols
       ansible.builtin.shell:
-        cmd: midclt call pool.dataset.query | jq -r '.[].name'
+        cmd: |
+          set -o pipefail
+          midclt call pool.dataset.query | jq -r '.[].name'
+        executable: /bin/bash
       register: existing_datasets
       changed_when: false
 
@@ -191,7 +206,10 @@
 
     - name: Check existing iSCSI portals
       ansible.builtin.shell:
-        cmd: midclt call iscsi.portal.query | jq -r '.[].id'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.portal.query | jq -r '.[].id'
+        executable: /bin/bash
       register: existing_portals
       changed_when: false
 
@@ -207,13 +225,19 @@
 
     - name: Get iSCSI portal ID
       ansible.builtin.shell:
-        cmd: midclt call iscsi.portal.query | jq -r '.[0].id'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.portal.query | jq -r '.[0].id'
+        executable: /bin/bash
       register: portal_id
       changed_when: false
 
     - name: Get existing iSCSI targets
       ansible.builtin.shell:
-        cmd: midclt call iscsi.target.query | jq -r '.[].name'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.target.query | jq -r '.[].name'
+        executable: /bin/bash
       register: existing_targets
       changed_when: false
 
@@ -229,7 +253,10 @@
 
     - name: Get all initiator group IDs by comment
       ansible.builtin.shell:
-        cmd: midclt call iscsi.initiator.query | jq -r '.[] | select(.comment == "{{ item.target_name }} initiators") | .id'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.initiator.query | jq -r '.[] | select(.comment == "{{ item.target_name }} initiators") | .id'
+        executable: /bin/bash
       loop: "{{ iscsi_zvols }}"
       register: initiator_ids_by_name
       changed_when: false
@@ -248,7 +275,10 @@
 
     - name: Get existing iSCSI extents
       ansible.builtin.shell:
-        cmd: midclt call iscsi.extent.query | jq -r '.[].name'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.extent.query | jq -r '.[].name'
+        executable: /bin/bash
       register: existing_extents
       changed_when: false
 
@@ -267,20 +297,29 @@
 
     - name: Get existing target-extent associations
       ansible.builtin.shell:
-        cmd: midclt call iscsi.targetextent.query | jq -r '.[].target'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.targetextent.query | jq -r '.[].target'
+        executable: /bin/bash
       register: existing_associations
       changed_when: false
 
     - name: Get target IDs for association
       ansible.builtin.shell:
-        cmd: midclt call iscsi.target.query | jq -r '.[] | select(.name == "{{ item.target_name }}") | .id'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.target.query | jq -r '.[] | select(.name == "{{ item.target_name }}") | .id'
+        executable: /bin/bash
       loop: "{{ iscsi_zvols }}"
       register: target_ids
       changed_when: false
 
     - name: Get extent IDs for association
       ansible.builtin.shell:
-        cmd: midclt call iscsi.extent.query | jq -r '.[] | select(.name == "{{ item.target_name }}") | .id'
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.extent.query | jq -r '.[] | select(.name == "{{ item.target_name }}") | .id'
+        executable: /bin/bash
       loop: "{{ iscsi_zvols }}"
       register: extent_ids
       changed_when: false
@@ -314,7 +353,10 @@
   tasks:
     - name: Check existing Proxmox storage
       ansible.builtin.shell:
-        cmd: pvesm status | awk '{print $1}'
+        cmd: |
+          set -o pipefail
+          pvesm status | awk '{print $1}'
+        executable: /bin/bash
       register: existing_storage
       changed_when: false
 

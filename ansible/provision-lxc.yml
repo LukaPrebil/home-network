@@ -43,7 +43,10 @@
   tasks:
     - name: Get list of existing containers
       ansible.builtin.shell:
-        cmd: pct list | awk 'NR>1 {print $1}'
+        cmd: |
+          set -o pipefail
+          pct list | awk 'NR>1 {print $1}'
+        executable: /bin/bash
       register: existing_containers
       changed_when: false
 

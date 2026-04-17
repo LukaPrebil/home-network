@@ -62,8 +62,10 @@
     - name: Get PCI addresses for NVMe devices (excluding boot drive)
       ansible.builtin.shell:
         cmd: |
+          set -o pipefail
           # Get NVMe devices - exclude MAXIO controller (boot drive)
           lspci -nn | grep 'Non-Volatile memory' | grep -v 'MAXIO' | awk '{print $1}'
+        executable: /bin/bash
       register: nvme_pci_addresses
       changed_when: false
 

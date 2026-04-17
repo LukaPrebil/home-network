@@ -12,7 +12,10 @@
 
 - name: Check current Omada Controller version
   ansible.builtin.shell:
-    cmd: "{{ omada_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'"
+    cmd: |
+      set -o pipefail
+      {{ omada_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'
+    executable: /bin/bash
   register: current_version
   changed_when: false
   failed_when: false
@@ -66,7 +69,10 @@
 
 - name: Verify upgraded Omada Controller version
   ansible.builtin.shell:
-    cmd: "{{ omada_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'"
+    cmd: |
+      set -o pipefail
+      {{ omada_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'
+    executable: /bin/bash
   register: upgraded_version
   changed_when: false
   failed_when: false
