@@ -20,7 +20,7 @@ services:
     volumes:
       - {{ otbr_data_dir }}:/var/lib/thread
     devices:
-      - {{ thread_usb_device }}:/dev/ttyUSB0
+      - {{ otbr_thread_usb_device }}:/dev/ttyUSB0
     environment:
       TZ: {{ otbr_timezone }}
       # Radio URL for the Thread dongle

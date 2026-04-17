@@ -3,33 +3,33 @@
 
 - name: Verify Docker is installed
   ansible.builtin.command: docker --version
-  register: docker_version_check
+  register: matter_server_docker_version_check
   changed_when: false
-  failed_when: docker_version_check.rc != 0
+  failed_when: matter_server_docker_version_check.rc != 0
 
 - name: Verify user is in docker group
   ansible.builtin.command: groups {{ ansible_user }}
-  register: user_groups
+  register: matter_server_user_groups
   changed_when: false
-  failed_when: "'docker' not in user_groups.stdout"
+  failed_when: "'docker' not in matter_server_user_groups.stdout"
 
 - name: Verify D-Bus socket exists
   ansible.builtin.stat:
     path: /run/dbus
-  register: dbus_check
-  failed_when: not dbus_check.stat.exists
+  register: matter_server_dbus_check
+  failed_when: not matter_server_dbus_check.stat.exists
 
 - name: Test network connectivity to OTBR
   ansible.builtin.wait_for:
-    host: "{{ otbr_host }}"
-    port: "{{ otbr_rest_api_port }}"
+    host: "{{ matter_server_otbr_host }}"
+    port: "{{ matter_server_otbr_rest_api_port }}"
     timeout: 10
-  register: otbr_connectivity
+  register: matter_server_otbr_connectivity
   failed_when: false
 
 - name: Warn if OTBR is not reachable
   ansible.builtin.debug:
     msg: |
-      WARNING: Cannot reach OTBR at {{ otbr_host }}:{{ otbr_rest_api_port }}
+      WARNING: Cannot reach OTBR at {{ matter_server_otbr_host }}:{{ matter_server_otbr_rest_api_port }}
       Matter Server will deploy but Thread devices may not work until OTBR is available.
-  when: otbr_connectivity.failed | default(false)
+  when: matter_server_otbr_connectivity.failed | default(false)

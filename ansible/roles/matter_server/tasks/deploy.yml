@@ -35,10 +35,10 @@
     method: GET
     status_code: [200, 400, 404, 426]  # 426 = Upgrade Required (WebSocket endpoint)
     timeout: 10
-  register: matter_api_check
+  register: matter_server_api_check
   retries: 5
   delay: 5
-  until: matter_api_check.status in [200, 400, 404, 426]
+  until: matter_server_api_check.status in [200, 400, 404, 426]
 
 - name: Display Matter Server deployment status
   ansible.builtin.debug:
@@ -53,7 +53,7 @@
       You MUST update Home Assistant to use the new URL:
 
       1. Navigate to Home Assistant
-         http://{{ home_assistant_host }}:8123
+         http://{{ matter_server_home_assistant_host }}:8123
 
       2. Go to Settings -> Devices & Services
 
@@ -69,5 +69,5 @@
       7. Verify all Matter devices are still visible
 
       Thread Border Router:
-        OTBR Location: {{ otbr_host }}:{{ otbr_rest_api_port }}
+        OTBR Location: {{ matter_server_otbr_host }}:{{ matter_server_otbr_rest_api_port }}
         Matter Server will discover Thread network automatically

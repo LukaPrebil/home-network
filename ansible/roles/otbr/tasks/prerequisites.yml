@@ -7,7 +7,7 @@
     name: "linux-modules-extra-{{ ansible_kernel }}"
     state: present
     update_cache: true
-  register: modules_install
+  register: otbr_modules_install
 
 - name: Enable IPv4 forwarding (required for Thread border routing)
   ansible.posix.sysctl:
@@ -69,25 +69,25 @@
 
 - name: Wait for USB device to appear
   ansible.builtin.wait_for:
-    path: "{{ thread_usb_device }}"
+    path: "{{ otbr_thread_usb_device }}"
     timeout: 30
-  register: usb_wait
+  register: otbr_usb_wait
 
 - name: Verify USB device exists
   ansible.builtin.stat:
-    path: "{{ thread_usb_device }}"
-  register: usb_device_stat
+    path: "{{ otbr_thread_usb_device }}"
+  register: otbr_usb_device_stat
 
 - name: Fail if USB device not found
   ansible.builtin.fail:
     msg: |
-      USB device {{ thread_usb_device }} not found!
+      USB device {{ otbr_thread_usb_device }} not found!
       Please verify:
         1. Sonoff ZB-Dongle-E is connected and passed through from Proxmox
         2. Device path is correct (check: ls -la /dev/serial/by-id/)
-        3. Override thread_usb_device variable if needed
-  when: not usb_device_stat.stat.exists
+        3. Override otbr_thread_usb_device variable if needed
+  when: not otbr_usb_device_stat.stat.exists
 
 - name: Display USB device info
   ansible.builtin.debug:
-    msg: "USB device found: {{ thread_usb_device }} -> {{ usb_device_stat.stat.lnk_source | default('direct device') }}"
+    msg: "USB device found: {{ otbr_thread_usb_device }} -> {{ otbr_usb_device_stat.stat.lnk_source | default('direct device') }}"

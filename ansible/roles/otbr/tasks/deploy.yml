@@ -49,6 +49,6 @@
       REST API: http://{{ ansible_host }}:{{ otbr_port_rest }}
 
       Thread Network:
-        - Channel: {{ thread_channel }}
-        - Network Name: {{ thread_network_name }}
-        - PAN ID: {{ thread_panid }}
+        - Channel: {{ otbr_thread_channel }}
+        - Network Name: {{ otbr_thread_network_name }}
+        - PAN ID: {{ otbr_thread_panid }}

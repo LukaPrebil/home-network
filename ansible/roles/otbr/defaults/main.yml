@@ -17,14 +17,14 @@ otbr_data_dir: "{{ otbr_base_dir }}/data"
 
 # USB Device Configuration (Sonoff ZB-Dongle-E with OpenThread firmware)
 # Use persistent by-id path to avoid issues with device enumeration order
-thread_usb_device: "/dev/serial/by-id/usb-ITEAD_SONOFF_Zigbee_3.0_USB_Dongle_Plus_V2_20221029081826-if00"
+otbr_thread_usb_device: "/dev/serial/by-id/usb-ITEAD_SONOFF_Zigbee_3.0_USB_Dongle_Plus_V2_20221029081826-if00"
 
 # Thread Network Configuration
-thread_channel: 15                          # Thread channel (default 15, avoids Zigbee channel 20)
-thread_network_name: "OpenThreadHA"         # Thread network name
-thread_panid: "0x1234"                      # PAN ID (16-bit hex)
-thread_extpanid: "1111111122222222"         # Extended PAN ID (64-bit hex)
-thread_network_key: "{{ vault_thread_network_key }}"  # 128-bit network key (from vault)
+otbr_thread_channel: 15                          # Thread channel (default 15, avoids Zigbee channel 20)
+otbr_thread_network_name: "OpenThreadHA"         # Thread network name
+otbr_thread_panid: "0x1234"                      # PAN ID (16-bit hex)
+otbr_thread_extpanid: "1111111122222222"         # Extended PAN ID (64-bit hex)
+otbr_thread_network_key: "{{ vault_thread_network_key }}"  # 128-bit network key (from vault)
 
 # OTBR Configuration
 otbr_port_web: 8086                         # OTBR Web UI port
@@ -35,4 +35,4 @@ otbr_backbone_interface: "eth0"             # Host network interface for Thread 
 otbr_timezone: "{{ timezone | default('UTC') }}"
 
 # Home Assistant integration info (for documentation in output)
-home_assistant_host: "{{ hostvars['haos']['ansible_host'] }}"
+otbr_home_assistant_host: "{{ hostvars['haos']['ansible_host'] }}"
