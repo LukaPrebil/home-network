@@ -58,6 +58,7 @@
         cmd: /usr/sbin/pct stop 200
       register: pct_stop
       failed_when: false
+      changed_when: pct_stop.rc == 0
 
     - name: Wait for container to stop
       ansible.builtin.pause:
@@ -67,15 +68,18 @@
       ansible.builtin.shell:
         cmd: |
           /usr/sbin/pct set 200 -mp0 /mnt/pve/truenas-docker,mp=/srv/docker
+      changed_when: true
 
     - name: Configure bind mount for Immich photos in immich container
       ansible.builtin.shell:
         cmd: |
           /usr/sbin/pct set 200 -mp1 /mnt/pve/truenas-immich-photos,mp=/mnt/immich-photos
+      changed_when: true
 
     - name: Start immich container
       ansible.builtin.shell:
         cmd: /usr/sbin/pct start 200
+      changed_when: true
 
     - name: Wait for container to start
       ansible.builtin.pause:

@@ -127,6 +127,7 @@
       loop_control:
         label: "{{ item.name }}"
       register: clone_results
+      changed_when: clone_results.rc | default(0) == 0
 
     - name: Get actual VMIDs for cloned VMs
       ansible.builtin.shell:
@@ -156,6 +157,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - VLAN {{ item.vlan_id }}"
+      changed_when: true
 
     - name: Configure network without VLAN tag (flat network)
       ansible.builtin.shell:
@@ -166,6 +168,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - No VLAN (flat network)"
+      changed_when: true
 
     - name: Configure static IP addresses
       ansible.builtin.shell:
@@ -175,6 +178,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - {{ item.ip }}"
+      changed_when: true
 
     - name: Set hostname via cloud-init
       ansible.builtin.shell:
@@ -184,6 +188,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }}"
+      changed_when: true
 
     - name: Update CPU cores if specified
       ansible.builtin.shell:
@@ -192,6 +197,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - {{ item.cores | default('default') }} cores"
+      changed_when: true
 
     - name: Update memory if specified
       ansible.builtin.shell:
@@ -200,6 +206,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - {{ item.memory | default('default') }}MB RAM"
+      changed_when: true
 
     - name: Resize disk if specified
       ansible.builtin.shell:
@@ -208,6 +215,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - {{ item.disk_size | default('no resize') }}"
+      changed_when: true
 
     - name: Set startup order for VMs
       ansible.builtin.shell:
@@ -216,6 +224,7 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - {{ item.startup | default('no startup order') }}"
+      changed_when: true
 
     - name: Start all new VMs
       ansible.builtin.shell:
@@ -224,6 +233,7 @@
       loop_control:
         label: "{{ item.name }}"
       register: vm_starts
+      changed_when: vm_starts.rc | default(0) == 0
 
     - name: Display provisioning summary
       ansible.builtin.debug:

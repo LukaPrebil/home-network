@@ -40,6 +40,7 @@
     cmd: iscsiadm -m node --targetname {{ uptime_kuma_iscsi_target_iqn }} --portal {{ uptime_kuma_iscsi_target_ip }} --login
   when: uptime_kuma_iscsi_target_iqn not in (iscsi_sessions.stdout | default(''))
   register: iscsi_login
+  changed_when: iscsi_login.rc == 0
 
 - name: Configure iSCSI node for automatic login on boot
   ansible.builtin.command:
@@ -73,6 +74,7 @@
   ansible.builtin.command:
     cmd: mkfs.ext4 -L kuma-data {{ iscsi_device.stdout }}
   when: blkid_result.rc != 0
+  changed_when: true
 
 - name: Create mount point
   ansible.builtin.file:

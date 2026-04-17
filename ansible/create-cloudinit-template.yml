@@ -68,6 +68,7 @@
           --vga serial0
           --agent enabled=1
       register: vm_create
+      changed_when: vm_create.rc == 0
 
     - name: Import cloud image as VM disk
       ansible.builtin.shell:
@@ -75,6 +76,7 @@
           qm importdisk {{ template_vmid }} {{ cloud_image_path }} {{ boot_disk_storage }}
       register: disk_import
       when: vm_create is succeeded
+      changed_when: disk_import.rc == 0
 
     - name: Attach imported disk to VM
       ansible.builtin.shell:
@@ -82,6 +84,7 @@
           qm set {{ template_vmid }}
           --scsi0 {{ boot_disk_storage }}:{{ template_vmid }}/vm-{{ template_vmid }}-disk-0.raw,discard=on,iothread=1,ssd=1
       when: disk_import is succeeded
+      changed_when: true
 
     - name: Add cloud-init drive
       ansible.builtin.shell:
@@ -89,16 +92,19 @@
           qm set {{ template_vmid }}
           --ide2 {{ cloudinit_storage }}:cloudinit
       when: disk_import is succeeded
+      changed_when: true
 
     - name: Configure boot order
       ansible.builtin.shell:
         cmd: qm set {{ template_vmid }} --boot order=scsi0
       when: disk_import is succeeded
+      changed_when: true
 
     - name: Resize boot disk to configured size
       ansible.builtin.shell:
         cmd: qm resize {{ template_vmid }} scsi0 {{ template_disk_size }}
       when: disk_import is succeeded
+      changed_when: true
 
 - name: Configure cloud-init defaults
   hosts: n5p
@@ -120,6 +126,7 @@
           --ciuser ubuntu
           --sshkeys /tmp/cloudinit_ssh_key.pub
       register: cloudinit_user
+      changed_when: cloudinit_user.rc == 0
 
     - name: Remove temporary SSH key file
       ansible.builtin.file:
@@ -132,11 +139,13 @@
           qm set {{ template_vmid }}
           --nameserver "{{ dns_servers | join(' ') }}"
       register: cloudinit_dns
+      changed_when: cloudinit_dns.rc == 0
 
     - name: Set cloud-init IP configuration to DHCP
       ansible.builtin.shell:
         cmd: qm set {{ template_vmid }} --ipconfig0 ip=dhcp
       register: cloudinit_ip
+      changed_when: cloudinit_ip.rc == 0
 
     - name: Display cloud-init configuration status
       ansible.builtin.debug:
@@ -152,6 +161,7 @@
       ansible.builtin.shell:
         cmd: qm template {{ template_vmid }}
       register: template_convert
+      changed_when: template_convert.rc == 0
 
     - name: Verify template creation
       ansible.builtin.shell:

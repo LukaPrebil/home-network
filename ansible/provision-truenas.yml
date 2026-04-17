@@ -97,6 +97,7 @@
           --tablet 0
           --agent enabled=1
       register: vm_create
+      changed_when: vm_create.rc == 0
 
     - name: Add boot disk to VM (on local-lvm)
       ansible.builtin.shell:
@@ -104,6 +105,7 @@
           qm set {{ truenas_vmid }}
           --scsi0 local-lvm:{{ truenas_boot_disk_size }},discard=on,iothread=1,ssd=1
       when: vm_create is succeeded
+      changed_when: true
 
     - name: Attach TrueNAS ISO to VM
       ansible.builtin.shell:
@@ -111,11 +113,13 @@
           qm set {{ truenas_vmid }}
           --ide2 local:iso/{{ truenas_iso_filename }},media=cdrom
       when: vm_create is succeeded
+      changed_when: true
 
     - name: Set boot order (boot from CD first for installation)
       ansible.builtin.shell:
         cmd: qm set {{ truenas_vmid }} --boot 'order=ide2;scsi0'
       when: vm_create is succeeded
+      changed_when: true
 
     - name: Pass through NVMe devices to VM
       ansible.builtin.shell:
@@ -126,6 +130,7 @@
       loop_control:
         index_var: idx
       when: nvme_pci_addresses.stdout_lines | length > 0
+      changed_when: true
 
     - name: Display VM configuration
       ansible.builtin.shell:
@@ -140,6 +145,7 @@
     - name: Start TrueNAS VM
       ansible.builtin.shell:
         cmd: "qm start {{ truenas_vmid }}"
+      changed_when: true
 
     - name: Display next steps
       ansible.builtin.debug:

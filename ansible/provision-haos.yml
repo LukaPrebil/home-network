@@ -99,6 +99,7 @@
           --agent enabled=1
           --description "{{ haos_vm.description }}"
       register: vm_create
+      changed_when: vm_create.rc == 0
 
     - name: Add EFI disk (required for UEFI boot)
       ansible.builtin.shell:
@@ -106,6 +107,7 @@
           qm set {{ haos_vm.vmid }}
           --efidisk0 {{ haos_vm.storage }}:1,efitype=4m,pre-enrolled-keys=0
       when: vm_create is succeeded
+      changed_when: true
 
     - name: Import HAOS disk image to VM storage
       ansible.builtin.shell:
@@ -113,6 +115,7 @@
           qm importdisk {{ haos_vm.vmid }} {{ image_path }} {{ haos_vm.storage }} --format qcow2
       when: vm_create is succeeded
       register: disk_import
+      changed_when: disk_import.rc == 0
 
     - name: Attach imported disk to VM
       ansible.builtin.shell:
@@ -120,16 +123,19 @@
           qm set {{ haos_vm.vmid }}
           --scsi0 {{ haos_vm.storage }}:{{ haos_vm.vmid }}/vm-{{ haos_vm.vmid }}-disk-0.qcow2,discard=on,iothread=1,ssd=1
       when: disk_import is succeeded
+      changed_when: true
 
     - name: Resize disk to desired size
       ansible.builtin.shell:
         cmd: "qm resize {{ haos_vm.vmid }} scsi0 {{ haos_vm.disk_size }}"
       when: disk_import is succeeded
+      changed_when: true
 
     - name: Set boot order
       ansible.builtin.shell:
         cmd: qm set {{ haos_vm.vmid }} --boot 'order=scsi0'
       when: vm_create is succeeded
+      changed_when: true
 
     - name: Display VM configuration
       ansible.builtin.shell:
@@ -144,6 +150,7 @@
     - name: Start HAOS VM
       ansible.builtin.shell:
         cmd: "qm start {{ haos_vm.vmid }}"
+      changed_when: true
 
     - name: Display next steps
       ansible.builtin.debug:

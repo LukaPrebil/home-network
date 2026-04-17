@@ -115,6 +115,7 @@
         - containers_to_create | length > 0
         - item.startup is defined
       become: true
+      changed_when: true
 
     - name: Start LXC containers
       community.proxmox.proxmox:
@@ -135,6 +136,7 @@
         - containers_to_create | length > 0
         - item.gpu_passthrough | default(false)
       become: true
+      changed_when: true
 
     - name: Add NFS mount capability to containers (if needed)
       ansible.builtin.shell:
@@ -144,6 +146,7 @@
       when:
         - containers_to_create | length > 0
       become: true
+      changed_when: true
 
     - name: Check if any containers need NFS Docker volumes
       ansible.builtin.set_fact:
@@ -176,6 +179,7 @@
         - containers_to_create | length > 0
         - item.nfs_docker_volumes | default(false)
       become: true
+      changed_when: true
 
     - name: Check if any containers need Plex NFS mounts
       ansible.builtin.set_fact:
@@ -227,6 +231,7 @@
         - containers_to_create | length > 0
         - item.nfs_plex_apps | default(false)
       become: true
+      changed_when: true
 
     - name: Configure bind mount for plex-bulk in containers
       ansible.builtin.shell:
@@ -237,6 +242,7 @@
         - containers_to_create | length > 0
         - item.nfs_plex_bulk | default(false)
       become: true
+      changed_when: true
 
 - name: Add new containers to in-memory inventory
   hosts: localhost

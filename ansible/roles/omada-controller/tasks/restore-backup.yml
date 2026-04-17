@@ -55,6 +55,7 @@
   ansible.builtin.shell:
     cmd: "{{ omada_install_dir }}/bin/control.sh import /tmp/omada-restore/backup.cfg"
   register: restore_result
+  changed_when: restore_result.rc == 0
 
 - name: Display restore result
   ansible.builtin.debug:

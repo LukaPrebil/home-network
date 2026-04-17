@@ -44,6 +44,7 @@
           }'
       register: pool_create_job
       when: zfs_pool_name not in existing_pools.stdout_lines
+      changed_when: pool_create_job.rc == 0
 
     - name: Display pool creation result
       ansible.builtin.debug:
@@ -91,6 +92,7 @@
       loop: "{{ zfs_datasets }}"
       when: item.name not in existing_datasets.stdout_lines
       register: datasets_created
+      changed_when: datasets_created.rc | default(0) == 0
 
     - name: Display created datasets
       ansible.builtin.debug:
@@ -148,6 +150,7 @@
       loop: "{{ nfs_shares }}"
       when: item.path not in existing_nfs_shares.stdout_lines
       register: nfs_shares_created
+      changed_when: nfs_shares_created.rc | default(0) == 0
 
     - name: Display NFS configuration status
       ansible.builtin.debug:
@@ -197,6 +200,7 @@
       loop: "{{ iscsi_zvols }}"
       when: item.name not in existing_datasets.stdout_lines
       register: zvols_created
+      changed_when: zvols_created.rc | default(0) == 0
 
     - name: Display zvol creation results
       ansible.builtin.debug:
@@ -222,6 +226,7 @@
           }'
       register: portal_created
       when: existing_portals.stdout_lines | length == 0
+      changed_when: portal_created.rc | default(0) == 0
 
     - name: Get iSCSI portal ID
       ansible.builtin.shell:
@@ -250,6 +255,7 @@
           }'
       loop: "{{ iscsi_zvols }}"
       when: item.target_name not in existing_targets.stdout_lines
+      changed_when: true
 
     - name: Get all initiator group IDs by comment
       ansible.builtin.shell:
@@ -272,6 +278,7 @@
       loop_control:
         index_var: idx
       when: item.target_name not in existing_targets.stdout_lines
+      changed_when: true
 
     - name: Get existing iSCSI extents
       ansible.builtin.shell:
@@ -294,6 +301,7 @@
       loop: "{{ iscsi_zvols }}"
       when: item.target_name not in existing_extents.stdout_lines
       register: extents_created
+      changed_when: extents_created.rc | default(0) == 0
 
     - name: Get existing target-extent associations
       ansible.builtin.shell:
@@ -337,6 +345,7 @@
         index_var: idx
       when: target_ids.results[idx].stdout not in existing_associations.stdout_lines
       register: associations_created
+      changed_when: associations_created.rc | default(0) == 0
 
     - name: Display iSCSI configuration status
       ansible.builtin.debug:
@@ -369,6 +378,7 @@
           --content images,rootdir
       when: "'truenas-vms' not in existing_storage.stdout"
       register: storage_vms_added
+      changed_when: storage_vms_added.rc | default(0) == 0
 
     - name: Add NFS storage for templates
       ansible.builtin.shell:
@@ -379,6 +389,7 @@
           --content iso,vztmpl
       when: "'truenas-templates' not in existing_storage.stdout"
       register: storage_templates_added
+      changed_when: storage_templates_added.rc | default(0) == 0
 
     - name: Verify Proxmox storage configuration
       ansible.builtin.shell:
