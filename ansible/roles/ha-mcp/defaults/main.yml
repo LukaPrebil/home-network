@@ -1,5 +1,5 @@
 ---
-ha_mcp_version: "7.2.0"
+ha_mcp_version: "7.3.0"
 ha_mcp_image: "ghcr.io/homeassistant-ai/ha-mcp:{{ ha_mcp_version }}"
 ha_mcp_base_dir: "/srv/docker/ha-mcp"
 ha_mcp_container_name: "ha-mcp"

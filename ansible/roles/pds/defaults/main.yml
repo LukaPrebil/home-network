@@ -2,7 +2,7 @@
 # ATProto PDS (Personal Data Server) default configuration
 
 # Version pinning
-pds_version: "0.4.208"
+pds_version: "0.4.219"
 
 # Docker image
 pds_image: "ghcr.io/bluesky-social/pds:{{ pds_version }}"
