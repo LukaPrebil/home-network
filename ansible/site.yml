@@ -217,7 +217,7 @@
     - secrets.yml
   roles:
     - docker
-    - ha-mcp
+    - ha_mcp
 
 - name: Deploy container services (Uptime Kuma, DDNS, OctoEverywhere)
   hosts: containers
@@ -228,8 +228,8 @@
     - secrets.yml
   roles:
     - docker
-    - uptime-kuma
-    - ddns-updater
+    - uptime_kuma
+    - ddns_updater
     - octoeverywhere
 
 - name: OS-level package upgrade (opt-in)
