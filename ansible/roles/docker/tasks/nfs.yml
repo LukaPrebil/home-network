@@ -7,21 +7,21 @@
 - name: Check if running in LXC container
   ansible.builtin.stat:
     path: /proc/1/environ
-  register: proc_environ
+  register: docker_proc_environ
 
 - name: Detect LXC environment
   ansible.builtin.command: grep -q container=lxc /proc/1/environ
-  register: is_lxc
+  register: docker_is_lxc
   failed_when: false
   changed_when: false
-  when: proc_environ.stat.exists
+  when: docker_proc_environ.stat.exists
 
 - name: Install NFS client packages (not needed for LXC with bind mounts)
   ansible.builtin.apt:
     name:
       - nfs-common
     state: present
-  when: is_lxc.rc | default(1) != 0
+  when: docker_is_lxc.rc | default(1) != 0
 
 - name: Ensure Docker base directory exists
   ansible.builtin.file:
@@ -31,7 +31,7 @@
 
 - name: Check if storage is already mounted
   ansible.builtin.command: mountpoint -q {{ docker_nfs_mount_point }}
-  register: nfs_mounted
+  register: docker_nfs_mounted
   failed_when: false
   changed_when: false
 
@@ -43,14 +43,14 @@
     opts: defaults,nofail,_netdev
     state: mounted
   when:
-    - nfs_mounted.rc != 0
-    - is_lxc.rc | default(1) != 0  # Skip for LXC containers
+    - docker_nfs_mounted.rc != 0
+    - docker_is_lxc.rc | default(1) != 0  # Skip for LXC containers
 
 - name: Verify storage is accessible
   ansible.builtin.command: df -h {{ docker_nfs_mount_point }}
-  register: nfs_df
+  register: docker_nfs_df
   changed_when: false
 
 - name: Display storage mount info
   ansible.builtin.debug:
-    msg: "{{ nfs_df.stdout_lines }}"
+    msg: "{{ docker_nfs_df.stdout_lines }}"

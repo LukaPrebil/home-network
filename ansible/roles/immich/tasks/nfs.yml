@@ -7,21 +7,21 @@
 - name: Check if running in LXC container
   ansible.builtin.stat:
     path: /proc/1/environ
-  register: proc_environ
+  register: immich_proc_environ
 
 - name: Detect LXC environment
   ansible.builtin.command: grep -q container=lxc /proc/1/environ
-  register: is_lxc
+  register: immich_is_lxc
   failed_when: false
   changed_when: false
-  when: proc_environ.stat.exists
+  when: immich_proc_environ.stat.exists
 
 - name: Install NFS client packages (not needed for LXC with bind mounts)
   ansible.builtin.apt:
     name:
       - nfs-common
     state: present
-  when: is_lxc.rc | default(1) != 0
+  when: immich_is_lxc.rc | default(1) != 0
 
 - name: Create Immich photo library mount point
   ansible.builtin.file:
@@ -44,14 +44,14 @@
     state: mounted
   when:
     - immich_nfs_mounted.rc != 0
-    - is_lxc.rc | default(1) != 0  # Skip for LXC containers
+    - immich_is_lxc.rc | default(1) != 0  # Skip for LXC containers
 
 - name: Verify storage is accessible
   ansible.builtin.stat:
     path: "{{ immich_nfs_mount_point }}"
-  register: nfs_mount_check
+  register: immich_nfs_mount_check
 
 - name: Display storage mount status
   ansible.builtin.debug:
     msg: "Immich photo library accessible at {{ immich_nfs_mount_point }}"
-  when: nfs_mount_check.stat.exists
+  when: immich_nfs_mount_check.stat.exists

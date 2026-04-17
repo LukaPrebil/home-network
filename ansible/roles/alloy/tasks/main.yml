@@ -29,7 +29,7 @@
 
 - name: Check if Docker is installed
   ansible.builtin.command: which docker
-  register: docker_check
+  register: alloy_docker_check
   changed_when: false
   failed_when: false
   tags:
@@ -39,7 +39,7 @@
 
 - name: Set Docker installed fact
   ansible.builtin.set_fact:
-    docker_installed: "{{ docker_check.rc == 0 }}"
+    alloy_docker_installed: "{{ alloy_docker_check.rc == 0 }}"
   tags:
     - alloy
     - monitoring

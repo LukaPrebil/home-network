@@ -55,7 +55,7 @@ loki.source.file "system_logs" {
   forward_to = [loki.write.logs.receiver]
 }
 
-{% if docker_installed %}
+{% if alloy_docker_installed %}
 // Loki - Docker container logs
 loki.source.docker "docker_logs" {
   host       = "unix:///var/run/docker.sock"

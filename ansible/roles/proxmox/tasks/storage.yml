@@ -3,14 +3,14 @@
 
 - name: Check existing Proxmox storage configuration
   ansible.builtin.command: pvesm status
-  register: storage_status
+  register: proxmox_storage_status
   changed_when: false
   failed_when: false
 
 - name: Display current storage status
   ansible.builtin.debug:
-    var: storage_status.stdout_lines
-  when: storage_status.stdout_lines is defined
+    var: proxmox_storage_status.stdout_lines
+  when: proxmox_storage_status.stdout_lines is defined
 
 - name: Ensure directory storage paths exist
   ansible.builtin.file:

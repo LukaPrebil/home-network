@@ -24,23 +24,23 @@
 - name: Discover iSCSI targets on TrueNAS
   ansible.builtin.command:
     cmd: iscsiadm -m discovery -t sendtargets -p {{ uptime_kuma_iscsi_target_ip }}
-  register: iscsi_discovery
+  register: uptime_kuma_iscsi_discovery
   changed_when: false
-  failed_when: iscsi_discovery.rc != 0
+  failed_when: uptime_kuma_iscsi_discovery.rc != 0
 
 - name: Check if iSCSI session already exists
   ansible.builtin.command:
     cmd: iscsiadm -m session
-  register: iscsi_sessions
+  register: uptime_kuma_iscsi_sessions
   changed_when: false
   failed_when: false
 
 - name: Login to iSCSI target
   ansible.builtin.command:
     cmd: iscsiadm -m node --targetname {{ uptime_kuma_iscsi_target_iqn }} --portal {{ uptime_kuma_iscsi_target_ip }} --login
-  when: uptime_kuma_iscsi_target_iqn not in (iscsi_sessions.stdout | default(''))
-  register: iscsi_login
-  changed_when: iscsi_login.rc == 0
+  when: uptime_kuma_iscsi_target_iqn not in (uptime_kuma_iscsi_sessions.stdout | default(''))
+  register: uptime_kuma_iscsi_login
+  changed_when: uptime_kuma_iscsi_login.rc == 0
 
 - name: Configure iSCSI node for automatic login on boot
   ansible.builtin.command:
@@ -52,30 +52,30 @@
   # format the filesystem; a handler at end-of-play would be too late.
   ansible.builtin.shell:
     cmd: ls /dev/disk/by-path/*{{ uptime_kuma_iscsi_target_iqn }}*lun-0 2>/dev/null
-  register: iscsi_device_wait
-  until: iscsi_device_wait.rc == 0
+  register: uptime_kuma_iscsi_device_wait
+  until: uptime_kuma_iscsi_device_wait.rc == 0
   retries: 6
   delay: 5
   changed_when: false
-  when: iscsi_login is changed
+  when: uptime_kuma_iscsi_login is changed
 
 - name: Resolve iSCSI disk device path via target IQN
   ansible.builtin.shell:
     cmd: readlink -f /dev/disk/by-path/*{{ uptime_kuma_iscsi_target_iqn }}*lun-0
-  register: iscsi_device
+  register: uptime_kuma_iscsi_device
   changed_when: false
 
 - name: Check if filesystem exists on iSCSI device
   ansible.builtin.command:
-    cmd: blkid {{ iscsi_device.stdout }}
-  register: blkid_result
+    cmd: blkid {{ uptime_kuma_iscsi_device.stdout }}
+  register: uptime_kuma_blkid_result
   changed_when: false
   failed_when: false
 
 - name: Format iSCSI device with ext4
   ansible.builtin.command:
-    cmd: mkfs.ext4 -L kuma-data {{ iscsi_device.stdout }}
-  when: blkid_result.rc != 0
+    cmd: mkfs.ext4 -L kuma-data {{ uptime_kuma_iscsi_device.stdout }}
+  when: uptime_kuma_blkid_result.rc != 0
   changed_when: true
 
 - name: Create mount point

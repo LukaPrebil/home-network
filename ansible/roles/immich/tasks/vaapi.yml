@@ -34,16 +34,16 @@
 - name: Test VA-API functionality
   ansible.builtin.command:
     cmd: vainfo
-  register: vainfo_output
+  register: immich_vainfo_output
   changed_when: false
   failed_when: false
 
 - name: Display VA-API information
   ansible.builtin.debug:
-    var: vainfo_output.stdout_lines
-  when: vainfo_output.rc == 0
+    var: immich_vainfo_output.stdout_lines
+  when: immich_vainfo_output.rc == 0
 
 - name: Warn if VA-API test failed
   ansible.builtin.debug:
     msg: "WARNING: VA-API test failed. GPU acceleration may not work properly."
-  when: vainfo_output.rc != 0
+  when: immich_vainfo_output.rc != 0

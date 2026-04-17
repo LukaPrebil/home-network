@@ -49,16 +49,16 @@
 - name: Test ROCm installation
   ansible.builtin.command:
     cmd: rocminfo
-  register: rocminfo_output
+  register: immich_rocminfo_output
   changed_when: false
   failed_when: false
 
 - name: Display ROCm information
   ansible.builtin.debug:
-    msg: "{{ rocminfo_output.stdout_lines | select('search', 'Agent|Name:|gfx') | list }}"
-  when: rocminfo_output.rc == 0
+    msg: "{{ immich_rocminfo_output.stdout_lines | select('search', 'Agent|Name:|gfx') | list }}"
+  when: immich_rocminfo_output.rc == 0
 
 - name: Warn if ROCm test failed
   ansible.builtin.debug:
     msg: "WARNING: ROCm test failed. GPU may not be detected."
-  when: rocminfo_output.rc != 0
+  when: immich_rocminfo_output.rc != 0

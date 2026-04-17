@@ -10,7 +10,7 @@
 
 - name: Test DNS resolution
   ansible.builtin.command: host download.truenas.com
-  register: dns_test
+  register: proxmox_dns_test
   changed_when: false
   failed_when: false
 
