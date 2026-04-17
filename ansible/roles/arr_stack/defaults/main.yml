@@ -2,53 +2,53 @@
 # Arr Stack role default variables
 
 # Component versions (using linuxserver.io images)
-prowlarr_version: "version-2.3.5.5327"
-sonarr_version: "version-4.0.17.2952"
-radarr_version: "version-6.1.1.10360"
-bazarr_version: "version-v1.5.6"
-qbittorrent_version: "5.1.4"
-seerr_version: "v3.2.0"
-flaresolverr_version: "v3.4.6"
+arr_stack_prowlarr_version: "version-2.3.5.5327"
+arr_stack_sonarr_version: "version-4.0.17.2952"
+arr_stack_radarr_version: "version-6.1.1.10360"
+arr_stack_bazarr_version: "version-v1.5.6"
+arr_stack_qbittorrent_version: "5.1.4"
+arr_stack_seerr_version: "v3.2.0"
+arr_stack_flaresolverr_version: "v3.4.6"
 
 # Base directories
-arr_base_dir: "/srv/docker"  # NFS mount for configs (docker-volumes on TrueNAS)
-arr_media_dir: "/mnt/plex-bulk"  # NFS mount for media (plex-bulk pool on TrueNAS)
+arr_stack_base_dir: "/srv/docker"  # NFS mount for configs (docker-volumes on TrueNAS)
+arr_stack_media_dir: "/mnt/plex-bulk"  # NFS mount for media (plex-bulk pool on TrueNAS)
 
 # Config directories
-prowlarr_config_dir: "{{ arr_base_dir }}/prowlarr"
-sonarr_config_dir: "{{ arr_base_dir }}/sonarr"
-radarr_config_dir: "{{ arr_base_dir }}/radarr"
-bazarr_config_dir: "{{ arr_base_dir }}/bazarr"
-qbittorrent_config_dir: "{{ arr_base_dir }}/qbittorrent"
-seerr_config_dir: "{{ arr_base_dir }}/overseerr"
+arr_stack_prowlarr_config_dir: "{{ arr_stack_base_dir }}/prowlarr"
+arr_stack_sonarr_config_dir: "{{ arr_stack_base_dir }}/sonarr"
+arr_stack_radarr_config_dir: "{{ arr_stack_base_dir }}/radarr"
+arr_stack_bazarr_config_dir: "{{ arr_stack_base_dir }}/bazarr"
+arr_stack_qbittorrent_config_dir: "{{ arr_stack_base_dir }}/qbittorrent"
+arr_stack_seerr_config_dir: "{{ arr_stack_base_dir }}/overseerr"
 
 # Docker Compose configuration
-arr_compose_dir: "/opt/arr-stack"
-arr_compose_file: "{{ arr_compose_dir }}/docker-compose.yml"
+arr_stack_compose_dir: "/opt/arr-stack"
+arr_stack_compose_file: "{{ arr_stack_compose_dir }}/docker-compose.yml"
 
 # Port configuration
-prowlarr_port: 9696
-sonarr_port: 8989
-radarr_port: 7878
-bazarr_port: 6767
-qbittorrent_port_web: 8080
-qbittorrent_port_bt: 6881
-seerr_port: 5055
-flaresolverr_port: 8191
+arr_stack_prowlarr_port: 9696
+arr_stack_sonarr_port: 8989
+arr_stack_radarr_port: 7878
+arr_stack_bazarr_port: 6767
+arr_stack_qbittorrent_port_web: 8080
+arr_stack_qbittorrent_port_bt: 6881
+arr_stack_seerr_port: 5055
+arr_stack_flaresolverr_port: 8191
 
 # Media library structure
-media_movies_dir: "{{ arr_media_dir }}/movies"
-media_tv_dir: "{{ arr_media_dir }}/tv"
-media_downloads_dir: "{{ arr_media_dir }}/downloads"
+arr_stack_media_movies_dir: "{{ arr_stack_media_dir }}/movies"
+arr_stack_media_tv_dir: "{{ arr_stack_media_dir }}/tv"
+arr_stack_media_downloads_dir: "{{ arr_stack_media_dir }}/downloads"
 
 # Docker network
-arr_docker_network: "arr-stack"
+arr_stack_docker_network: "arr-stack"
 
 # Timezone
-arr_timezone: "{{ timezone | default('UTC') }}"
+arr_stack_timezone: "{{ timezone | default('UTC') }}"
 
 # PUID/PGID for linuxserver.io containers
 # For VMs: Use standard user IDs
 # For LXC: Use root (UID 0) due to unprivileged LXC UID mapping
-arr_puid: 0
-arr_pgid: 0
+arr_stack_puid: 0
+arr_stack_pgid: 0

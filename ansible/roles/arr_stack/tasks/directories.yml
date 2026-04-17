@@ -3,7 +3,7 @@
 
 - name: Create arr-stack compose directory
   ansible.builtin.file:
-    path: "{{ arr_compose_dir }}"
+    path: "{{ arr_stack_compose_dir }}"
     state: directory
     mode: '0755'
   tags:
@@ -16,12 +16,12 @@
     state: directory
     mode: '0755'
   loop:
-    - "{{ prowlarr_config_dir }}"
-    - "{{ sonarr_config_dir }}"
-    - "{{ radarr_config_dir }}"
-    - "{{ bazarr_config_dir }}"
-    - "{{ qbittorrent_config_dir }}"
-    - "{{ seerr_config_dir }}"
+    - "{{ arr_stack_prowlarr_config_dir }}"
+    - "{{ arr_stack_sonarr_config_dir }}"
+    - "{{ arr_stack_radarr_config_dir }}"
+    - "{{ arr_stack_bazarr_config_dir }}"
+    - "{{ arr_stack_qbittorrent_config_dir }}"
+    - "{{ arr_stack_seerr_config_dir }}"
   tags:
     - arr-stack
     - setup
@@ -32,11 +32,11 @@
     state: directory
     mode: '0755'
   loop:
-    - "{{ media_movies_dir }}"
-    - "{{ media_tv_dir }}"
-    - "{{ media_downloads_dir }}"
-    - "{{ media_downloads_dir }}/movies"
-    - "{{ media_downloads_dir }}/tv"
+    - "{{ arr_stack_media_movies_dir }}"
+    - "{{ arr_stack_media_tv_dir }}"
+    - "{{ arr_stack_media_downloads_dir }}"
+    - "{{ arr_stack_media_downloads_dir }}/movies"
+    - "{{ arr_stack_media_downloads_dir }}/tv"
   tags:
     - arr-stack
     - setup

@@ -4,7 +4,7 @@
 - name: Deploy arr-stack docker-compose.yml
   ansible.builtin.template:
     src: docker-compose.yml.j2
-    dest: "{{ arr_compose_file }}"
+    dest: "{{ arr_stack_compose_file }}"
     mode: '0644'
   notify: Restart Arr Stack
   tags:
@@ -13,9 +13,9 @@
 
 - name: Start Arr Stack services
   community.docker.docker_compose_v2:
-    project_src: "{{ arr_compose_dir }}"
+    project_src: "{{ arr_stack_compose_dir }}"
     state: present
-  register: arr_deploy
+  register: arr_stack_deploy
   tags:
     - arr-stack
     - deploy
@@ -23,13 +23,13 @@
 - name: Display Arr Stack deployment status
   ansible.builtin.debug:
     msg: |
-      Arr Stack services {{ 'deployed' if arr_deploy.changed else 'already running' }}:
-      - Prowlarr: http://{{ ansible_host }}:{{ prowlarr_port }}
-      - Sonarr: http://{{ ansible_host }}:{{ sonarr_port }}
-      - Radarr: http://{{ ansible_host }}:{{ radarr_port }}
-      - Bazarr: http://{{ ansible_host }}:{{ bazarr_port }}
-      - qBittorrent: http://{{ ansible_host }}:{{ qbittorrent_port_web }}
-      - Seerr: http://{{ ansible_host }}:{{ seerr_port }}
+      Arr Stack services {{ 'deployed' if arr_stack_deploy.changed else 'already running' }}:
+      - Prowlarr: http://{{ ansible_host }}:{{ arr_stack_prowlarr_port }}
+      - Sonarr: http://{{ ansible_host }}:{{ arr_stack_sonarr_port }}
+      - Radarr: http://{{ ansible_host }}:{{ arr_stack_radarr_port }}
+      - Bazarr: http://{{ ansible_host }}:{{ arr_stack_bazarr_port }}
+      - qBittorrent: http://{{ ansible_host }}:{{ arr_stack_qbittorrent_port_web }}
+      - Seerr: http://{{ ansible_host }}:{{ arr_stack_seerr_port }}
   tags:
     - arr-stack
     - deploy
