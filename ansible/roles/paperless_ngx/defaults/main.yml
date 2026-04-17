@@ -16,7 +16,7 @@ paperless_ngx_docker_network: "traefik"
 
 # NFS mount for document storage
 paperless_ngx_nfs_server: "{{ truenas_nfs_server }}"
-paperless_ngx_nfs_share: "{{ truenas_paperless_ngx_share }}"
+paperless_ngx_nfs_share: "{{ truenas_paperless_share }}"
 paperless_ngx_nfs_mount_point: "/mnt/paperless"
 paperless_ngx_nfs_opts: "defaults,nofail,_netdev"
 
