@@ -7,7 +7,7 @@ crowdsec_config_dir: "{{ crowdsec_base_dir }}/config"
 crowdsec_data_dir: "{{ crowdsec_base_dir }}/data"
 
 # Docker image
-crowdsec_image: "crowdsecurity/crowdsec:v1.7.6"
+crowdsec_image: "crowdsecurity/crowdsec:v1.7.7"
 crowdsec_container_name: "crowdsec"
 
 # Docker Compose
