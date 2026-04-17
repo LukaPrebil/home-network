@@ -3,8 +3,8 @@
 
 # Version pinning
 paperless_ngx_version: "2.20.14"
-paperless_ngx_redis_version: "7-alpine"
-paperless_ngx_postgres_version: "17-alpine"
+paperless_ngx_redis_version: "8-alpine"
+paperless_ngx_postgres_version: "18-alpine"
 
 # Directories
 paperless_ngx_base_dir: "/srv/docker/paperless-ngx"

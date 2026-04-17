@@ -14,7 +14,7 @@ services:
     container_name: paperless-db
     restart: unless-stopped
     volumes:
-      - {{ paperless_ngx_base_dir }}/pgdata:/var/lib/postgresql/data
+      - {{ paperless_ngx_base_dir }}/pgdata:/var/lib/postgresql
     environment:
       POSTGRES_DB: {{ paperless_ngx_db_name }}
       POSTGRES_USER: {{ paperless_ngx_db_user }}
