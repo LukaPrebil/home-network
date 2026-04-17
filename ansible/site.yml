@@ -48,7 +48,7 @@
   vars_files:
     - secrets.yml
   roles:
-    - node-exporter
+    - node_exporter
 
 - name: Deploy Grafana Alloy for metrics and log shipping
   hosts: monitoring_agents
@@ -160,7 +160,7 @@
     - secrets.yml
   roles:
     - docker
-    - matter-server
+    - matter_server
 
 - name: Deploy Jellyfin media server
   hosts: media_hosts
