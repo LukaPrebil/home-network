@@ -2,7 +2,7 @@
 # Jellyfin role default variables
 
 # Jellyfin version
-jellyfin_version: "10.11.6"
+jellyfin_version: "10.11.8"
 
 # Base directories
 jellyfin_base_dir: "/mnt/plex-apps"  # NFS mount point for app configs
