@@ -11,28 +11,28 @@
 
 - name: Create Paperless-ngx NFS mount point
   ansible.builtin.file:
-    path: "{{ paperless_nfs_mount_point }}"
+    path: "{{ paperless_ngx_nfs_mount_point }}"
     state: directory
     mode: '0755'
 
 - name: Check if storage is already mounted
-  ansible.builtin.command: mountpoint -q {{ paperless_nfs_mount_point }}
-  register: paperless_nfs_mounted
+  ansible.builtin.command: mountpoint -q {{ paperless_ngx_nfs_mount_point }}
+  register: paperless_ngx_nfs_mounted
   failed_when: false
   changed_when: false
 
 - name: Mount TrueNAS NFS share for Paperless-ngx documents
   ansible.posix.mount:
-    path: "{{ paperless_nfs_mount_point }}"
-    src: "{{ paperless_nfs_server }}:{{ paperless_nfs_share }}"
+    path: "{{ paperless_ngx_nfs_mount_point }}"
+    src: "{{ paperless_ngx_nfs_server }}:{{ paperless_ngx_nfs_share }}"
     fstype: nfs
-    opts: "{{ paperless_nfs_opts }}"
+    opts: "{{ paperless_ngx_nfs_opts }}"
     state: mounted
-  when: paperless_nfs_mounted.rc != 0
+  when: paperless_ngx_nfs_mounted.rc != 0
 
 - name: Create NFS subdirectories for Paperless-ngx
   ansible.builtin.file:
-    path: "{{ paperless_nfs_mount_point }}/{{ item }}"
+    path: "{{ paperless_ngx_nfs_mount_point }}/{{ item }}"
     state: directory
     mode: '0755'
   loop:
@@ -41,10 +41,10 @@
 
 - name: Verify storage is accessible
   ansible.builtin.stat:
-    path: "{{ paperless_nfs_mount_point }}"
-  register: nfs_mount_check
+    path: "{{ paperless_ngx_nfs_mount_point }}"
+  register: paperless_ngx_nfs_mount_check
 
 - name: Display storage mount status
   ansible.builtin.debug:
-    msg: "Paperless-ngx document storage accessible at {{ paperless_nfs_mount_point }}"
-  when: nfs_mount_check.stat.exists
+    msg: "Paperless-ngx document storage accessible at {{ paperless_ngx_nfs_mount_point }}"
+  when: paperless_ngx_nfs_mount_check.stat.exists

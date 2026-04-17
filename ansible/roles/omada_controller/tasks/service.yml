@@ -4,28 +4,28 @@
 - name: Ensure Omada Controller service is in desired state
   ansible.builtin.systemd:
     name: tpeap
-    state: "{{ omada_service_state }}"
+    state: "{{ omada_controller_service_state }}"
     # Don't enable service (it's a generated unit that can't be enabled)
     daemon_reload: true
 
 - name: Wait for Omada Controller to be ready
   ansible.builtin.wait_for:
     host: "{{ ansible_host }}"
-    port: "{{ omada_https_port }}"
+    port: "{{ omada_controller_https_port }}"
     timeout: 120
     delay: 10
-  when: omada_service_state == 'started'
+  when: omada_controller_service_state == 'started'
 
 - name: Display Omada Controller access information
   ansible.builtin.debug:
     msg:
       - "Omada Controller is running"
-      - "Web UI (HTTPS): https://{{ ansible_host }}:{{ omada_https_port }}"
-      - "Web UI (HTTP): http://{{ ansible_host }}:{{ omada_http_port }}"
+      - "Web UI (HTTPS): https://{{ ansible_host }}:{{ omada_controller_https_port }}"
+      - "Web UI (HTTP): http://{{ ansible_host }}:{{ omada_controller_http_port }}"
       - ""
       - "Default credentials (if new installation):"
       - "  Username: admin"
       - "  Password: admin"
       - ""
       - "If backup was restored, use your existing credentials"
-  when: omada_service_state == 'started'
+  when: omada_controller_service_state == 'started'

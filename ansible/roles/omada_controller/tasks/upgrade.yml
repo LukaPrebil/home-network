@@ -6,7 +6,7 @@
     msg:
       - "=========================================="
       - "Upgrading Omada Controller"
-      - "From: {{ omada_previous_version }}"
+      - "From: {{ omada_controller_previous_version }}"
       - "To: {{ omada_controller_version }}"
       - "=========================================="
 
@@ -14,15 +14,15 @@
   ansible.builtin.shell:
     cmd: |
       set -o pipefail
-      {{ omada_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'
+      {{ omada_controller_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'
     executable: /bin/bash
-  register: current_version
+  register: omada_controller_current_version
   changed_when: false
   failed_when: false
 
 - name: Display current version
   ansible.builtin.debug:
-    msg: "Current Omada version: {{ current_version.stdout }}"
+    msg: "Current Omada version: {{ omada_controller_current_version.stdout }}"
 
 # Upgrade Omada Controller
 - name: Create temporary directory for Omada upgrade
@@ -34,22 +34,22 @@
 - name: Copy local Omada v6 .deb package to target
   ansible.builtin.copy:
     src: "{{ omada_controller_deb_local }}"
-    dest: "/tmp/omada-upgrade/omada_{{ omada_controller_version }}.deb"
+    dest: "/tmp/omada-upgrade/omada_controller_{{ omada_controller_version }}.deb"
     mode: '0644'
-  when: omada_use_local_deb | bool
+  when: omada_controller_use_local_deb | bool
 
 - name: Download Omada Controller v6 .deb package
   ansible.builtin.get_url:
     url: "{{ omada_controller_deb_url }}"
-    dest: "/tmp/omada-upgrade/omada_{{ omada_controller_version }}.deb"
+    dest: "/tmp/omada-upgrade/omada_controller_{{ omada_controller_version }}.deb"
     mode: '0644'
-  when: not (omada_use_local_deb | bool)
+  when: not (omada_controller_use_local_deb | bool)
 
 - name: Upgrade Omada Controller to v6
   ansible.builtin.apt:
-    deb: "/tmp/omada-upgrade/omada_{{ omada_controller_version }}.deb"
+    deb: "/tmp/omada-upgrade/omada_controller_{{ omada_controller_version }}.deb"
     state: present
-  register: omada_upgrade_result
+  register: omada_controller_upgrade_result
 
 - name: Clean up temporary upgrade files
   ansible.builtin.file:
@@ -63,7 +63,7 @@
 
 - name: Wait for Omada Controller to be ready
   ansible.builtin.wait_for:
-    port: "{{ omada_https_port }}"
+    port: "{{ omada_controller_https_port }}"
     delay: 10
     timeout: 120
 
@@ -71,9 +71,9 @@
   ansible.builtin.shell:
     cmd: |
       set -o pipefail
-      {{ omada_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'
+      {{ omada_controller_install_dir }}/bin/control.sh status | grep -i version || echo 'unknown'
     executable: /bin/bash
-  register: upgraded_version
+  register: omada_controller_upgraded_version
   changed_when: false
   failed_when: false
 
@@ -82,8 +82,8 @@
     msg:
       - "=========================================="
       - "Omada Controller Upgrade Complete!"
-      - "Previous version: {{ current_version.stdout }}"
-      - "New version: {{ upgraded_version.stdout }}"
-      - "Web UI: https://{{ ansible_host }}:{{ omada_https_port }}"
-      - "New device management port: {{ omada_device_mgmt_port }}"
+      - "Previous version: {{ omada_controller_current_version.stdout }}"
+      - "New version: {{ omada_controller_upgraded_version.stdout }}"
+      - "Web UI: https://{{ ansible_host }}:{{ omada_controller_https_port }}"
+      - "New device management port: {{ omada_controller_device_mgmt_port }}"
       - "=========================================="

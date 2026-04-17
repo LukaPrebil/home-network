@@ -3,46 +3,46 @@
 
 - name: Check if Omada Controller is already installed
   ansible.builtin.stat:
-    path: "{{ omada_install_dir }}/bin/control.sh"
-  register: omada_installed
+    path: "{{ omada_controller_install_dir }}/bin/control.sh"
+  register: omada_controller_installed
 
 - name: Create temporary directory for Omada installer
   ansible.builtin.file:
     path: /tmp/omada-installer
     state: directory
     mode: '0755'
-  when: not omada_installed.stat.exists
+  when: not omada_controller_installed.stat.exists
 
 - name: Copy local Omada .deb package to target
   ansible.builtin.copy:
     src: "{{ omada_controller_deb_local }}"
-    dest: "/tmp/omada-installer/omada_{{ omada_controller_version }}.deb"
+    dest: "/tmp/omada-installer/omada_controller_{{ omada_controller_version }}.deb"
     mode: '0644'
   when:
-    - not omada_installed.stat.exists
-    - omada_use_local_deb | bool
+    - not omada_controller_installed.stat.exists
+    - omada_controller_use_local_deb | bool
 
 - name: Download Omada Controller .deb package
   ansible.builtin.get_url:
     url: "{{ omada_controller_deb_url }}"
-    dest: "/tmp/omada-installer/omada_{{ omada_controller_version }}.deb"
+    dest: "/tmp/omada-installer/omada_controller_{{ omada_controller_version }}.deb"
     mode: '0644'
   when:
-    - not omada_installed.stat.exists
-    - not (omada_use_local_deb | bool)
+    - not omada_controller_installed.stat.exists
+    - not (omada_controller_use_local_deb | bool)
 
 - name: Install Omada Controller from .deb package
   ansible.builtin.apt:
-    deb: "/tmp/omada-installer/omada_{{ omada_controller_version }}.deb"
+    deb: "/tmp/omada-installer/omada_controller_{{ omada_controller_version }}.deb"
     state: present
-  when: not omada_installed.stat.exists
+  when: not omada_controller_installed.stat.exists
   notify: Restart Omada Controller
 
 - name: Clean up temporary installer files
   ansible.builtin.file:
     path: /tmp/omada-installer
     state: absent
-  when: not omada_installed.stat.exists
+  when: not omada_controller_installed.stat.exists
 
 - name: Ensure Omada data directories exist
   ansible.builtin.file:
@@ -52,13 +52,13 @@
     group: omada
     mode: '0755'
   loop:
-    - "{{ omada_data_dir }}"
-    - "{{ omada_work_dir }}"
-    - "{{ omada_logs_dir }}"
+    - "{{ omada_controller_data_dir }}"
+    - "{{ omada_controller_work_dir }}"
+    - "{{ omada_controller_logs_dir }}"
 
 - name: Display Omada Controller installation info
   ansible.builtin.debug:
     msg:
       - "Omada Controller {{ omada_controller_version }} installed successfully"
-      - "Installation directory: {{ omada_install_dir }}"
-      - "Web UI: https://{{ ansible_host }}:{{ omada_https_port }}"
+      - "Installation directory: {{ omada_controller_install_dir }}"
+      - "Web UI: https://{{ ansible_host }}:{{ omada_controller_https_port }}"

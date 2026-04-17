@@ -11,7 +11,7 @@
     name:
       - wget
       - curl
-      - "openjdk-{{ omada_java_version }}-jre-headless"  # Java version from defaults
+      - "openjdk-{{ omada_controller_java_version }}-jre-headless"  # Java version from defaults
       - jsvc  # Java service wrapper
       - gnupg
       - ca-certificates
@@ -21,45 +21,45 @@
 # Omada v6.0 requires MongoDB 8.0
 - name: Determine MongoDB version based on Omada version
   ansible.builtin.set_fact:
-    mongodb_version: "{{ '8.0' if omada_controller_version is version('6.0', '>=') else '7.0' }}"
+    omada_controller_mongodb_version: "{{ '8.0' if omada_controller_version is version('6.0', '>=') else '7.0' }}"
 
 - name: Check if MongoDB repository is already configured
   ansible.builtin.stat:
-    path: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
-  register: mongodb_repo_check
+    path: "/etc/apt/sources.list.d/mongodb-org-{{ omada_controller_mongodb_version }}.list"
+  register: omada_controller_mongodb_repo_check
 
 - name: Create directory for MongoDB GPG key
   ansible.builtin.file:
     path: /usr/share/keyrings
     state: directory
     mode: '0755'
-  when: not mongodb_repo_check.stat.exists
+  when: not omada_controller_mongodb_repo_check.stat.exists
 
 - name: Download MongoDB GPG key (ASCII armoured)
   ansible.builtin.get_url:
-    url: "https://pgp.mongodb.com/server-{{ mongodb_version }}.asc"
-    dest: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.asc"
+    url: "https://pgp.mongodb.com/server-{{ omada_controller_mongodb_version }}.asc"
+    dest: "/usr/share/keyrings/mongodb-server-{{ omada_controller_mongodb_version }}.asc"
     mode: '0644'
-  when: not mongodb_repo_check.stat.exists
+  when: not omada_controller_mongodb_repo_check.stat.exists
 
 - name: Dearmor MongoDB GPG key for apt
   ansible.builtin.command:
-    cmd: "gpg --batch --yes -o /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg --dearmor /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.asc"
-    creates: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
-  when: not mongodb_repo_check.stat.exists
+    cmd: "gpg --batch --yes -o /usr/share/keyrings/mongodb-server-{{ omada_controller_mongodb_version }}.gpg --dearmor /usr/share/keyrings/mongodb-server-{{ omada_controller_mongodb_version }}.asc"
+    creates: "/usr/share/keyrings/mongodb-server-{{ omada_controller_mongodb_version }}.gpg"
+  when: not omada_controller_mongodb_repo_check.stat.exists
 
 - name: Add MongoDB repository (using Jammy packages for Ubuntu 25.04)
   ansible.builtin.lineinfile:
-    path: "/etc/apt/sources.list.d/mongodb-org-{{ mongodb_version }}.list"
-    line: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/{{ mongodb_version }} multiverse"
+    path: "/etc/apt/sources.list.d/mongodb-org-{{ omada_controller_mongodb_version }}.list"
+    line: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-{{ omada_controller_mongodb_version }}.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/{{ omada_controller_mongodb_version }} multiverse"
     create: true
     mode: '0644'
-  when: not mongodb_repo_check.stat.exists
+  when: not omada_controller_mongodb_repo_check.stat.exists
 
 - name: Update apt cache after adding MongoDB repository
   ansible.builtin.apt:
     update_cache: true
-  when: not mongodb_repo_check.stat.exists
+  when: not omada_controller_mongodb_repo_check.stat.exists
 
 - name: Install MongoDB
   ansible.builtin.apt:

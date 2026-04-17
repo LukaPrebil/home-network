@@ -7,20 +7,20 @@
 
 - name: Include Omada Controller upgrade tasks (if enabled)
   ansible.builtin.import_tasks: upgrade.yml
-  when: omada_upgrade_mode | bool
+  when: omada_controller_upgrade_mode | bool
   tags: [omada, upgrade]
 
 - name: Include Omada Controller installation tasks
   ansible.builtin.import_tasks: install.yml
-  when: not (omada_upgrade_mode | bool)
+  when: not (omada_controller_upgrade_mode | bool)
   tags: [omada, install]
 
 - name: Include backup restore tasks (if enabled)
   ansible.builtin.import_tasks: restore-backup.yml
-  when: omada_restore_backup | bool
+  when: omada_controller_restore_backup | bool
   tags: [omada, restore]
 
 - name: Include service management tasks
   ansible.builtin.import_tasks: service.yml
-  when: not (omada_upgrade_mode | bool)
+  when: not (omada_controller_upgrade_mode | bool)
   tags: [omada, service]

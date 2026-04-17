@@ -3,13 +3,13 @@
 
 - name: Ensure traefik network exists
   community.docker.docker_network:
-    name: "{{ paperless_docker_network }}"
+    name: "{{ paperless_ngx_docker_network }}"
     state: present
 
 - name: Deploy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
-    dest: "{{ paperless_compose_file }}"
+    dest: "{{ paperless_ngx_compose_file }}"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
@@ -17,15 +17,15 @@
 
 - name: Deploy Paperless-ngx stack
   community.docker.docker_compose_v2:
-    project_src: "{{ paperless_base_dir }}"
+    project_src: "{{ paperless_ngx_base_dir }}"
     pull: "always"
     state: present
-  register: paperless_deploy
+  register: paperless_ngx_deploy
 
 - name: Wait for Paperless-ngx to be ready
   ansible.builtin.wait_for:
     host: "{{ ansible_host }}"
-    port: "{{ paperless_port }}"
+    port: "{{ paperless_ngx_port }}"
     timeout: 120
     delay: 10
 
@@ -33,5 +33,5 @@
   ansible.builtin.debug:
     msg:
       - "Paperless-ngx deployment complete!"
-      - "Access Paperless-ngx at: http://{{ ansible_host }}:{{ paperless_port }}"
+      - "Access Paperless-ngx at: http://{{ ansible_host }}:{{ paperless_ngx_port }}"
       - "Public URL: https://documents.lukapg.dev (via Traefik)"

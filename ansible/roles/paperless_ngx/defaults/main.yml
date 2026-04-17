@@ -2,30 +2,30 @@
 # Paperless-ngx default configuration
 
 # Version pinning
-paperless_version: "2.20.14"
-paperless_redis_version: "7-alpine"
-paperless_postgres_version: "17-alpine"
+paperless_ngx_version: "2.20.14"
+paperless_ngx_redis_version: "7-alpine"
+paperless_ngx_postgres_version: "17-alpine"
 
 # Directories
-paperless_base_dir: "/srv/docker/paperless-ngx"
-paperless_compose_file: "{{ paperless_base_dir }}/docker-compose.yml"
+paperless_ngx_base_dir: "/srv/docker/paperless-ngx"
+paperless_ngx_compose_file: "{{ paperless_ngx_base_dir }}/docker-compose.yml"
 
 # Network
-paperless_port: 8010
-paperless_docker_network: "traefik"
+paperless_ngx_port: 8010
+paperless_ngx_docker_network: "traefik"
 
 # NFS mount for document storage
-paperless_nfs_server: "{{ truenas_nfs_server }}"
-paperless_nfs_share: "{{ truenas_paperless_share }}"
-paperless_nfs_mount_point: "/mnt/paperless"
-paperless_nfs_opts: "defaults,nofail,_netdev"
+paperless_ngx_nfs_server: "{{ truenas_nfs_server }}"
+paperless_ngx_nfs_share: "{{ truenas_paperless_ngx_share }}"
+paperless_ngx_nfs_mount_point: "/mnt/paperless"
+paperless_ngx_nfs_opts: "defaults,nofail,_netdev"
 
 # Database
-paperless_db_name: "paperless"
-paperless_db_user: "paperless"
+paperless_ngx_db_name: "paperless"
+paperless_ngx_db_user: "paperless"
 
 # Paperless config
-paperless_ocr_language: "slv+eng"
-paperless_ocr_install_languages: "slv"  # Additional Tesseract languages to install at startup
-paperless_time_zone: "{{ timezone }}"
-paperless_admin_user: "luka"
+paperless_ngx_ocr_language: "slv+eng"
+paperless_ngx_ocr_install_languages: "slv"  # Additional Tesseract languages to install at startup
+paperless_ngx_time_zone: "{{ timezone }}"
+paperless_ngx_admin_user: "luka"
