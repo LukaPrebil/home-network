@@ -66,7 +66,7 @@
         image_path: "/var/lib/vz/template/cache/{{ haos_vm.image_filename }}"
 
     - name: Check if HAOS VM already exists
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm status {{ haos_vm.vmid }}"
       register: vm_exists
       failed_when: false
@@ -126,19 +126,19 @@
       changed_when: true
 
     - name: Resize disk to desired size
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm resize {{ haos_vm.vmid }} scsi0 {{ haos_vm.disk_size }}"
       when: disk_import is succeeded
       changed_when: true
 
     - name: Set boot order
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm set {{ haos_vm.vmid }} --boot 'order=scsi0'
       when: vm_create is succeeded
       changed_when: true
 
     - name: Display VM configuration
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm config {{ haos_vm.vmid }}"
       register: vm_config
       changed_when: false
@@ -148,7 +148,7 @@
         msg: "{{ vm_config.stdout_lines }}"
 
     - name: Start HAOS VM
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm start {{ haos_vm.vmid }}"
       changed_when: true
 

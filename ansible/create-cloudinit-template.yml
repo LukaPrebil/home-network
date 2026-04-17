@@ -41,7 +41,7 @@
     - group_vars/cloudinit_template.yml
   tasks:
     - name: Check if template VM already exists
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm status {{ template_vmid }}"
       register: vm_exists
       failed_when: false
@@ -95,13 +95,13 @@
       changed_when: true
 
     - name: Configure boot order
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm set {{ template_vmid }} --boot order=scsi0
       when: disk_import is succeeded
       changed_when: true
 
     - name: Resize boot disk to configured size
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm resize {{ template_vmid }} scsi0 {{ template_disk_size }}
       when: disk_import is succeeded
       changed_when: true
@@ -142,7 +142,7 @@
       changed_when: cloudinit_dns.rc == 0
 
     - name: Set cloud-init IP configuration to DHCP
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm set {{ template_vmid }} --ipconfig0 ip=dhcp
       register: cloudinit_ip
       changed_when: cloudinit_ip.rc == 0
@@ -158,13 +158,13 @@
     - group_vars/cloudinit_template.yml
   tasks:
     - name: Convert VM to template
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm template {{ template_vmid }}
       register: template_convert
       changed_when: template_convert.rc == 0
 
     - name: Verify template creation
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm config {{ template_vmid }}
       register: template_config
       changed_when: false

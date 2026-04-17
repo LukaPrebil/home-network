@@ -47,7 +47,7 @@
     state: absent
 
 - name: Test ROCm installation
-  ansible.builtin.shell:
+  ansible.builtin.command:
     cmd: rocminfo
   register: rocminfo_output
   changed_when: false

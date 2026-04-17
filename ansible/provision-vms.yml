@@ -64,7 +64,7 @@
       "99": "192.168.99.0/24 (Guest)"
   tasks:
     - name: Check if template exists
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm status {{ template_vmid }}"
       register: template_exists
       failed_when: false
@@ -191,7 +191,7 @@
       changed_when: true
 
     - name: Update CPU cores if specified
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm set {{ vm_vmid_map[item.name] }} --cores {{ item.cores }}
       when: item.cores is defined
       loop: "{{ vms_to_provision }}"
@@ -200,7 +200,7 @@
       changed_when: true
 
     - name: Update memory if specified
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm set {{ vm_vmid_map[item.name] }} --memory {{ item.memory }}
       when: item.memory is defined
       loop: "{{ vms_to_provision }}"
@@ -209,7 +209,7 @@
       changed_when: true
 
     - name: Resize disk if specified
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm resize {{ vm_vmid_map[item.name] }} scsi0 {{ item.disk_size }}
       when: item.disk_size is defined
       loop: "{{ vms_to_provision }}"
@@ -218,7 +218,7 @@
       changed_when: true
 
     - name: Set startup order for VMs
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm set {{ vm_vmid_map[item.name] }} --startup {{ item.startup }}
       when: item.startup is defined
       loop: "{{ vms_to_provision }}"
@@ -227,7 +227,7 @@
       changed_when: true
 
     - name: Start all new VMs
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: qm start {{ vm_vmid_map[item.name] }}
       loop: "{{ vms_to_provision }}"
       loop_control:

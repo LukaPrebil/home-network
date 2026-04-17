@@ -10,7 +10,7 @@
   register: proc_environ
 
 - name: Detect LXC environment
-  ansible.builtin.shell: grep -q container=lxc /proc/1/environ
+  ansible.builtin.command: grep -q container=lxc /proc/1/environ
   register: is_lxc
   failed_when: false
   changed_when: false

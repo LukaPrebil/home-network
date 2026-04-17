@@ -48,7 +48,7 @@
     expected_nvme_count: 3
   tasks:
     - name: Check if TrueNAS VM already exists
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm status {{ truenas_vmid }}"
       register: vm_exists
       failed_when: false
@@ -133,7 +133,7 @@
       changed_when: true
 
     - name: Display VM configuration
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm config {{ truenas_vmid }}"
       register: vm_config
       changed_when: false
@@ -143,7 +143,7 @@
         msg: "{{ vm_config.stdout_lines }}"
 
     - name: Start TrueNAS VM
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: "qm start {{ truenas_vmid }}"
       changed_when: true
 

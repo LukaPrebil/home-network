@@ -32,7 +32,7 @@
   # This is needed for /dev/kfd access for ROCm
 
 - name: Test VA-API functionality
-  ansible.builtin.shell:
+  ansible.builtin.command:
     cmd: vainfo
   register: vainfo_output
   changed_when: false

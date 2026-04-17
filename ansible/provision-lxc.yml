@@ -108,7 +108,7 @@
       when: containers_to_create | length > 0
 
     - name: Set startup order for LXC containers
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: pct set {{ item.vmid }} --startup {{ item.startup }}
       loop: "{{ containers_to_create }}"
       when:

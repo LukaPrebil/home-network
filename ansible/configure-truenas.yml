@@ -51,7 +51,7 @@
         msg: "Pool '{{ zfs_pool_name }}' {{ 'created successfully' if pool_create_job is changed else 'already exists' }}"
 
     - name: Verify pool was created
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: /usr/sbin/zpool status {{ zfs_pool_name }}
       register: pool_status
       changed_when: false
@@ -101,7 +101,7 @@
       when: datasets_created.results is defined
 
     - name: List all datasets
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: /usr/sbin/zfs list
       register: zfs_list
       changed_when: false
@@ -122,7 +122,7 @@
       changed_when: nfs_enabled.stdout != "null"
 
     - name: Start NFS service
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: midclt call service.start nfs
       register: nfs_started
       failed_when: false
@@ -172,7 +172,7 @@
       changed_when: iscsi_enabled.stdout != "null"
 
     - name: Start iSCSI service
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: midclt call service.start iscsitarget
       register: iscsi_started
       failed_when: false
@@ -392,7 +392,7 @@
       changed_when: storage_templates_added.rc | default(0) == 0
 
     - name: Verify Proxmox storage configuration
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: pvesm status
       register: storage_status
       changed_when: false

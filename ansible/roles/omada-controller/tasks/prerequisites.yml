@@ -35,9 +35,16 @@
     mode: '0755'
   when: not mongodb_repo_check.stat.exists
 
-- name: Download and add MongoDB GPG key
-  ansible.builtin.shell:
-    cmd: "curl -fsSL https://pgp.mongodb.com/server-{{ mongodb_version }}.asc | gpg -o /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg --dearmor"
+- name: Download MongoDB GPG key (ASCII armoured)
+  ansible.builtin.get_url:
+    url: "https://pgp.mongodb.com/server-{{ mongodb_version }}.asc"
+    dest: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.asc"
+    mode: '0644'
+  when: not mongodb_repo_check.stat.exists
+
+- name: Dearmor MongoDB GPG key for apt
+  ansible.builtin.command:
+    cmd: "gpg --batch --yes -o /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg --dearmor /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.asc"
     creates: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
   when: not mongodb_repo_check.stat.exists
 

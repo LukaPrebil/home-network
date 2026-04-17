@@ -125,9 +125,8 @@
   notify: Restart AdGuard Home
 
 - name: Install AdGuard Home systemd service
-  ansible.builtin.shell:
-    cmd: "{{ adguard_install_dir }}/AdGuardHome -s install -w {{ adguard_work_dir }} -c {{ adguard_work_dir}}/AdGuardHome.yaml"
-  args:
+  ansible.builtin.command:
+    cmd: "{{ adguard_install_dir }}/AdGuardHome -s install -w {{ adguard_work_dir }} -c {{ adguard_work_dir }}/AdGuardHome.yaml"
     creates: /etc/systemd/system/AdGuardHome.service
 
 - name: Ensure AdGuard Home service is enabled and started

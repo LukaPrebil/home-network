@@ -52,7 +52,7 @@
     mode: '0644'
 
 - name: Restore backup using Omada CLI
-  ansible.builtin.shell:
+  ansible.builtin.command:
     cmd: "{{ omada_install_dir }}/bin/control.sh import /tmp/omada-restore/backup.cfg"
   register: restore_result
   changed_when: restore_result.rc == 0

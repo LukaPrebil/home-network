@@ -54,7 +54,7 @@
       when: immich_nfs_check.rc != 0
 
     - name: Stop immich container to add bind mounts
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: /usr/sbin/pct stop 200
       register: pct_stop
       failed_when: false
@@ -77,7 +77,7 @@
       changed_when: true
 
     - name: Start immich container
-      ansible.builtin.shell:
+      ansible.builtin.command:
         cmd: /usr/sbin/pct start 200
       changed_when: true
 
