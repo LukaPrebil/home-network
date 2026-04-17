@@ -6,3 +6,6 @@
 .DS_Store
 .mcp.json
 backups/
+.claude/scheduled_tasks.lock
+.claude/state/
+.playwright-mcp/
