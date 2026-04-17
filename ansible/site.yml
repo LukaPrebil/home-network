@@ -16,6 +16,7 @@
 #   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
 #   ansible-playbook site.yml --limit immich             # Everything for Immich host
 #   ansible-playbook site.yml --limit 'all:!tn-storage'  # Skip TrueNAS (no apt)
+#   ansible-playbook site.yml --tags apt-upgrade --limit '<host>'  # Opt-in OS package upgrade
 
 - name: Configure all Linux servers with common settings
   hosts: linux_servers
@@ -230,3 +231,13 @@
     - uptime-kuma
     - ddns-updater
     - octoeverywhere
+
+- name: OS-level package upgrade (opt-in)
+  hosts: linux_servers
+  become: true
+  tags:
+    - apt-upgrade
+    - never
+  tasks:
+    - name: Import apt-upgrade tasks
+      ansible.builtin.import_tasks: roles/common/tasks/upgrade.yml
