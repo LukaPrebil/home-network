@@ -50,7 +50,7 @@ immich_gpu_devices:
 immich_hsa_override: ""
 
 # VA-API packages for AMD GPU hardware transcoding
-vaapi_packages:
+immich_vaapi_packages:
   - mesa-va-drivers  # AMD VA-API drivers
   - libva-drm2       # VA-API DRM runtime
   - vainfo           # VA-API info tool for testing

@@ -16,10 +16,10 @@ alloy_arch_map:
   armv7l: "armv7"
 
 # Prometheus server configuration (for sending metrics)
-prometheus_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:9090"
+alloy_prometheus_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:9090"
 
 # Loki server configuration (for sending logs)
-loki_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:3100"
+alloy_loki_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:3100"
 
 # Alloy service configuration
 alloy_listen_port: 12345

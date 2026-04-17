@@ -29,7 +29,7 @@ prometheus.scrape "host_metrics" {
 // Prometheus remote write to monitoring stack
 prometheus.remote_write "metrics" {
   endpoint {
-    url = "{{ prometheus_url }}/api/v1/write"
+    url = "{{ alloy_prometheus_url }}/api/v1/write"
 
     // Add labels to identify the source
     queue_config {
@@ -95,7 +95,7 @@ loki.process "add_docker_labels" {
 // Loki remote write to monitoring stack
 loki.write "logs" {
   endpoint {
-    url = "{{ loki_url }}/loki/api/v1/push"
+    url = "{{ alloy_loki_url }}/loki/api/v1/push"
   }
 
   external_labels = {

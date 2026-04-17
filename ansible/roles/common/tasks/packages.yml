@@ -15,7 +15,7 @@
 
 - name: Check if zsh is installed
   ansible.builtin.command: which zsh
-  register: zsh_installed
+  register: common_zsh_installed
   changed_when: false
   failed_when: false
   when:
@@ -28,16 +28,16 @@
     state: present
   when:
     - ansible_os_family == "Debian"
-    - zsh_installed is defined
-    - zsh_installed.rc is defined
-    - zsh_installed.rc != 0
+    - common_zsh_installed is defined
+    - common_zsh_installed.rc is defined
+    - common_zsh_installed.rc != 0
     - admin_users is defined
     - "'proxmox_hosts' not in group_names"
 
 - name: Check if oh-my-zsh is installed for users with zsh
   ansible.builtin.stat:
     path: "/home/{{ item.name }}/.oh-my-zsh"
-  register: ohmyzsh_stat
+  register: common_ohmyzsh_stat
   loop: "{{ admin_users | default([]) }}"
   when:
     - admin_users is defined
@@ -52,7 +52,7 @@
     - item.item.shell == "/usr/bin/zsh"
     - not item.stat.exists
     - "'proxmox_hosts' not in group_names"
-  loop: "{{ ohmyzsh_stat.results }}"
+  loop: "{{ common_ohmyzsh_stat.results }}"
   loop_control:
     label: "{{ item.item.name }}"
   changed_when: true

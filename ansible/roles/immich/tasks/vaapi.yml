@@ -8,7 +8,7 @@
 
 - name: Install VA-API packages for AMD GPU
   ansible.builtin.apt:
-    name: "{{ vaapi_packages }}"
+    name: "{{ immich_vaapi_packages }}"
     state: present
 
 - name: Add root user to video group for GPU access
