@@ -19,7 +19,7 @@
     mode: '0700'
 
 - name: Add SSH authorized key for ansible user
-  ansible.builtin.authorized_key:
+  ansible.posix.authorized_key:
     user: "{{ automation_user.name }}"
     key: "{{ automation_user.ssh_key }}"
     state: present
@@ -57,7 +57,7 @@
     - "'proxmox_hosts' not in group_names"
 
 - name: Add SSH authorized keys for admin users
-  ansible.builtin.authorized_key:
+  ansible.posix.authorized_key:
     user: "{{ item.name }}"
     key: "{{ item.ssh_key }}"
     state: present
