@@ -36,10 +36,13 @@
       when: not image_stat.stat.exists
       register: image_download
 
-    - name: Extract HAOS image
-      ansible.builtin.shell:
+    - name: Extract HAOS image  # noqa: no-handler
+      # Runs inline rather than as a handler because the next task stats the
+      # extracted file and fails fast if absent -- handlers fire at end of play.
+      ansible.builtin.command:
         cmd: "xz -d -k {{ compressed_path }}"
       when: image_download is changed
+      changed_when: true
 
     - name: Verify extracted image exists
       ansible.builtin.stat:

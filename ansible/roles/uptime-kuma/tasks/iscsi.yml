@@ -47,7 +47,9 @@
     cmd: iscsiadm -m node --targetname {{ uptime_kuma_iscsi_target_iqn }} --portal {{ uptime_kuma_iscsi_target_ip }} -o update -n node.startup -v automatic
   changed_when: false
 
-- name: Wait for iSCSI device to appear
+- name: Wait for iSCSI device to appear  # noqa: no-handler
+  # Block-and-wait is the intent: following tasks resolve the device path and
+  # format the filesystem; a handler at end-of-play would be too late.
   ansible.builtin.shell:
     cmd: ls /dev/disk/by-path/*{{ uptime_kuma_iscsi_target_iqn }}*lun-0 2>/dev/null
   register: iscsi_device_wait
