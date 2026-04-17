@@ -81,8 +81,8 @@ scrape_configs:
   # Ookla Speedtest metrics (bandwidth intensive - long interval)
   # Timeout set high for multiple server tests (each test takes ~60-90s)
   - job_name: 'speedtest'
-    scrape_interval: {{ speedtest_scrape_interval }}
-    scrape_timeout: {{ speedtest_scrape_timeout }}
+    scrape_interval: {{ monitoring_stack_speedtest_scrape_interval }}
+    scrape_timeout: {{ monitoring_stack_speedtest_scrape_timeout }}
     metrics_path: /probe
     params:
       script: [speedtest]

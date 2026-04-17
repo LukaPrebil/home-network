@@ -16,7 +16,7 @@ datasources:
     type: prometheus
     uid: prometheus
     access: proxy
-    url: http://prometheus:{{ prometheus_port }}
+    url: http://prometheus:{{ monitoring_stack_prometheus_port }}
     isDefault: true
     editable: false
     jsonData:
@@ -27,7 +27,7 @@ datasources:
     type: loki
     uid: loki
     access: proxy
-    url: http://loki:{{ loki_port }}
+    url: http://loki:{{ monitoring_stack_loki_port }}
     isDefault: false
     editable: false
     jsonData:

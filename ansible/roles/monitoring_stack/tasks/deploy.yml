@@ -3,29 +3,29 @@
 
 - name: Pull monitoring stack Docker images
   community.docker.docker_compose_v2:
-    project_src: "{{ monitoring_compose_dir }}"
+    project_src: "{{ monitoring_stack_compose_dir }}"
     pull: "always"
-  register: monitoring_pull
+  register: monitoring_stack_pull
   tags:
     - monitoring-stack
     - deploy
 
 - name: Start monitoring stack
   community.docker.docker_compose_v2:
-    project_src: "{{ monitoring_compose_dir }}"
+    project_src: "{{ monitoring_stack_compose_dir }}"
     state: present
-  register: monitoring_deploy
+  register: monitoring_stack_deploy
   tags:
     - monitoring-stack
     - deploy
 
 - name: Wait for Prometheus to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ prometheus_port }}/-/ready"
+    url: "http://localhost:{{ monitoring_stack_prometheus_port }}/-/ready"
     method: GET
     status_code: 200
-  register: prometheus_health
-  until: prometheus_health.status == 200
+  register: monitoring_stack_prometheus_health
+  until: monitoring_stack_prometheus_health.status == 200
   retries: 30
   delay: 5
   changed_when: false
@@ -36,11 +36,11 @@
 
 - name: Wait for Grafana to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ grafana_port }}/api/health"
+    url: "http://localhost:{{ monitoring_stack_grafana_port }}/api/health"
     method: GET
     status_code: 200
-  register: grafana_health
-  until: grafana_health.status == 200
+  register: monitoring_stack_grafana_health
+  until: monitoring_stack_grafana_health.status == 200
   retries: 30
   delay: 5
   changed_when: false
@@ -51,11 +51,11 @@
 
 - name: Wait for Loki to be ready
   ansible.builtin.uri:
-    url: "http://localhost:{{ loki_port }}/ready"
+    url: "http://localhost:{{ monitoring_stack_loki_port }}/ready"
     method: GET
     status_code: 200
-  register: loki_health
-  until: loki_health.status == 200
+  register: monitoring_stack_loki_health
+  until: monitoring_stack_loki_health.status == 200
   retries: 30
   delay: 5
   changed_when: false
@@ -68,9 +68,9 @@
   ansible.builtin.debug:
     msg:
       - "Monitoring stack is now running!"
-      - "Grafana: http://{{ ansible_host }}:{{ grafana_port }} (admin/{{ grafana_admin_password }})"
-      - "Prometheus: http://{{ ansible_host }}:{{ prometheus_port }}"
-      - "Loki: http://{{ ansible_host }}:{{ loki_port }}"
+      - "Grafana: http://{{ ansible_host }}:{{ monitoring_stack_grafana_port }} (admin/{{ monitoring_stack_grafana_admin_password }})"
+      - "Prometheus: http://{{ ansible_host }}:{{ monitoring_stack_prometheus_port }}"
+      - "Loki: http://{{ ansible_host }}:{{ monitoring_stack_loki_port }}"
   tags:
     - monitoring-stack
     - deploy

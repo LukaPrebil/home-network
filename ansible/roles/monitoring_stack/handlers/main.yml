@@ -3,5 +3,5 @@
 
 - name: Restart Monitoring Stack
   community.docker.docker_compose_v2:
-    project_src: "{{ monitoring_compose_dir }}"
+    project_src: "{{ monitoring_stack_compose_dir }}"
     state: restarted

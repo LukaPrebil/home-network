@@ -4,68 +4,68 @@
 
 services:
   prometheus:
-    image: prom/prometheus:{{ prometheus_version }}
+    image: prom/prometheus:{{ monitoring_stack_prometheus_version }}
     container_name: prometheus
     restart: unless-stopped
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time={{ prometheus_retention }}'
+      - '--storage.tsdb.retention.time={{ monitoring_stack_prometheus_retention }}'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
     networks:
-      - {{ monitoring_docker_network }}
+      - {{ monitoring_stack_docker_network }}
     ports:
-      - "{{ prometheus_port }}:9090"
+      - "{{ monitoring_stack_prometheus_port }}:9090"
     volumes:
-      - {{ prometheus_config_dir }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - {{ prometheus_data_dir }}:/prometheus
+      - {{ monitoring_stack_prometheus_config_dir }}/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - {{ monitoring_stack_prometheus_data_dir }}:/prometheus
     environment:
       - TZ={{ timezone | default('UTC') }}
 
   loki:
-    image: grafana/loki:{{ loki_version }}
+    image: grafana/loki:{{ monitoring_stack_loki_version }}
     container_name: loki
     restart: unless-stopped
     command: -config.file=/etc/loki/loki-config.yml
     networks:
-      - {{ monitoring_docker_network }}
+      - {{ monitoring_stack_docker_network }}
     ports:
-      - "{{ loki_port }}:3100"
+      - "{{ monitoring_stack_loki_port }}:3100"
     volumes:
-      - {{ loki_config_dir }}/loki-config.yml:/etc/loki/loki-config.yml:ro
-      - {{ loki_data_dir }}:/loki
+      - {{ monitoring_stack_loki_config_dir }}/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - {{ monitoring_stack_loki_data_dir }}:/loki
     environment:
       - TZ={{ timezone | default('UTC') }}
 
   grafana:
-    image: grafana/grafana:{{ grafana_version }}
+    image: grafana/grafana:{{ monitoring_stack_grafana_version }}
     container_name: grafana
     restart: unless-stopped
     networks:
-      - {{ monitoring_docker_network }}
+      - {{ monitoring_stack_docker_network }}
     ports:
-      - "{{ grafana_port }}:3000"
+      - "{{ monitoring_stack_grafana_port }}:3000"
     volumes:
-      - {{ grafana_data_dir }}:/var/lib/grafana
-      - {{ grafana_data_dir }}/provisioning:/etc/grafana/provisioning
+      - {{ monitoring_stack_grafana_data_dir }}:/var/lib/grafana
+      - {{ monitoring_stack_grafana_data_dir }}/provisioning:/etc/grafana/provisioning
     environment:
       - TZ={{ timezone | default('UTC') }}
-      - GF_SECURITY_ADMIN_USER={{ grafana_admin_user }}
-      - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password | replace('$', '$$') }}
+      - GF_SECURITY_ADMIN_USER={{ monitoring_stack_grafana_admin_user }}
+      - GF_SECURITY_ADMIN_PASSWORD={{ monitoring_stack_grafana_admin_password | replace('$', '$$') }}
       - GF_INSTALL_PLUGINS=
       - GF_USERS_ALLOW_SIGN_UP=false
 
   cadvisor:
-    image: ghcr.io/google/cadvisor:{{ cadvisor_version }}
+    image: ghcr.io/google/cadvisor:{{ monitoring_stack_cadvisor_version }}
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
     networks:
-      - {{ monitoring_docker_network }}
+      - {{ monitoring_stack_docker_network }}
     ports:
-      - "{{ cadvisor_port }}:8080"
+      - "{{ monitoring_stack_cadvisor_port }}:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -78,51 +78,51 @@ services:
       - TZ={{ timezone | default('UTC') }}
 
   proxmox-exporter:
-    image: prompve/prometheus-pve-exporter:{{ proxmox_exporter_version }}
+    image: prompve/prometheus-pve-exporter:{{ monitoring_stack_proxmox_exporter_version }}
     container_name: proxmox-exporter
     restart: unless-stopped
     networks:
-      - {{ monitoring_docker_network }}
+      - {{ monitoring_stack_docker_network }}
     ports:
-      - "{{ proxmox_exporter_port }}:9221"
+      - "{{ monitoring_stack_proxmox_exporter_port }}:9221"
     environment:
       - TZ={{ timezone | default('UTC') }}
-      - PVE_URL={{ proxmox_api_url }}
+      - PVE_URL={{ monitoring_stack_proxmox_api_url }}
       - PVE_USER={{ vault_proxmox_api_user }}
       - PVE_TOKEN_NAME={{ vault_proxmox_api_token_name }}
       - PVE_TOKEN_VALUE={{ vault_proxmox_api_token_secret | replace('$', '$$') }}
-      - PVE_VERIFY_SSL={{ proxmox_api_verify_ssl | string | lower }}
+      - PVE_VERIFY_SSL={{ monitoring_stack_proxmox_api_verify_ssl | string | lower }}
 
   omada-exporter:
-    image: chhaley/omada_exporter:{{ omada_exporter_version }}
+    image: chhaley/omada_exporter:{{ monitoring_stack_omada_exporter_version }}
     container_name: omada-exporter
     restart: unless-stopped
     networks:
-      - {{ monitoring_docker_network }}
+      - {{ monitoring_stack_docker_network }}
     ports:
-      - "{{ omada_exporter_port }}:9202"
+      - "{{ monitoring_stack_omada_exporter_port }}:9202"
     environment:
       - TZ={{ timezone | default('UTC') }}
-      - OMADA_HOST={{ omada_controller_url }}
+      - OMADA_HOST={{ monitoring_stack_omada_controller_url }}
       - OMADA_USER={{ vault_omada_controller_user }}
       - OMADA_PASS={{ vault_omada_controller_password | replace('$', '$$') }}
-      - OMADA_SITE={{ omada_site }}
+      - OMADA_SITE={{ monitoring_stack_omada_site }}
       - OMADA_INSECURE=true
 
   speedtest-exporter:
-    image: billimek/prometheus-speedtest-exporter:{{ speedtest_exporter_version }}
+    image: billimek/prometheus-speedtest-exporter:{{ monitoring_stack_speedtest_exporter_version }}
     container_name: speedtest-exporter
     restart: unless-stopped
     networks:
-      - {{ monitoring_docker_network }}
+      - {{ monitoring_stack_docker_network }}
     ports:
-      - "{{ speedtest_exporter_port }}:9469"
+      - "{{ monitoring_stack_speedtest_exporter_port }}:9469"
     environment:
       - TZ={{ timezone | default('UTC') }}
-{% if speedtest_server_ids is defined and speedtest_server_ids %}
-      - server_ids={{ speedtest_server_ids }}
+{% if monitoring_stack_speedtest_server_ids is defined and monitoring_stack_speedtest_server_ids %}
+      - server_ids={{ monitoring_stack_speedtest_server_ids }}
 {% endif %}
 
 networks:
-  {{ monitoring_docker_network }}:
+  {{ monitoring_stack_docker_network }}:
     external: true

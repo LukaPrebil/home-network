@@ -3,7 +3,7 @@
 
 - name: Create monitoring compose directory
   ansible.builtin.file:
-    path: "{{ monitoring_compose_dir }}"
+    path: "{{ monitoring_stack_compose_dir }}"
     state: directory
     mode: '0755'
   tags:
@@ -38,16 +38,16 @@
     state: directory
     mode: '0755'
   loop:
-    - "{{ grafana_data_dir }}"
-    - "{{ grafana_data_dir }}/provisioning"
-    - "{{ grafana_data_dir }}/provisioning/datasources"
-    - "{{ grafana_data_dir }}/provisioning/dashboards"
-    - "{{ grafana_data_dir }}/provisioning/dashboards/definitions"
-    - "{{ grafana_data_dir }}/provisioning/alerting"
-    - "{{ prometheus_data_dir }}"
-    - "{{ prometheus_config_dir }}"
-    - "{{ loki_data_dir }}"
-    - "{{ loki_config_dir }}"
+    - "{{ monitoring_stack_grafana_data_dir }}"
+    - "{{ monitoring_stack_grafana_data_dir }}/provisioning"
+    - "{{ monitoring_stack_grafana_data_dir }}/provisioning/datasources"
+    - "{{ monitoring_stack_grafana_data_dir }}/provisioning/dashboards"
+    - "{{ monitoring_stack_grafana_data_dir }}/provisioning/dashboards/definitions"
+    - "{{ monitoring_stack_grafana_data_dir }}/provisioning/alerting"
+    - "{{ monitoring_stack_prometheus_data_dir }}"
+    - "{{ monitoring_stack_prometheus_config_dir }}"
+    - "{{ monitoring_stack_loki_data_dir }}"
+    - "{{ monitoring_stack_loki_config_dir }}"
   when: inventory_hostname not in groups.get('lxc_containers', [])
   tags:
     - monitoring-stack

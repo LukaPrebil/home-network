@@ -11,8 +11,8 @@ contactPoints:
       - uid: telegram-homelab
         type: telegram
         settings:
-          botToken: "{{ grafana_telegram_bot_token }}"
-          chatId: "{{ grafana_telegram_chat_id }}"
+          botToken: "{{ monitoring_stack_grafana_telegram_bot_token }}"
+          chatId: "{{ monitoring_stack_grafana_telegram_chat_id }}"
           parseMode: HTML
 {% raw %}
           message: |
