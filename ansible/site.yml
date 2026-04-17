@@ -80,7 +80,7 @@
     - secrets.yml
   roles:
     - docker
-    - monitoring-stack
+    - monitoring_stack
 
 - name: Deploy CrowdSec intrusion detection
   hosts: traefik
@@ -126,7 +126,7 @@
     - secrets.yml
   roles:
     - common
-    - omada-controller
+    - omada_controller
 
 - name: Deploy AdGuard Home DNS
   hosts: adguard_hosts
@@ -184,7 +184,7 @@
     - secrets.yml
   roles:
     - docker
-    - arr-stack
+    - arr_stack
 
 - name: Deploy Paperless-ngx document management
   hosts: containers
@@ -195,7 +195,7 @@
     - secrets.yml
   roles:
     - docker
-    - paperless-ngx
+    - paperless_ngx
 
 - name: Deploy ATProto PDS (Personal Data Server)
   hosts: containers
