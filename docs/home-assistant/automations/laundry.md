@@ -17,7 +17,7 @@ Six automations and a WLED notification script that track washing machine and dr
 | `automation.helper_set_washing_machine_status_to_off` | Automation | Mark washer emptied |
 | `automation.helper_set_dryer_status_to_off` | Automation | Mark dryer emptied |
 | `script.wled_refresh_all_notifications` | Script | Update WLED strip with active notifications |
-| `automation.kitchen_counter_full_light_switch` | Automation | Refresh WLED when kitchen switch toggles |
+| `automation.kitchen_counter_full_light_switch_2` | Automation | Refresh WLED when kitchen switch toggles |
 
 ## Notification Tags
 
@@ -98,7 +98,7 @@ The kitchen counter has a WLED strip that serves as a visual notification displa
    → Apply preset "{DeviceName} notification on"
 ```
 
-The `automation.kitchen_counter_full_light_switch` triggers `wled_refresh_all_notifications` whenever `switch.switch_cabinet_light` changes, so the WLED base state stays in sync with the kitchen light.
+The `automation.kitchen_counter_full_light_switch_2` triggers `wled_refresh_all_notifications` whenever `switch.switch_cabinet_light` changes, so the WLED base state stays in sync with the kitchen light. (The `_2` suffix exists because a stale entity-registry entry held the original slug when the automation was recreated on 2026-04-17; the stale entry can be purged from the HA UI → Settings → Devices & Services → Entities, after which the automation can be renamed back.)
 
 ## Notes
 
