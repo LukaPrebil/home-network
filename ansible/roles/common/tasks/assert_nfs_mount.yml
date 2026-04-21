@@ -1,0 +1,53 @@
+---
+# Fail-fast guard: assert a path is on an NFS mount.
+#
+# Invoked from other roles via include_role + tasks_from so the guard has
+# a single implementation. Prevents deploys from silently writing data to
+# a local stub directory when the real NFS mount is missing (see the power
+# outage incident on 2026-04-21).
+#
+# The `common_nfs_mount_path` does not need to be the mount point itself —
+# the guard resolves the containing mount via `stat -c %m` and verifies
+# that mount's fstype in /proc/mounts is NFS. This allows consumers to
+# pass subdirectories (e.g. /srv/docker/matter-server) and still guard
+# against the parent mount being a local stub.
+#
+# Usage:
+#   - name: Assert /srv/docker/matter-server is on an NFS mount
+#     ansible.builtin.include_role:
+#       name: common
+#       tasks_from: assert_nfs_mount
+#     vars:
+#       common_nfs_mount_path: "{{ matter_server_base_dir }}"
+#
+# Matches any NFS fstype (nfs, nfs4, nfs41) by the line format in /proc/mounts.
+# Server-agnostic — for our single-TrueNAS setup that is sufficient; revisit
+# if the topology ever adds a second NFS server.
+
+- name: "Find containing mountpoint for {{ common_nfs_mount_path }}"
+  ansible.builtin.command: stat -c %m {{ common_nfs_mount_path }}
+  register: common_nfs_containing_mount
+  changed_when: false
+  check_mode: false
+
+- name: Read /proc/mounts to look up its fstype
+  ansible.builtin.slurp:
+    src: /proc/mounts
+  register: common_proc_mounts
+  check_mode: false
+
+- name: "Assert NFS mount is present at {{ common_nfs_mount_path }}"
+  ansible.builtin.assert:
+    that:
+      - (' ' ~ common_nfs_containing_mount.stdout ~ ' nfs') in (common_proc_mounts.content | b64decode)
+    fail_msg: |
+      {{ common_nfs_mount_path }} is on mount {{ common_nfs_containing_mount.stdout }},
+      which is not an NFS mount on {{ inventory_hostname }}.
+      Refusing to deploy — writes would go to a local stub directory and be lost
+      when the real mount is restored.
+
+      Fix on target:
+        sudo mount {{ common_nfs_containing_mount.stdout }}
+
+      If TrueNAS ({{ truenas_nfs_server }}) is unreachable, check its power/network first.
+    success_msg: "{{ common_nfs_mount_path }} is on NFS mount {{ common_nfs_containing_mount.stdout }} — safe to deploy."

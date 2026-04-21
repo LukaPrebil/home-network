@@ -15,12 +15,6 @@
     state: directory
     mode: '0755'
 
-- name: Check if storage is already mounted
-  ansible.builtin.command: mountpoint -q {{ paperless_ngx_nfs_mount_point }}
-  register: paperless_ngx_nfs_mounted
-  failed_when: false
-  changed_when: false
-
 - name: Mount TrueNAS NFS share for Paperless-ngx documents
   ansible.posix.mount:
     path: "{{ paperless_ngx_nfs_mount_point }}"
@@ -28,7 +22,6 @@
     fstype: nfs
     opts: "{{ paperless_ngx_nfs_opts }}"
     state: mounted
-  when: paperless_ngx_nfs_mounted.rc != 0
 
 - name: Create NFS subdirectories for Paperless-ngx
   ansible.builtin.file:

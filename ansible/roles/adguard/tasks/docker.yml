@@ -1,6 +1,13 @@
 ---
 # AdGuard Home Docker deployment (for rpi4 and other Docker hosts)
 
+- name: Assert AdGuard Docker path is an NFS mount
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: assert_nfs_mount
+  vars:
+    common_nfs_mount_path: "{{ adguard_docker_dir }}"
+
 - name: Install apache2-utils for htpasswd
   ansible.builtin.apt:
     name: apache2-utils

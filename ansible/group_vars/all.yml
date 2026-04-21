@@ -17,6 +17,13 @@ truenas_paperless_share: "/mnt/tank/paperless"
 truenas_plex_apps_share: "/mnt/plex-apps"  # Separate pool
 truenas_plex_bulk_share: "/mnt/plex-bulk"  # Separate pool
 
+# NFS client mount options (shared default for all TrueNAS NFS mounts)
+# - nofail + _netdev: don't block boot on unreachable NFS
+# - x-systemd.automount: mount on first access; retries past the boot race
+# - x-systemd.mount-timeout=60s: give NFS up to 60s to come up on first access
+# - x-systemd.idle-timeout=0: never auto-unmount on idle
+nfs_common_opts: "defaults,nofail,_netdev,x-systemd.automount,x-systemd.mount-timeout=60s,x-systemd.idle-timeout=0"
+
 # Timezone
 timezone: Europe/Ljubljana
 

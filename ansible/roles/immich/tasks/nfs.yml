@@ -29,12 +29,6 @@
     state: directory
     mode: '0755'
 
-- name: Check if storage is already mounted
-  ansible.builtin.command: mountpoint -q {{ immich_nfs_mount_point }}
-  register: immich_nfs_mounted
-  failed_when: false
-  changed_when: false
-
 - name: Mount TrueNAS NFS share for Immich photos (VMs/bare metal only)
   ansible.posix.mount:
     path: "{{ immich_nfs_mount_point }}"
@@ -42,9 +36,7 @@
     fstype: nfs
     opts: "{{ immich_nfs_opts }}"
     state: mounted
-  when:
-    - immich_nfs_mounted.rc != 0
-    - immich_is_lxc.rc | default(1) != 0  # Skip for LXC containers
+  when: immich_is_lxc.rc | default(1) != 0  # Skip for LXC containers
 
 - name: Verify storage is accessible
   ansible.builtin.stat:

@@ -19,23 +19,13 @@
     - arr-stack
     - setup
 
-- name: Check if plex-bulk is already mounted
-  ansible.builtin.command: mountpoint -q {{ arr_stack_media_dir }}
-  register: arr_stack_plex_bulk_mounted
-  failed_when: false
-  changed_when: false
-  tags:
-    - arr-stack
-    - setup
-
 - name: Mount TrueNAS plex-bulk NFS share
   ansible.posix.mount:
     path: "{{ arr_stack_media_dir }}"
     src: "{{ truenas_nfs_server }}:{{ truenas_plex_bulk_share }}"
     fstype: nfs
-    opts: defaults,nofail,_netdev
+    opts: "{{ arr_stack_nfs_opts }}"
     state: mounted
-  when: arr_stack_plex_bulk_mounted.rc != 0
   tags:
     - arr-stack
     - setup

@@ -1,6 +1,14 @@
 ---
 # Deploy and manage Immich with Docker Compose
 
+- name: Assert Immich photo library path is an NFS mount
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: assert_nfs_mount
+  vars:
+    common_nfs_mount_path: "{{ immich_nfs_mount_point }}"
+  when: immich_is_lxc.rc | default(1) != 0  # LXC uses a bind mount from the Proxmox host, not a direct NFS mount
+
 - name: Deploy Immich Docker Compose stack
   community.docker.docker_compose_v2:
     project_src: "{{ immich_base_dir }}"

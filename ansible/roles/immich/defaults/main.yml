@@ -12,7 +12,7 @@ immich_upload_dir: "/mnt/immich-photos"  # NFS mount point for photo library
 immich_nfs_server: "{{ truenas_nfs_server }}"
 immich_nfs_share: "/mnt/tank/immich-photos"
 immich_nfs_mount_point: "{{ immich_upload_dir }}"
-immich_nfs_opts: "defaults,nofail,_netdev"
+immich_nfs_opts: "{{ nfs_common_opts }}"
 
 # External libraries configuration (for importing existing photos)
 # List of host paths to mount read-only into the container

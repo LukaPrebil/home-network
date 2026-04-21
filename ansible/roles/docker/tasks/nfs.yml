@@ -29,22 +29,22 @@
     state: directory
     mode: '0755'
 
-- name: Check if storage is already mounted
-  ansible.builtin.command: mountpoint -q {{ docker_nfs_mount_point }}
-  register: docker_nfs_mounted
-  failed_when: false
-  changed_when: false
-
 - name: Mount TrueNAS NFS share for Docker volumes (VMs/bare metal only)
   ansible.posix.mount:
     path: "{{ docker_nfs_mount_point }}"
     src: "{{ truenas_nfs_server }}:{{ truenas_docker_volumes_share }}"
     fstype: nfs
-    opts: defaults,nofail,_netdev
+    opts: "{{ docker_nfs_opts }}"
     state: mounted
-  when:
-    - docker_nfs_mounted.rc != 0
-    - docker_is_lxc.rc | default(1) != 0  # Skip for LXC containers
+  when: docker_is_lxc.rc | default(1) != 0  # Skip for LXC containers
+
+- name: Assert Docker volumes path is an NFS mount
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: assert_nfs_mount
+  vars:
+    common_nfs_mount_path: "{{ docker_nfs_mount_point }}"
+  when: docker_is_lxc.rc | default(1) != 0
 
 - name: Verify storage is accessible
   ansible.builtin.command: df -h {{ docker_nfs_mount_point }}
@@ -54,3 +54,26 @@
 - name: Display storage mount info
   ansible.builtin.debug:
     msg: "{{ docker_nfs_df.stdout_lines }}"
+
+- name: Ensure docker.service drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: docker_is_lxc.rc | default(1) != 0
+
+- name: Configure docker.service to require NFS mount
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker.service.d/wait-for-nfs.conf
+    content: |
+      # Managed by Ansible — ensure docker.service waits for the NFS mount
+      # so containers never start against an empty local stub directory.
+      [Unit]
+      RequiresMountsFor={{ docker_nfs_mount_point }}
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd daemon
+  when: docker_is_lxc.rc | default(1) != 0

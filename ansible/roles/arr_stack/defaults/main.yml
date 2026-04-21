@@ -13,6 +13,7 @@ arr_stack_flaresolverr_version: "v3.4.6"
 # Base directories
 arr_stack_base_dir: "/srv/docker"  # NFS mount for configs (docker-volumes on TrueNAS)
 arr_stack_media_dir: "/mnt/plex-bulk"  # NFS mount for media (plex-bulk pool on TrueNAS)
+arr_stack_nfs_opts: "{{ nfs_common_opts }}"
 
 # Config directories
 arr_stack_prowlarr_config_dir: "{{ arr_stack_base_dir }}/prowlarr"

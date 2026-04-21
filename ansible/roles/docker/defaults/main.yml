@@ -15,3 +15,4 @@ docker_base_dir: "/srv/docker"
 docker_mtu: 1492  # PPPoE max MTU - prevents fragmentation on 1Gb fiber
 
 docker_nfs_mount_point: "{{ docker_base_dir }}"
+docker_nfs_opts: "{{ nfs_common_opts }}"
