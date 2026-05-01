@@ -35,12 +35,16 @@ dev_vm_claude_repo: "git@github.com:domengabrovsek/claude.git"
 dev_vm_claude_ref: HEAD
 dev_vm_claude_path: "{{ dev_vm_user.home }}/code/domengabrovsek/claude"
 
-# DNS for this VM is set at cloud-init clone time via the dns_servers field
-# in group_vars/vms.yml (consumed by provision-vms.yml's --nameserver step).
-# Cloud-init bakes the resolvers into systemd-resolved at first boot. To
-# change DNS later, edit the entry in vms.yml and re-run
-# `qm set 148 --nameserver "..."` on n5p, or rerun the provision-vms.yml
-# play (it's idempotent).
+# DNS - override the global all.yml fallback that includes 1.1.1.1 / 1.0.0.1.
+# This list also feeds:
+#   - the common role's dns.yml task that writes /etc/resolv.conf
+#   - cloud-init via group_vars/vms.yml's dns_servers (which inherits this if
+#     not separately overridden)
+# AdGuard primary + secondary already gives two-server redundancy; if both are
+# down DNS legitimately fails rather than silently bypassing filtering.
+dns_servers:
+  - 192.168.1.145  # AdGuard Home (primary, LXC on n5p)
+  - 192.168.1.110  # AdGuard Home (secondary, Docker on rpi4)
 
 # SSH allowlist - whole home /24. The plan originally pinned this to a single
 # DHCP-reserved MacBook IP, but the reservation didn't stick and the convenience
