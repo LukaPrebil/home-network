@@ -14,9 +14,12 @@
 #   ansible-playbook site.yml --tags ha-mcp              # Home Assistant MCP server
 #   ansible-playbook site.yml --tags crowdsec             # CrowdSec intrusion detection
 #   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
+#   ansible-playbook site.yml --tags dev-vm              # Dev VM (apt, dotfiles, claude code, ufw)
+#   ansible-playbook site.yml --tags tailscale           # Tailscale role only
 #   ansible-playbook site.yml --limit immich             # Everything for Immich host
 #   ansible-playbook site.yml --limit 'all:!tn-storage'  # Skip TrueNAS (no apt)
-#   ansible-playbook site.yml --tags apt-upgrade --limit '<host>'  # Opt-in OS package upgrade
+#   ansible-playbook site.yml --tags apt-upgrade --limit '<host>'   # Opt-in OS package upgrade
+#   ansible-playbook site.yml --tags dev-vm-upgrade --limit dev     # Opt-in dev-VM apt upgrade
 
 - name: Configure all Linux servers with common settings
   hosts: linux_servers
@@ -37,6 +40,23 @@
     - secrets.yml
   roles:
     - proxmox
+
+- name: Configure development VM
+  hosts: dev_hosts
+  become: true
+  tags:
+    - dev-vm
+  vars_files:
+    - secrets.yml
+  pre_tasks:
+    - name: Wait for SSH to come up
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+  roles:
+    - common
+    - docker
+    - tailscale
+    - dev_vm
 
 - name: Deploy Node Exporter for metrics collection
   hosts: monitoring_agents
@@ -241,3 +261,29 @@
   tasks:
     - name: Import apt-upgrade tasks
       ansible.builtin.import_tasks: roles/common/tasks/upgrade.yml
+
+- name: Manual apt upgrade for dev VM (opt-in, never as part of common run)
+  hosts: dev_hosts
+  become: true
+  tags:
+    - dev-vm-upgrade
+    - never
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Run apt dist-upgrade with autoremove
+      ansible.builtin.apt:
+        upgrade: dist
+        autoremove: true
+
+    - name: Check for required reboot
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: dev_vm_reboot_required
+
+    - name: Notify if reboot required
+      ansible.builtin.debug:
+        msg: "REBOOT REQUIRED - run 'sudo reboot' from the dev VM at your convenience."
+      when: dev_vm_reboot_required.stat.exists
