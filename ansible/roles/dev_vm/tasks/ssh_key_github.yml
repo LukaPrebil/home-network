@@ -1,0 +1,62 @@
+---
+# Generate a per-host ed25519 keypair on the VM, pin GitHub's host key
+# literal in known_hosts (no TOFU), and register the public key with GitHub
+# via community.general.github_key. Idempotent by title - re-runs are a no-op
+# once the key is registered.
+
+- name: Ensure SSH directory exists for {{ dev_vm_user.name }}
+  ansible.builtin.file:
+    path: "{{ dev_vm_user.home }}/.ssh"
+    state: directory
+    owner: "{{ dev_vm_user.name }}"
+    group: "{{ dev_vm_user.name }}"
+    mode: '0700'
+
+- name: Generate ed25519 SSH key for {{ dev_vm_user.name }}
+  community.crypto.openssh_keypair:
+    path: "{{ dev_vm_user.home }}/.ssh/id_ed25519"
+    type: ed25519
+    comment: "{{ dev_vm_user.name }}@{{ inventory_hostname }}"
+    owner: "{{ dev_vm_user.name }}"
+    group: "{{ dev_vm_user.name }}"
+    mode: '0600'
+
+- name: Pin GitHub host key in known_hosts (no TOFU)
+  ansible.builtin.known_hosts:
+    path: "{{ dev_vm_user.home }}/.ssh/known_hosts"
+    name: github.com
+    key: "{{ dev_vm_github_host_key }}"
+    state: present
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+
+# Slurp the public key from the target VM. lookup('file', ...) would read
+# the control node, which is wrong here.
+- name: Slurp the VM's public SSH key
+  ansible.builtin.slurp:
+    src: "{{ dev_vm_user.home }}/.ssh/id_ed25519.pub"
+  register: dev_vm_pubkey_slurp
+
+- name: Register VM SSH key with GitHub (idempotent by title)
+  community.general.github_key:
+    name: "{{ dev_vm_github_key_title }}"
+    pubkey: "{{ dev_vm_pubkey_slurp.content | b64decode | trim }}"
+    token: "{{ vault_github_pat }}"
+    state: present
+  no_log: true
+  register: dev_vm_github_key_add
+
+# GitHub's SSH service returns rc=1 with the message "Hi <user>! You've
+# successfully authenticated, but GitHub does not provide shell access." once
+# the key has propagated. Retry until that succeeds.
+- name: Wait for GitHub key propagation
+  ansible.builtin.command:
+    cmd: ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes git@github.com
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  register: dev_vm_github_ssh_check
+  until: dev_vm_github_ssh_check.rc in [0, 1]
+  retries: 10
+  delay: 3
+  changed_when: false
+  failed_when: dev_vm_github_ssh_check.rc not in [0, 1]

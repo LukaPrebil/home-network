@@ -1,0 +1,14 @@
+---
+# tlrc is pinned via dev_vm_tlrc_version. cargo install --locked --version is
+# idempotent on version match (no-op when the pinned version is already there).
+
+- name: Install / upgrade tlrc to pinned version
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export PATH="$HOME/.cargo/bin:$PATH"
+    cargo install --locked --version {{ dev_vm_tlrc_version }} tlrc
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  changed_when: false  # cargo prints status to stderr on no-op; treat as informational

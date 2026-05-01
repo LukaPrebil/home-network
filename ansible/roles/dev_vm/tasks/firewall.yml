@@ -1,0 +1,55 @@
+---
+# UFW configuration order is critical: rules first, flush handlers (so the
+# rule additions are committed), THEN the default-deny policy. Without the
+# meta: flush_handlers between rule-add and policy-mutation, a re-run that
+# changes policy could deny incoming traffic before the LAN allowlist
+# was reloaded into the active ruleset, with a brief unreachable-SSH window.
+#
+# First run note: this play must be reached over LAN (192.168.1.139 ->
+# 192.168.1.148), not Tailscale, because tailscale0 doesn't exist until the
+# tailscale role has run AND tailscaled has come up. Subsequent runs are
+# safe over either path.
+
+- name: Wait for tailscale0 interface to come up
+  ansible.builtin.command:
+    cmd: ip link show tailscale0
+  register: dev_vm_tailscale0_check
+  until: dev_vm_tailscale0_check.rc == 0
+  retries: 30
+  delay: 2
+  changed_when: false
+
+- name: UFW allow SSH from configured LAN allowlist
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    src: "{{ item }}"
+  loop: "{{ dev_vm_ssh_allow_cidrs }}"
+  notify: Reload UFW
+
+- name: UFW allow all on tailscale0 interface
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: tailscale0
+  notify: Reload UFW
+
+- name: Flush UFW handlers - commit rule reload before policy mutation
+  ansible.builtin.meta: flush_handlers
+
+- name: UFW default allow outgoing
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+  notify: Reload UFW
+
+- name: UFW default deny incoming
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+  notify: Reload UFW
+
+- name: UFW enable
+  community.general.ufw:
+    state: enabled

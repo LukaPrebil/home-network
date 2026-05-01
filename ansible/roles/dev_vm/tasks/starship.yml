@@ -1,0 +1,8 @@
+---
+- name: Install starship prompt
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -sS https://starship.rs/install.sh | sh -s -- --yes
+  args:
+    creates: /usr/local/bin/starship
+    executable: /bin/bash

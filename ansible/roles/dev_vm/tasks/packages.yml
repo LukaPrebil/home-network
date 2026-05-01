@@ -1,0 +1,26 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install dev VM apt packages
+  ansible.builtin.apt:
+    name: "{{ dev_vm_apt_packages }}"
+    state: present
+
+# bat and fdfind are renamed on Debian/Ubuntu to avoid clashing with existing
+# binaries. Create the canonical names so chezmoi-applied aliases just work.
+- name: Symlink batcat to /usr/local/bin/bat
+  ansible.builtin.file:
+    src: /usr/bin/batcat
+    dest: /usr/local/bin/bat
+    state: link
+    force: true
+
+- name: Symlink fdfind to /usr/local/bin/fd
+  ansible.builtin.file:
+    src: /usr/bin/fdfind
+    dest: /usr/local/bin/fd
+    state: link
+    force: true

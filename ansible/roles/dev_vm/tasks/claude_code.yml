@@ -1,0 +1,26 @@
+---
+# Claude Code via the official native installer. Pinned to
+# dev_vm_claude_code_version on first install. Auto-updates run in the
+# background once installed; the version pin is the floor, not a freeze.
+
+- name: Check installed claude version
+  ansible.builtin.command:
+    cmd: "{{ dev_vm_user.home }}/.local/bin/claude --version"
+  register: dev_vm_claude_installed
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+
+- name: Install Claude Code (pinned to {{ dev_vm_claude_code_version }})
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -fsSL https://claude.ai/install.sh | bash -s {{ dev_vm_claude_code_version }}
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  when: >
+    dev_vm_claude_installed.rc != 0
+    or dev_vm_claude_code_version not in (dev_vm_claude_installed.stdout | default(''))
+  changed_when: true

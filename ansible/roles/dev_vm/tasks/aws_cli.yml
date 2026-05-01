@@ -1,0 +1,39 @@
+---
+# Install AWS CLI v2 via the official installer. Ubuntu's apt awscli is the v1
+# stub. Idempotent on every axis: if the right major version is already
+# installed, the download / unzip / install steps are skipped.
+
+- name: Check if AWS CLI v2 is installed
+  ansible.builtin.command: aws --version
+  register: dev_vm_aws_cli_check
+  changed_when: false
+  failed_when: false
+
+- name: Download AWS CLI v2 installer
+  ansible.builtin.get_url:
+    url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+    dest: /tmp/awscliv2.zip
+    mode: '0644'
+  retries: 3
+  delay: 10
+  when: dev_vm_aws_cli_check.rc != 0 or 'aws-cli/2' not in dev_vm_aws_cli_check.stdout
+
+- name: Unzip AWS CLI v2 installer
+  ansible.builtin.unarchive:
+    src: /tmp/awscliv2.zip
+    dest: /tmp/
+    remote_src: true
+  when: dev_vm_aws_cli_check.rc != 0 or 'aws-cli/2' not in dev_vm_aws_cli_check.stdout
+
+- name: Install AWS CLI v2
+  ansible.builtin.command: /tmp/aws/install --update
+  when: dev_vm_aws_cli_check.rc != 0 or 'aws-cli/2' not in dev_vm_aws_cli_check.stdout
+  changed_when: true
+
+- name: Cleanup AWS CLI installer artefacts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/awscliv2.zip
+    - /tmp/aws

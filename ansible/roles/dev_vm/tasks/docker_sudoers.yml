@@ -1,0 +1,12 @@
+---
+# luka is intentionally NOT in the docker group - mounting host fs from a
+# container (-v /:/host) is a passwordless root escape. Allow passwordless
+# sudo only for docker / docker-compose so day-to-day usage stays friction-free.
+
+- name: Allow passwordless sudo for docker and docker-compose for {{ dev_vm_user.name }}
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ dev_vm_user.name }}-docker"
+    mode: '0440'
+    content: |
+      {{ dev_vm_user.name }} ALL=(root) NOPASSWD: /usr/bin/docker, /usr/bin/docker-compose, /usr/libexec/docker/cli-plugins/docker-compose
+    validate: 'visudo -cf %s'

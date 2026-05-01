@@ -1,0 +1,59 @@
+---
+# Top-level orchestration for the dev_vm role. Each include carries the
+# 'dev-vm' tag so subtasks remain reachable when running with --tags dev-vm.
+
+- name: Preflight - verify GitHub PAT scope and validity
+  ansible.builtin.include_tasks: github_preflight.yml
+  tags: dev-vm
+
+- name: Apt packages and apt-based dependencies
+  ansible.builtin.include_tasks: packages.yml
+  tags: dev-vm
+
+- name: Install AWS CLI v2
+  ansible.builtin.include_tasks: aws_cli.yml
+  tags: dev-vm
+
+- name: Generate per-host SSH key and register with GitHub
+  ansible.builtin.include_tasks: ssh_key_github.yml
+  tags: dev-vm
+
+- name: Install chezmoi and apply dotfiles
+  ansible.builtin.include_tasks: chezmoi.yml
+  tags: dev-vm
+
+- name: Clone Claude config repo and create symlink set
+  ansible.builtin.include_tasks: claude_config.yml
+  tags: dev-vm
+
+- name: Install nvm + Node LTS
+  ansible.builtin.include_tasks: nvm_node.yml
+  tags: dev-vm
+
+- name: Install Claude Code via official installer
+  ansible.builtin.include_tasks: claude_code.yml
+  tags: dev-vm
+
+- name: Install starship prompt
+  ansible.builtin.include_tasks: starship.yml
+  tags: dev-vm
+
+- name: Install Rust toolchain
+  ansible.builtin.include_tasks: rustup.yml
+  tags: dev-vm
+
+- name: Install cargo crates not in apt (tlrc)
+  ansible.builtin.include_tasks: cargo_crates.yml
+  tags: dev-vm
+
+- name: Sudoers entry passwordless sudo for docker
+  ansible.builtin.include_tasks: docker_sudoers.yml
+  tags: dev-vm
+
+- name: Configure UFW firewall
+  ansible.builtin.include_tasks: firewall.yml
+  tags: dev-vm
+
+# Patching is intentionally manual on this host. See
+# docs/infrastructure/dev-vm-setup.md for the rationale and the
+# 'ansible-playbook site.yml --tags dev-vm-upgrade --limit dev' recipe.

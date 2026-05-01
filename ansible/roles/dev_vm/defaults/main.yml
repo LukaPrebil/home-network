@@ -1,0 +1,16 @@
+---
+# Defaults for the dev_vm role. Real values live in host_vars/dev.yml; these
+# are minimal placeholders so the role can be reasoned about in isolation.
+
+dev_vm_user:
+  name: luka
+  home: /home/luka
+  shell: /usr/bin/zsh
+
+dev_vm_apt_packages: []
+dev_vm_cargo_crates: []
+dev_vm_claude_symlinks: []
+dev_vm_ssh_allow_cidrs: []
+
+# Versions are caller-specified - no defaults so a misconfigured host_vars
+# fails loudly rather than silently using a stale pin.

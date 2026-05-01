@@ -1,0 +1,32 @@
+---
+# nvm + Node LTS for web-dev work. Claude Code now uses the standalone native
+# installer (claude_code.yml) and no longer depends on Node.
+
+- name: Check if nvm is installed for {{ dev_vm_user.name }}
+  ansible.builtin.stat:
+    path: "{{ dev_vm_user.home }}/.nvm/nvm.sh"
+  register: dev_vm_nvm_stat
+
+- name: Install nvm
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/{{ dev_vm_nvm_version }}/install.sh | bash
+  args:
+    executable: /bin/bash
+    creates: "{{ dev_vm_user.home }}/.nvm/nvm.sh"
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+
+- name: Install Node LTS via nvm
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="$HOME/.nvm"
+    . "$NVM_DIR/nvm.sh"
+    nvm install --lts
+    nvm alias default 'lts/*'
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  register: dev_vm_nvm_install_node
+  changed_when: "'is already installed' not in dev_vm_nvm_install_node.stdout"

@@ -1,0 +1,62 @@
+---
+# Clone domengabrovsek/claude into ~/code/domengabrovsek/claude and recreate
+# the symlink set under ~/.claude/ that mirrors the macOS workstation layout.
+
+- name: Ensure ~/code/domengabrovsek directory exists
+  ansible.builtin.file:
+    path: "{{ dev_vm_user.home }}/code/domengabrovsek"
+    state: directory
+    owner: "{{ dev_vm_user.name }}"
+    group: "{{ dev_vm_user.name }}"
+    mode: '0755'
+
+- name: Clone domengabrovsek/claude repo
+  ansible.builtin.git:
+    repo: "{{ dev_vm_claude_repo }}"
+    dest: "{{ dev_vm_claude_path }}"
+    version: "{{ dev_vm_claude_ref }}"
+    update: true
+    # NO accept_newhostkey - github.com is pinned in known_hosts via
+    # ssh_key_github.yml. If that task hasn't run, this fails closed
+    # rather than TOFU-accepting a possibly MITM'd key.
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+
+- name: Ensure ~/.claude directory exists
+  ansible.builtin.file:
+    path: "{{ dev_vm_user.home }}/.claude"
+    state: directory
+    owner: "{{ dev_vm_user.name }}"
+    group: "{{ dev_vm_user.name }}"
+    mode: '0755'
+
+- name: Validate every symlink source exists in the cloned repo
+  ansible.builtin.stat:
+    path: "{{ dev_vm_claude_path }}/{{ item.src }}"
+  register: dev_vm_claude_symlink_src_stat
+  loop: "{{ dev_vm_claude_symlinks }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Fail loudly if any expected symlink source is missing
+  ansible.builtin.fail:
+    msg: |
+      Claude config symlink source missing in {{ dev_vm_claude_path }}:
+      {{ item.item.src }} (referenced as {{ item.item.name }} in dev_vm_claude_symlinks).
+      The upstream repo has likely restructured. Update host_vars/dev.yml.
+  loop: "{{ dev_vm_claude_symlink_src_stat.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not item.stat.exists
+
+- name: Create Claude config symlinks
+  ansible.builtin.file:
+    src: "{{ dev_vm_claude_path }}/{{ item.src }}"
+    dest: "{{ dev_vm_user.home }}/.claude/{{ item.name }}"
+    state: link
+    force: true
+    owner: "{{ dev_vm_user.name }}"
+    group: "{{ dev_vm_user.name }}"
+  loop: "{{ dev_vm_claude_symlinks }}"
+  loop_control:
+    label: "{{ item.name }}"

@@ -1,0 +1,46 @@
+---
+# Install chezmoi via the official installer (Ubuntu 26.04's apt may lag),
+# then clone + apply LukaPrebil/dotfiles. Ref pinning supports temporarily
+# holding off on a flaky upstream commit.
+
+- name: Install chezmoi via official installer
+  ansible.builtin.shell:
+    cmd: sh -c "$(curl -fsLS https://get.chezmoi.io)" -- -b /usr/local/bin
+  args:
+    creates: /usr/local/bin/chezmoi
+    executable: /bin/bash
+
+- name: Run chezmoi init --apply against user's dotfiles
+  ansible.builtin.command:
+    cmd: "chezmoi init --apply --ssh {{ dev_vm_dotfiles_remote }}"
+  args:
+    creates: "{{ dev_vm_user.home }}/.local/share/chezmoi/.git/HEAD"
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+
+- name: Pin chezmoi source to configured ref (if not HEAD)
+  ansible.builtin.git:
+    repo: "git@github.com:{{ dev_vm_dotfiles_remote }}/dotfiles.git"
+    dest: "{{ dev_vm_user.home }}/.local/share/chezmoi"
+    version: "{{ dev_vm_dotfiles_ref }}"
+    update: true
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  when: dev_vm_dotfiles_ref != "HEAD"
+
+- name: Preview chezmoi diff
+  ansible.builtin.command:
+    cmd: chezmoi diff
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  register: dev_vm_chezmoi_diff
+  changed_when: false
+  failed_when: false
+
+- name: Apply chezmoi if diff is non-empty
+  ansible.builtin.command:
+    cmd: chezmoi apply
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  when: dev_vm_chezmoi_diff.stdout | length > 0
+  changed_when: true

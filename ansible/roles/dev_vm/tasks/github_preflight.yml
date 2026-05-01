@@ -1,0 +1,21 @@
+---
+# Fail fast if vault_github_pat is missing, expired, or scope-insufficient.
+# The downstream ssh_key_github.yml step is task #5 in the role; this preflight
+# is task #1 so the operator sees the failure before anything else runs.
+
+- name: Verify GitHub PAT is valid and has scope to read SSH keys
+  ansible.builtin.uri:
+    url: https://api.github.com/user/keys
+    method: GET
+    headers:
+      Authorization: "Bearer {{ vault_github_pat }}"
+      Accept: application/vnd.github+json
+      X-GitHub-Api-Version: "2022-11-28"
+    status_code: 200
+    return_content: false
+  delegate_to: localhost
+  become: false
+  no_log: true
+  register: dev_vm_github_preflight
+  failed_when:
+    - dev_vm_github_preflight.status is not defined or dev_vm_github_preflight.status != 200

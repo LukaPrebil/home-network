@@ -1,0 +1,17 @@
+---
+- name: Check if rustup is installed for {{ dev_vm_user.name }}
+  ansible.builtin.stat:
+    path: "{{ dev_vm_user.home }}/.cargo/bin/rustup"
+  register: dev_vm_rustup_stat
+
+- name: Install rustup (--no-modify-path; chezmoi handles PATH)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain stable --no-modify-path
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  when: not dev_vm_rustup_stat.stat.exists
+  changed_when: true
