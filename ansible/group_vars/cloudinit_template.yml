@@ -2,15 +2,18 @@
 # Variables for cloud-init template creation
 
 # Ubuntu cloud image configuration
-ubuntu_version: "25.04"
-ubuntu_codename: "plucky"
-cloud_image_filename: "ubuntu-25.04-server-cloudimg-amd64.img"
+ubuntu_version: "26.04"
+ubuntu_codename: "resolute"
+cloud_image_filename: "ubuntu-26.04-server-cloudimg-amd64.img"
 cloud_image_url: "https://cloud-images.ubuntu.com/releases/{{ ubuntu_version }}/release/{{ cloud_image_filename }}"
 cloud_image_path: "/mnt/pve/truenas-templates/template/iso/{{ cloud_image_filename }}"
 
 # Template VM configuration
+# template_name is version-agnostic so renames are not required on every Ubuntu upgrade.
+# template_vmid stays at 9000 in steady state. To rebuild side-by-side, override at run time:
+#   ansible-playbook create-cloudinit-template.yml -e template_vmid=9001
 template_vmid: 9000
-template_name: "ubuntu-2504-cloudinit-template"
+template_name: "ubuntu-cloudinit-template"
 template_cores: 2
 template_memory: 2048  # 2GB
 template_disk_size: 10G

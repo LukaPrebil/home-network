@@ -1,8 +1,9 @@
 ---
-# Playbook to create Ubuntu 25.04 cloud-init template on Proxmox
-# This creates a reusable template for rapid VM provisioning
+# Playbook to create Ubuntu cloud-init template on Proxmox.
+# Ubuntu version is parameterised via group_vars/cloudinit_template.yml.
+# This creates a reusable template for rapid VM provisioning.
 
-- name: Download Ubuntu 25.04 cloud image
+- name: Download Ubuntu cloud image
   hosts: n5p
   become: true
   vars_files:
@@ -182,7 +183,7 @@
           - ""
           - "Template ID: {{ template_vmid }}"
           - "Template Name: {{ template_name }}"
-          - "Ubuntu Version: 25.04 (Plucky Puffin)"
+          - "Ubuntu Version: {{ ubuntu_version }} ({{ ubuntu_codename | capitalize }})"
           - ""
           - "Template Configuration:"
           - "  CPU: 2 cores"
