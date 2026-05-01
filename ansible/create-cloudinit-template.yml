@@ -71,10 +71,10 @@
       register: vm_create
       changed_when: vm_create.rc == 0
 
-    - name: Import cloud image as VM disk
+    - name: Import cloud image as VM disk (qcow2 so clones support qm snapshot)
       ansible.builtin.shell:
         cmd: >
-          qm importdisk {{ template_vmid }} {{ cloud_image_path }} {{ boot_disk_storage }}
+          qm importdisk {{ template_vmid }} {{ cloud_image_path }} {{ boot_disk_storage }} --format qcow2
       register: disk_import
       when: vm_create is succeeded
       changed_when: disk_import.rc == 0
@@ -83,7 +83,7 @@
       ansible.builtin.shell:
         cmd: >
           qm set {{ template_vmid }}
-          --scsi0 {{ boot_disk_storage }}:{{ template_vmid }}/vm-{{ template_vmid }}-disk-0.raw,discard=on,iothread=1,ssd=1
+          --scsi0 {{ boot_disk_storage }}:{{ template_vmid }}/vm-{{ template_vmid }}-disk-0.qcow2,discard=on,iothread=1,ssd=1
       when: disk_import is succeeded
       changed_when: true
 
