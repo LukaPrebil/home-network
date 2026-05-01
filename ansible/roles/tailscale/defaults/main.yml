@@ -1,0 +1,13 @@
+---
+# Defaults for the tailscale role.
+#
+# Override per-host as needed. The role only calls `tailscale up` when an
+# auth key is supplied AND the backend is not already Running, so re-runs
+# are safe after revoking the auth key in the admin console.
+
+tailscale_hostname: "{{ inventory_hostname }}"
+tailscale_advertise_tags: ""        # e.g. "tag:dev"; empty = no tag flag
+tailscale_accept_dns: false         # keep host DNS authoritative (AdGuard etc.)
+tailscale_accept_routes: false      # don't accept advertised subnet routes
+tailscale_authkey: ""               # vault'd one-shot key; empty = skip up
+tailscale_extra_args: []
