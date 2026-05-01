@@ -53,13 +53,15 @@ Proxmox n5p (192.168.1.128)
 
 | Path | Address | When |
 |------|---------|------|
-| LAN | `192.168.1.148` | At home (MacBook DHCP-reserved at `192.168.1.139`) |
+| LAN | `192.168.1.148` | At home (any device on the home /24) |
 | MagicDNS | `dev.lan` (if AdGuard rewrite added) or `dev.<tailnet>.ts.net` | Always |
 | Tailscale | `100.x.x.x` (visible in `tailscale status`) | Off-LAN |
 
-UFW posture: default deny in / allow out, allowlist `192.168.1.139/32` on
+UFW posture: default deny in / allow out, allowlist `192.168.1.0/24` on
 22/tcp, allow all on `tailscale0`. Run `sudo ufw status verbose` on the VM
-to confirm.
+to confirm. Tighten the allowlist to a smaller CIDR or specific /32s by
+editing `dev_vm_ssh_allow_cidrs` in `host_vars/dev.yml` and re-running
+the role.
 
 ## How to re-run the role
 
