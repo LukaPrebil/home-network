@@ -15,7 +15,12 @@
   tags: system
 
 - name: Include weekly VM snapshot cron tasks
-  ansible.builtin.include_tasks: snapshot_cron.yml
+  ansible.builtin.include_tasks:
+    file: snapshot_cron.yml
+    apply:
+      tags:
+        - snapshot-cron
+        - proxmox
   tags:
     - snapshot-cron
     - proxmox
