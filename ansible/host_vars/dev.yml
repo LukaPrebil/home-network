@@ -110,6 +110,9 @@ dev_vm_apt_packages:
   - gnupg
   - apt-transport-https
   - lsb-release
+  # Required for ansible's `become_user` to a non-root user without falling
+  # back to world-readable temp files (the cloud image ships without acl).
+  - acl
   # Firewall (no unattended-upgrades on this host - see patching strategy
   # in docs/infrastructure/dev-vm-setup.md)
   - ufw
