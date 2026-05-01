@@ -1,6 +1,6 @@
 ---
 # VM definitions for cloning from cloud-init template
-# Each VM will be cloned from the ubuntu-2504-cloudinit-template
+# Each VM is cloned from the ubuntu-cloudinit-template
 
 vms_to_create:
   - name: containers
@@ -14,6 +14,27 @@ vms_to_create:
     storage: truenas-vms
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     description: "Docker Host VM - runs containerized services"
+
+  - name: dev
+    vmid: 148
+    vlan_id: null  # Flat network until Omada router lands; will migrate to VLAN 20
+    ip: 192.168.1.148
+    gateway: 192.168.1.1
+    cores: 6
+    memory: 16384  # 16GB
+    disk_size: "+90G"  # Template ships 10GB, final disk 100GB
+    storage: truenas-vms
+    startup: "order=3"  # Boot after tn-storage (order=1) and containers (order=2)
+    # Per-VM DNS override - AdGuard pair only, no Cloudflare fallback.
+    # The global default in group_vars/all.yml falls back to 1.1.1.1/1.0.0.1
+    # if AdGuard hiccups, which would bypass filtering. AdGuard primary +
+    # secondary already gives two-server redundancy; if both are down DNS
+    # legitimately fails.
+    dns_servers:
+      - 192.168.1.145  # AdGuard Home (primary, LXC on n5p)
+      - 192.168.1.110  # AdGuard Home (secondary, Docker on rpi4)
+    snapshot_weekly: true  # Picked up by the n5p weekly snapshot cron
+    description: "Development VM - Ubuntu 26.04, web-dev environment, Tailscale"
 
   # Example VM definitions (uncomment and customize as needed)
 

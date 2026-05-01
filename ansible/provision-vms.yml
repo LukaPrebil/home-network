@@ -217,6 +217,15 @@
         label: "{{ item.name }} - {{ item.disk_size | default('no resize') }}"
       changed_when: true
 
+    - name: Override cloud-init nameservers for VMs that opt out of the global list
+      ansible.builtin.command:
+        cmd: qm set {{ vm_vmid_map[item.name] }} --nameserver "{{ item.dns_servers | join(' ') }}"
+      when: item.dns_servers is defined
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - DNS {{ item.dns_servers | default('default') }}"
+      changed_when: true
+
     - name: Set startup order for VMs
       ansible.builtin.command:
         cmd: qm set {{ vm_vmid_map[item.name] }} --startup {{ item.startup }}
