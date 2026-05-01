@@ -11,10 +11,12 @@ KEEP=4
 
 VMIDS=({% for vm in vms_to_create | selectattr('snapshot_weekly', 'defined') | selectattr('snapshot_weekly', 'equalto', true) | list %}{{ vm.vmid }} {% endfor %})
 
+{% raw %}
 if [[ ${#VMIDS[@]} -eq 0 ]]; then
   echo "[snapshot-vms] $(date -Iseconds) no VMs flagged snapshot_weekly; nothing to do"
   exit 0
 fi
+{% endraw %}
 
 for vmid in "${VMIDS[@]}"; do
   echo "[snapshot-vms] $(date -Iseconds) snapshotting $vmid as $LABEL"
