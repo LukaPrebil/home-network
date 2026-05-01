@@ -42,10 +42,12 @@ dev_vm_claude_path: "{{ dev_vm_user.home }}/code/domengabrovsek/claude"
 # `qm set 148 --nameserver "..."` on n5p, or rerun the provision-vms.yml
 # play (it's idempotent).
 
-# SSH allowlist - single MacBook IP via DHCP reservation. Tailscale handles
-# everything off-LAN.
+# SSH allowlist - whole home /24. The plan originally pinned this to a single
+# DHCP-reserved MacBook IP, but the reservation didn't stick and the convenience
+# of "any device on the home LAN can SSH" wins on a single-user homelab where
+# the LAN is already trusted (and where Tailscale is the off-LAN path).
 dev_vm_ssh_allow_cidrs:
-  - "192.168.1.139/32"  # MacBook (DHCP-reserved)
+  - "192.168.1.0/24"
 
 # Tailscale (consumed by the standalone tailscale role)
 tailscale_hostname: dev
