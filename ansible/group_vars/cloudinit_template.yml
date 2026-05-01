@@ -10,9 +10,13 @@ cloud_image_path: "/mnt/pve/truenas-templates/template/iso/{{ cloud_image_filena
 
 # Template VM configuration
 # template_name is version-agnostic so renames are not required on every Ubuntu upgrade.
-# template_vmid stays at 9000 in steady state. To rebuild side-by-side, override at run time:
-#   ansible-playbook create-cloudinit-template.yml -e template_vmid=9001
-template_vmid: 9000
+# template_vmid is 9001 (was 9000 before the 26.04 bump). Proxmox 9.x removed the
+# `qm set --vmid` inline rename, so the side-by-side rebuild produced 9001 and we
+# kept it. To rebuild side-by-side again on a future Ubuntu bump, override at run
+# time with a free VMID:
+#   ansible-playbook create-cloudinit-template.yml -e template_vmid=9002
+# Then validate the new template, destroy the old 9001, and update this var.
+template_vmid: 9001
 template_name: "ubuntu-cloudinit-template"
 template_cores: 2
 template_memory: 2048  # 2GB
