@@ -1,0 +1,13 @@
+---
+# Defaults for the common role.
+#
+# common_install_oh_my_zsh: when true (default), the role installs upstream
+# oh-my-zsh for any admin_user with shell /usr/bin/zsh. Override to false on
+# hosts where dotfiles management (e.g. chezmoi) is responsible for the
+# ~/.oh-my-zsh tree, otherwise the upstream installer clobbers the curated copy.
+common_install_oh_my_zsh: true
+
+# Per-host override for sshd PermitRootLogin. Defaults to prohibit-password to
+# preserve current behaviour on every existing host. Set to "no" on a host that
+# never needs root SSH (e.g. the dev VM).
+common_sshd_permit_root_login: prohibit-password

@@ -40,6 +40,7 @@
   register: common_ohmyzsh_stat
   loop: "{{ admin_users | default([]) }}"
   when:
+    - common_install_oh_my_zsh | bool
     - admin_users is defined
     - item.shell == "/usr/bin/zsh"
     - "'proxmox_hosts' not in group_names"
@@ -48,6 +49,7 @@
   ansible.builtin.shell: |
     su - {{ item.item.name }} -c 'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended'
   when:
+    - common_install_oh_my_zsh | bool
     - admin_users is defined
     - item.item.shell == "/usr/bin/zsh"
     - not item.stat.exists
