@@ -28,6 +28,17 @@
   loop: "{{ dev_vm_ssh_allow_cidrs }}"
   notify: Reload UFW
 
+- name: UFW allow node_exporter (9100) and Alloy (12345) from LAN allowlist
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    proto: tcp
+    src: "{{ item.1 }}"
+  loop: "{{ ['9100', '12345'] | product(dev_vm_ssh_allow_cidrs) | list }}"
+  loop_control:
+    label: "port {{ item.0 }} from {{ item.1 }}"
+  notify: Reload UFW
+
 - name: UFW allow all on tailscale0 interface
   community.general.ufw:
     rule: allow
