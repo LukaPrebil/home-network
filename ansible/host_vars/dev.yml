@@ -1,0 +1,133 @@
+---
+# Host-specific variables for the dev VM.
+#
+# Hardware: Proxmox VM (6 cores, 16 GB RAM, 100 GB disk on truenas-vms)
+# Role:     Headless web-development VM (LAN SSH + Tailscale)
+# IP today: 192.168.1.148 (flat network)
+# IP later: 192.168.20.x once the Omada router lands and VLAN 20 is active
+
+# Admin user. zsh from the start (no shell flip during bootstrap); the
+# common role's oh-my-zsh installer is suppressed via the flag below so
+# chezmoi stays the source of truth for the ~/.oh-my-zsh tree.
+admin_users:
+  - name: luka
+    shell: /usr/bin/zsh
+    groups:
+      - sudo  # NOT docker - see roles/dev_vm/tasks/docker_sudoers.yml
+    ssh_key: "{{ vault_luka_ssh_public_key }}"
+
+# Suppress upstream oh-my-zsh install. Default in common is true to
+# preserve existing behaviour for n5p, docker hosts, etc.
+common_install_oh_my_zsh: false
+
+# Defense in depth - this box never needs root SSH.
+common_sshd_permit_root_login: "no"
+
+# dev_vm role configuration
+dev_vm_user:
+  name: luka
+  home: /home/luka
+  shell: /usr/bin/zsh
+
+dev_vm_dotfiles_remote: LukaPrebil
+dev_vm_dotfiles_ref: HEAD  # pin to a SHA when something is in flight upstream
+dev_vm_claude_repo: "git@github.com:domengabrovsek/claude.git"
+dev_vm_claude_ref: HEAD
+dev_vm_claude_path: "{{ dev_vm_user.home }}/code/domengabrovsek/claude"
+
+# DNS for this VM is set at cloud-init clone time via the dns_servers field
+# in group_vars/vms.yml (consumed by provision-vms.yml's --nameserver step).
+# Cloud-init bakes the resolvers into systemd-resolved at first boot. To
+# change DNS later, edit the entry in vms.yml and re-run
+# `qm set 148 --nameserver "..."` on n5p, or rerun the provision-vms.yml
+# play (it's idempotent).
+
+# SSH allowlist - single MacBook IP via DHCP reservation. Tailscale handles
+# everything off-LAN.
+dev_vm_ssh_allow_cidrs:
+  - "192.168.1.139/32"  # MacBook (DHCP-reserved)
+
+# Tailscale (consumed by the standalone tailscale role)
+tailscale_hostname: dev
+tailscale_advertise_tags: "tag:dev"
+tailscale_accept_dns: false        # keep AdGuard authoritative
+tailscale_accept_routes: false     # no subnet routers today; explicit
+tailscale_authkey: "{{ vault_tailscale_auth_key }}"
+
+# GitHub API - used once during bootstrap to register the per-host SSH key
+dev_vm_github_user: LukaPrebil
+dev_vm_github_key_title: "{{ dev_vm_user.name }}@{{ inventory_hostname }} (homelab)"
+
+# Pinned versions. Bump deliberately by editing this file.
+# Claude Code: pinned to a specific release at install time via the official
+# installer (curl https://claude.ai/install.sh | bash -s <version>). The
+# Native installer auto-updates in the background once installed; the pin is
+# only the floor.
+dev_vm_claude_code_version: "2.1.126"
+dev_vm_nvm_version: "v0.40.0"
+# tlrc: cargo install --locked --version <ver>
+dev_vm_tlrc_version: "1.13.0"
+# Note: chezmoi/starship/rustup/nvm installer scripts are run via curl|sh
+# under the trust assumption "TLS + upstream domain are sufficient for a
+# personal homelab dev box". We do NOT verify SHA256 of the installer
+# scripts themselves - see threat model discussion in dev-vm-setup.md.
+
+# GitHub's published ed25519 host key, pinned (no TOFU). Verify against
+# https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints
+# before changing.
+dev_vm_github_host_key: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+
+# Apt packages (web-dev + terminal core, Brewfile-derived subset)
+dev_vm_apt_packages:
+  # Build / language base
+  - build-essential
+  - pkg-config
+  - python3-pip
+  - python3-venv
+  # Shells / terminal
+  - zsh
+  - tmux
+  - htop
+  - tree
+  - unzip
+  # CLI productivity (Brewfile direct apt translations)
+  - bat
+  - eza
+  - fd-find
+  - fzf
+  - ripgrep
+  - jq
+  - zoxide
+  - zsh-syntax-highlighting
+  - git-delta
+  - git-lfs
+  - ffmpeg
+  - lolcat
+  # Networking / SSL / utility
+  - ca-certificates
+  - gnupg
+  - apt-transport-https
+  - lsb-release
+  # Firewall (no unattended-upgrades on this host - see patching strategy
+  # in docs/infrastructure/dev-vm-setup.md)
+  - ufw
+
+# Cargo crates that aren't packaged in apt. tlrc only.
+dev_vm_cargo_crates:
+  - tlrc
+
+# Claude config symlinks. Names are derived from src basenames; statusline.sh
+# is the one explicit mapping (lives under scripts/ in the repo).
+dev_vm_claude_symlinks:
+  - {name: agents, src: agents}
+  - {name: CLAUDE.md, src: CLAUDE.md}
+  - {name: commands, src: commands}
+  - {name: docs, src: docs}
+  - {name: hooks, src: hooks}
+  - {name: pull_request_template.md, src: pull_request_template.md}
+  - {name: references, src: references}
+  - {name: RTK.md, src: RTK.md}
+  - {name: rules, src: rules}
+  - {name: settings.json, src: settings.json}
+  - {name: skills, src: skills}
+  - {name: statusline.sh, src: scripts/statusline.sh}
