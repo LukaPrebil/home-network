@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Managed by Ansible. Weekly pre-upgrade snapshot of declared VMs, keep last 4.
+#
+# VMIDs are sourced from group_vars/vms.yml at template time: every VM with
+# snapshot_weekly: true is included. Re-render and redeploy the script via
+# the proxmox role to add or remove VMs from this list.
+set -euo pipefail
+
+LABEL="auto-$(date +%Y-%m-%d)"
+KEEP=4
+
+VMIDS=({% for vm in vms_to_create | selectattr('snapshot_weekly', 'defined') | selectattr('snapshot_weekly', 'equalto', true) | list %}{{ vm.vmid }} {% endfor %})
+
+if [[ ${#VMIDS[@]} -eq 0 ]]; then
+  echo "[snapshot-vms] $(date -Iseconds) no VMs flagged snapshot_weekly; nothing to do"
+  exit 0
+fi
+
+for vmid in "${VMIDS[@]}"; do
+  echo "[snapshot-vms] $(date -Iseconds) snapshotting $vmid as $LABEL"
+  if ! qm snapshot "$vmid" "$LABEL" --description "Auto weekly pre-upgrade snapshot"; then
+    echo "[snapshot-vms] WARN: snapshot failed for $vmid (continuing)"
+    continue
+  fi
+
+  # Prune: keep only the most recent $KEEP "auto-*" snapshots.
+  mapfile -t old < <(qm listsnapshot "$vmid" 2>/dev/null \
+    | awk '/auto-[0-9]/ {print $1}' \
+    | sort \
+    | head -n -"$KEEP" || true)
+  for snap in "${old[@]}"; do
+    [[ -z "$snap" ]] && continue
+    echo "[snapshot-vms] pruning $vmid:$snap"
+    qm delsnapshot "$vmid" "$snap" || echo "[snapshot-vms] WARN: prune failed for $vmid:$snap"
+  done
+done

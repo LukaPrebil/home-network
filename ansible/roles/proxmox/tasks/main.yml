@@ -13,3 +13,9 @@
 - name: Import system configuration tasks
   ansible.builtin.import_tasks: system.yml
   tags: system
+
+- name: Include weekly VM snapshot cron tasks
+  ansible.builtin.include_tasks: snapshot_cron.yml
+  tags:
+    - snapshot-cron
+    - proxmox
