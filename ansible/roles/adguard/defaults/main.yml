@@ -146,8 +146,13 @@ adguard_dns_rewrites:
   # access broke. This routes LAN clients through the same Traefik that
   # serves WAN clients (via Cloudflare port-forward), so cert + auth + auth
   # middleware are uniform on both paths.
-  - domain: "plex.lukapg.dev"
-    answer: "192.168.1.142"
+  #
+  # Two flavours coexist here:
+  #   - Public *.lukapg.dev (Cloudflare A record exists, WAN-reachable
+  #     via CF proxy):  ha, photos, grafana, jellyfin, kuma, status.
+  #   - Internal-only *.lukapg.dev (no Cloudflare A record, NXDOMAIN
+  #     externally; Traefik enforces a LAN+tailnet ipAllowList on the
+  #     route): n5p, tn, omada, adguard.
   - domain: "jellyfin.lukapg.dev"
     answer: "192.168.1.142"
   - domain: "ha.lukapg.dev"
@@ -159,4 +164,16 @@ adguard_dns_rewrites:
   - domain: "kuma.lukapg.dev"
     answer: "192.168.1.142"
   - domain: "status.lukapg.dev"
+    answer: "192.168.1.142"
+
+  # Internal-only services (no public Cloudflare DNS, lan-only middleware
+  # at Traefik). See ansible/roles/traefik/templates/dynamic.yml.j2 for
+  # the matching routers.
+  - domain: "n5p.lukapg.dev"
+    answer: "192.168.1.142"
+  - domain: "tn.lukapg.dev"
+    answer: "192.168.1.142"
+  - domain: "omada.lukapg.dev"
+    answer: "192.168.1.142"
+  - domain: "adguard.lukapg.dev"
     answer: "192.168.1.142"

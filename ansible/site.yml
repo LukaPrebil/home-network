@@ -151,6 +151,7 @@
 - name: Deploy AdGuard Home DNS
   hosts: adguard_hosts
   become: true
+  serial: 1  # primary + secondary stagger so one DNS server always answers
   tags:
     - adguard
   vars_files:
