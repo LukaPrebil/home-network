@@ -137,19 +137,26 @@ adguard_dns_rewrites:
   - domain: "rpi4.lan"
     answer: "192.168.1.110"
 
-  # Public domain local overrides (split-DNS for internal access)
-  # These override public DNS to provide direct local access
+  # Public domain local overrides (split-DNS for internal access).
+  # All *.lukapg.dev names answer with Traefik's LAN IP (192.168.1.142):
+  # Traefik terminates TLS with the wildcard cert, then reverse-proxies to
+  # the right backend by Host header. Pointing rewrites directly at backend
+  # IPs (HAOS, Plex, etc.) only worked when those backends speak HTTPS on
+  # 443 with a cert that matches the SNI - none of ours do, so LAN-direct
+  # access broke. This routes LAN clients through the same Traefik that
+  # serves WAN clients (via Cloudflare port-forward), so cert + auth + auth
+  # middleware are uniform on both paths.
   - domain: "plex.lukapg.dev"
-    answer: "192.168.1.147"
+    answer: "192.168.1.142"
   - domain: "jellyfin.lukapg.dev"
-    answer: "192.168.1.147"
+    answer: "192.168.1.142"
   - domain: "ha.lukapg.dev"
-    answer: "192.168.1.144"
+    answer: "192.168.1.142"
   - domain: "photos.lukapg.dev"
-    answer: "192.168.1.141"
+    answer: "192.168.1.142"
   - domain: "grafana.lukapg.dev"
-    answer: "192.168.1.146"
+    answer: "192.168.1.142"
   - domain: "kuma.lukapg.dev"
-    answer: "192.168.1.140"
+    answer: "192.168.1.142"
   - domain: "status.lukapg.dev"
-    answer: "192.168.1.140"
+    answer: "192.168.1.142"
