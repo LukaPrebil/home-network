@@ -1,0 +1,26 @@
+---
+# Full passwordless sudo for the operator. The earlier carve-out (docker /
+# docker-compose only) was security theatre: `sudo docker run -v /:/host` is
+# itself a root escape, so the narrow rule already granted effective root
+# while inflicting friction on every other command. Given SSH key-only auth
+# and LAN/Tailscale-only ingress on this single-user homelab, a password
+# gate would not change the practical threat model.
+
+- name: Allow passwordless sudo for {{ dev_vm_user.name }}
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ dev_vm_user.name }}"
+    mode: '0440'
+    content: |
+      {{ dev_vm_user.name }} ALL=(ALL) NOPASSWD: ALL
+    validate: 'visudo -cf %s'
+  tags:
+    - dev-vm
+    - dev-vm-sudoers
+
+- name: Remove obsolete docker-only sudoers drop-in
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/{{ dev_vm_user.name }}-docker"
+    state: absent
+  tags:
+    - dev-vm
+    - dev-vm-sudoers

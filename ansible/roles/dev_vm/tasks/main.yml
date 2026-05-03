@@ -46,9 +46,11 @@
   ansible.builtin.include_tasks: cargo_crates.yml
   tags: dev-vm
 
-- name: Sudoers entry passwordless sudo for docker
-  ansible.builtin.include_tasks: docker_sudoers.yml
-  tags: dev-vm
+- name: Sudoers entry passwordless sudo for {{ dev_vm_user.name }}
+  ansible.builtin.include_tasks: sudoers.yml
+  tags:
+    - dev-vm
+    - dev-vm-sudoers
 
 - name: Configure UFW firewall
   ansible.builtin.include_tasks: firewall.yml

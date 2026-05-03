@@ -160,17 +160,18 @@ If the VM is ever destroyed or compromised: visit
 `luka@dev (homelab)`, delete it. The VM identity is contained to that one
 key — no impact on macOS workflows.
 
-## Docker access
+## Sudo and Docker access
 
-`luka` is intentionally **not** in the `docker` group. Docker membership is
-a passwordless root escape via `docker run -v /:/host`. With Claude Code
-running arbitrary npm-installed code under `luka`, the friction of typing
-`sudo docker` (or aliasing it) is microscopic compared to that blast radius.
-
-A sudoers entry permits `luka` to run `/usr/bin/docker` and
-`/usr/bin/docker-compose` (and the docker-compose plugin path) without
-password, so day-to-day Docker is friction-free. See
-`roles/dev_vm/tasks/docker_sudoers.yml`.
+`luka` has full `NOPASSWD: ALL` sudo via `/etc/sudoers.d/luka` (managed by
+`roles/dev_vm/tasks/sudoers.yml`). The user is intentionally **not** in
+the `docker` group: group membership lets any process running as `luka`
+silently use the docker socket, while `sudo docker` at least leaves an
+audit trail in the system log. The passwordless choice is honest about
+the threat model — `sudo docker run -v /:/host` is itself a root escape,
+so any sudo carve-out that includes docker effectively grants full root.
+With SSH restricted to keys + LAN/Tailscale, the password gate would only
+add per-command friction without changing what an attacker who reaches
+`luka`'s shell can do.
 
 ## Optional hardening
 

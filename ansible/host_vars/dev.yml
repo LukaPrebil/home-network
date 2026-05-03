@@ -13,7 +13,7 @@ admin_users:
   - name: luka
     shell: /usr/bin/zsh
     groups:
-      - sudo  # NOT docker - see roles/dev_vm/tasks/docker_sudoers.yml
+      - sudo  # NOT docker - see roles/dev_vm/tasks/sudoers.yml
     ssh_key: "{{ vault_luka_ssh_public_key }}"
 
 # Suppress upstream oh-my-zsh install. Default in common is true to

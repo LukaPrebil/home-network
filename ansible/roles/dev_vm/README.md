@@ -27,9 +27,12 @@ Layered on top of `common`, `docker`, and `tailscale`:
    `dev_vm_claude_code_version`. Auto-update is left enabled.
 9. **starship**, **rustup**, **tlrc** - tooling that's not in apt or that
    the user prefers to track outside the distro release.
-10. **Docker sudoers** - passwordless sudo for `/usr/bin/docker` and
-    `docker-compose` for `luka`. The user is NOT in the `docker` group so
-    a compromised npm dep can't trivially mount the host filesystem.
+10. **Sudoers** - full `NOPASSWD: ALL` for `luka`. The user is NOT in the
+    `docker` group (so a compromised npm dep can't silently mount the host
+    fs by joining a compromised process's namespace), but `sudo docker run
+    -v /:/host` is still a one-liner root escape, which made the previous
+    docker-only carve-out security theatre. SSH key-only auth and LAN /
+    Tailscale-only ingress are the real perimeter.
 11. **UFW** - LAN allowlist (`dev_vm_ssh_allow_cidrs`) + tailscale0 allow,
     `flush_handlers` before policy mutation, default deny incoming.
 
