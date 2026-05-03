@@ -178,6 +178,54 @@ The Traefik dashboard is not publicly routed. It is accessible only via LAN:
 
 The `.lan` domain is configured as an AdGuard DNS rewrite in `roles/adguard/defaults/main.yml`.
 
+### Internal-Only Routes (HTTPS via Traefik, no public DNS)
+
+Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reachable at `*.lukapg.dev` URLs that are **only resolvable on the LAN and tailnet** — public DNS returns NXDOMAIN. Traefik enforces a `lan-only` `ipAllowList` middleware as a defence-in-depth backstop.
+
+Pattern:
+
+1. **AdGuard split-DNS rewrite** (in `roles/adguard/defaults/main.yml`) points the name at Traefik's LAN IP (`192.168.1.142`).
+2. **No Cloudflare A record** for the name. Public resolvers return NXDOMAIN.
+3. **Traefik router** in `dynamic.yml.j2` attaches the `lan-only` middleware (alongside `crowdsec`, `proxy-headers`, `security-headers`).
+4. **Self-signed HTTPS upstreams** (Proxmox, TrueNAS, Omada) reference per-router `serversTransport` blocks with `insecureSkipVerify: true`. AdGuard speaks plain HTTP and needs no transport block.
+
+Example router (Proxmox VE on n5p):
+
+```yaml
+# In dynamic.yml.j2 (routers section)
+proxmox-secure:
+  rule: "Host(`n5p.lukapg.dev`)"
+  entryPoints:
+    - websecure
+  service: proxmox
+  tls:
+    certResolver: letsencrypt
+    domains:
+      - main: "lukapg.dev"
+        sans:
+          - "*.lukapg.dev"
+  middlewares:
+    - lan-only
+    - crowdsec
+    - proxy-headers
+    - security-headers
+
+# In dynamic.yml.j2 (services section)
+proxmox:
+  loadBalancer:
+    servers:
+      - url: "https://192.168.1.128:8006"
+    passHostHeader: true
+    serversTransport: proxmox-tls
+
+# In dynamic.yml.j2 (serversTransports section)
+serversTransports:
+  proxmox-tls:
+    insecureSkipVerify: true
+```
+
+The `lan-only` middleware permits `127.0.0.1/32`, `192.168.1.0/24` (current flat LAN), `100.64.0.0/10` (Tailscale CGNAT IPv4), and `fd7a:115c:a1e0::/48` (Tailscale CGNAT IPv6). `cloudflare-real-ip` is intentionally omitted from internal routes (no Cloudflare in path) and `rate-limit` is omitted because admin SPAs poll fast enough to brush against the 100 req/min limit.
+
 ## Advanced: Static File Provider Routing (Non-Docker Services)
 
 For services running on a different host (not co-located with Traefik), use the **static file provider** instead of Docker labels. Routes are defined in `roles/traefik/templates/dynamic.yml.j2`.

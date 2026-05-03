@@ -5,8 +5,3 @@
   community.docker.docker_compose_v2:
     project_src: "{{ traefik_base_dir }}"
     state: restarted
-
-- name: Reload Traefik
-  ansible.builtin.command:
-    cmd: docker compose -f {{ traefik_compose_file }} restart traefik
-  changed_when: true

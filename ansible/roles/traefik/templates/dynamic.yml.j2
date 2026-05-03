@@ -41,12 +41,21 @@ http:
         burst: 50
         period: 1m
 
-    # IP whitelist for internal services (optional)
-    # internal-whitelist:
-    #   ipWhiteList:
-    #     sourceRange:
-    #       - "192.168.0.0/16"
-    #       - "10.0.0.0/8"
+    # LAN + tailnet-only allow-list, attached to internal-only routers.
+    # Traefik 3.x: ipAllowList replaces deprecated ipWhiteList.
+    # Tailnet CIDRs (100.64.0.0/10, fd7a:115c:a1e0::/48) are universal
+    # across all Tailscale tailnets, not tailnet-specific.
+    # NOTE: When VLANs migrate (Mgmt 10, Trusted 20, Servers 30, DMZ 60),
+    # update sourceRange to enumerate the trusted VLAN CIDRs and exclude
+    # IoT/Cameras/Guest. Today's flat /24 means everyone-on-Wi-Fi can
+    # reach internal routes; tightening only meaningful after VLAN migration.
+    lan-only:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"           # local probes / Traefik ping
+          - "192.168.1.0/24"         # current flat LAN
+          - "100.64.0.0/10"          # Tailscale CGNAT IPv4
+          - "fd7a:115c:a1e0::/48"    # Tailscale CGNAT IPv6
 
     # Redirect to HTTPS
     https-redirect:
@@ -252,6 +261,95 @@ http:
         - security-headers
         - rate-limit
 
+    # ─── Internal-only routers (LAN + tailnet only) ───
+    # No Cloudflare proxy, no public DNS — split-DNS only via AdGuard.
+    # Middleware chain: `lan-only` first (drops non-LAN/non-tailnet),
+    # `crowdsec` next (brute-force detection on internal admin endpoints
+    # — Proxmox login is the highest-value target in the homelab), then
+    # `proxy-headers` and `security-headers`.
+    # Intentionally omitted: `cloudflare-real-ip` (no CF in path) and
+    # `rate-limit` (admin SPAs poll fast enough to brush 100 req/min).
+
+    # Proxmox VE (n5p) — HTTPS self-signed backend, noVNC over WebSocket
+    proxmox-secure:
+      rule: "Host(`n5p.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: proxmox
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - lan-only
+{% if traefik_crowdsec_enabled | default(false) %}
+        - crowdsec
+{% endif %}
+        - proxy-headers
+        - security-headers
+
+    # TrueNAS Scale — HTTPS self-signed backend, WebSocket Web Shell
+    truenas-secure:
+      rule: "Host(`tn.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: truenas
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - lan-only
+{% if traefik_crowdsec_enabled | default(false) %}
+        - crowdsec
+{% endif %}
+        - proxy-headers
+        - security-headers
+
+    # Omada Controller — HTTPS self-signed backend, WebSocket device map
+    omada-secure:
+      rule: "Host(`omada.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: omada
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - lan-only
+{% if traefik_crowdsec_enabled | default(false) %}
+        - crowdsec
+{% endif %}
+        - proxy-headers
+        - security-headers
+
+    # AdGuard Home (primary) — plain HTTP backend on adguard LXC
+    adguard-secure:
+      rule: "Host(`adguard.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: adguard
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+        - lan-only
+{% if traefik_crowdsec_enabled | default(false) %}
+        - crowdsec
+{% endif %}
+        - proxy-headers
+        - security-headers
+
 {% endif %}
 
   # Services - backend targets
@@ -300,6 +398,54 @@ http:
         servers:
           - url: "http://192.168.1.140:3000"
         passHostHeader: true
+
+    # ─── Internal-only service backends ───
+    # HTTPS-self-signed backends reference per-router serversTransports
+    # defined below; AdGuard speaks plain HTTP so no transport block.
+
+    proxmox:
+      loadBalancer:
+        servers:
+          - url: "https://192.168.1.128:8006"
+        passHostHeader: true
+        serversTransport: proxmox-tls
+
+    truenas:
+      loadBalancer:
+        servers:
+          - url: "https://192.168.1.150:443"
+        passHostHeader: true
+        serversTransport: truenas-tls
+
+    omada:
+      loadBalancer:
+        servers:
+          - url: "https://192.168.1.143:8043"
+        passHostHeader: true
+        serversTransport: omada-tls
+
+    adguard:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.145:3000"
+        passHostHeader: true
+{% endif %}
+
+  # serversTransports — per-router upstream TLS verification policy.
+  # Internal HTTPS backends present self-signed certs; insecureSkipVerify
+  # is acceptable here because the connection is LAN-only and the backend
+  # identity is implicit in the routing rule (Host header → fixed IP).
+  # See plan Risks §11 for the residual LAN-MITM risk this accepts.
+  serversTransports:
+{% if traefik_acme_enabled | default(false) %}
+    proxmox-tls:
+      insecureSkipVerify: true
+    truenas-tls:
+      insecureSkipVerify: true
+      # If TrueNAS Web Shell hangs on first connect (known H2-over-WS
+      # quirk on Scale 25.x), add: disableHTTP2: true
+    omada-tls:
+      insecureSkipVerify: true
 {% endif %}
 
 # TLS configuration

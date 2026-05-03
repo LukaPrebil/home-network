@@ -26,4 +26,6 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Reload Traefik
+  # No notify: Traefik file provider watches this directory
+  # (traefik_file_provider_watch=true) and applies dynamic config edits
+  # without a container restart.
