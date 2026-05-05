@@ -354,6 +354,70 @@
           - "Configured targets: {{ iscsi_zvols | map(attribute='target_name') | list }}"
           - "Portal ID: {{ portal_id.stdout }}"
 
+- name: Ensure TrueNAS guest kernel cmdline tunables (virtio-net mitigations)
+  # Why: TrueNAS Scale 25.04 + single-queue virtio_net + napi_tx=Y is
+  # vulnerable to an upstream "host stalls waiting for kick" race that
+  # wedges the VM's NIC under sustained TX load. Disabling napi_tx in
+  # the guest closes the race window. See
+  # docs/infrastructure/truenas-virtio-tuning.md for the full story.
+  #
+  # This play stages the change in TrueNAS's config DB. The reboot is
+  # performed by provision-truenas.yml when its qm-config reconciler
+  # detects drift; on a normally-converged stack a manual reboot is
+  # also fine.
+  hosts: tn-storage
+  vars_files:
+    - secrets.yml
+  vars:
+    truenas_kernel_extra_required:
+      - virtio_net.napi_tx=0
+  tasks:
+    - name: Read current kernel_extra_options
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call system.advanced.config | jq -r '.kernel_extra_options // ""'
+        executable: /bin/bash
+      register: truenas_kernel_extra_current
+      changed_when: false
+      check_mode: false  # read-only probe; always run, even in --check
+
+    - name: Compute desired kernel_extra_options as the union of current + required
+      # Set-based logic so this is order-insensitive: any pre-existing
+      # options stay, any required options are added. Drift is computed
+      # from set membership, not string equality, so a future re-render
+      # by midclt that reorders or whitespace-normalises won't trip the
+      # play into a no-op apply.
+      ansible.builtin.set_fact:
+        truenas_kernel_extra_current_set: "{{ (truenas_kernel_extra_current.stdout | default('') | trim).split() }}"
+        truenas_kernel_extra_desired_set: "{{ (truenas_kernel_extra_current.stdout | default('') | trim).split() | union(truenas_kernel_extra_required) }}"
+
+    - name: Render desired kernel_extra_options string (sorted for stability)
+      ansible.builtin.set_fact:
+        truenas_kernel_extra_desired: "{{ truenas_kernel_extra_desired_set | sort | join(' ') }}"
+
+    - name: Detect cmdline drift (missing required options)
+      ansible.builtin.set_fact:
+        truenas_kernel_extra_drift: "{{ truenas_kernel_extra_required | reject('in', truenas_kernel_extra_current_set) | list | length > 0 }}"
+
+    - name: Apply kernel_extra_options if drifted
+      ansible.builtin.shell:
+        cmd: |
+          midclt call system.advanced.update '{
+            "kernel_extra_options": "{{ truenas_kernel_extra_desired }}"
+          }'
+        executable: /bin/bash
+      register: truenas_kernel_extra_apply
+      # The cmdline change is staged in TrueNAS's config DB and takes
+      # effect on next TrueNAS VM reboot. provision-truenas.yml reboots
+      # the VM iff its drift detector trips (qm config, runtime queues,
+      # or pending cmdline). If you only changed cmdline, reboot during
+      # a maintenance window with:
+      #   ansible-playbook provision-truenas.yml -e truenas_allow_reboot=true
+      # See docs/infrastructure/truenas-virtio-tuning.md.
+      when: truenas_kernel_extra_drift
+      changed_when: truenas_kernel_extra_apply.rc == 0
+
 - name: Add TrueNAS storage to Proxmox
   hosts: n5p
   become: true

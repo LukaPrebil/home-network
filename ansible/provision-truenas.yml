@@ -1,6 +1,16 @@
 ---
-# Playbook to provision TrueNAS Scale VM on Proxmox
-# This creates the VM and prepares it for manual installation via the web UI
+# Playbook to provision-or-converge the TrueNAS Scale VM on Proxmox.
+# - First run: creates the VM and prepares it for manual installation
+#   via the web UI.
+# - Subsequent runs: leave the existing VM in place; reconcile the qm
+#   config knobs we manage as IaC (currently: net0 multiqueue and the
+#   per-VM firewall bridge flag). Reboots the VM iff a managed knob
+#   actually drifted.
+#
+# Run order with configure-truenas.yml: configure first (stages
+# midclt-side changes like kernel_extra_options), provision second
+# (applies qm config, reboots if needed, both knobs activate together).
+# See docs/infrastructure/truenas-virtio-tuning.md.
 
 - name: Download TrueNAS Scale ISO
   hosts: n5p
@@ -31,7 +41,7 @@
       ansible.builtin.debug:
         msg: "TrueNAS ISO {{ 'downloaded' if iso_download is changed else 'already exists' }} at {{ truenas_iso_path }}"
 
-- name: Create TrueNAS VM with NVMe passthrough
+- name: Provision-or-converge TrueNAS VM
   hosts: n5p
   become: true
   vars_files:
@@ -44,138 +54,405 @@
     truenas_memory: 20480  # 20GB RAM
     truenas_cores: 4
     truenas_boot_disk_size: 32  # GB
-    # NVMe devices to pass through (will be auto-detected)
+    # NVMe devices to pass through (will be auto-detected on first run)
     expected_nvme_count: 3
+    # net0 fields the reconciler manages. Other fields (MAC, bridge, tag,
+    # rate, link_down, ...) are read from the live config and preserved.
+    truenas_net0_managed_fields:
+      firewall: '0'
+      queues: '4'
+    # Operator gate: rebooting TrueNAS takes every NFS-backed VM/LXC into
+    # IO wait until it comes back. Set this only during a maintenance
+    # window. Default false so unrelated runs of this playbook never
+    # trigger an unintended reboot.
+    truenas_allow_reboot: false
   tasks:
     - name: Check if TrueNAS VM already exists
       ansible.builtin.command:
         cmd: "qm status {{ truenas_vmid }}"
-      register: vm_exists
+      register: truenas_vm_status
       failed_when: false
       changed_when: false
 
-    - name: Fail if VM already exists
-      ansible.builtin.fail:
-        msg: "VM {{ truenas_vmid }} already exists. Delete it first with 'qm destroy {{ truenas_vmid }}' or choose a different VMID."
-      when: vm_exists.rc == 0
+    - name: Set fact whether VM already exists
+      ansible.builtin.set_fact:
+        truenas_vm_exists: "{{ truenas_vm_status.rc == 0 }}"
 
-    - name: Get PCI addresses for NVMe devices (excluding boot drive)
+    # ---- Create-only block: runs only on first provision ----
+    - name: Create TrueNAS VM (first-run only)
+      when: not truenas_vm_exists
+      block:
+        - name: Get PCI addresses for NVMe devices (excluding boot drive)
+          ansible.builtin.shell:
+            cmd: |
+              set -o pipefail
+              # Get NVMe devices - exclude MAXIO controller (boot drive)
+              lspci -nn | grep 'Non-Volatile memory' | grep -v 'MAXIO' | awk '{print $1}'
+            executable: /bin/bash
+          register: nvme_pci_addresses
+          changed_when: false
+
+        - name: Validate NVMe device count
+          ansible.builtin.assert:
+            that:
+              - nvme_pci_addresses.stdout_lines | length == expected_nvme_count
+            fail_msg: "Expected {{ expected_nvme_count }} NVMe devices but found {{ nvme_pci_addresses.stdout_lines | length }}"
+            success_msg: "Found {{ expected_nvme_count }} NVMe devices for passthrough"
+
+        - name: Display NVMe PCI addresses
+          ansible.builtin.debug:
+            msg: "Will pass through NVMe devices at PCI addresses: {{ nvme_pci_addresses.stdout_lines }}"
+
+        - name: Create TrueNAS VM
+          ansible.builtin.command:
+            cmd: >
+              qm create {{ truenas_vmid }}
+              --name {{ truenas_name }}
+              --memory {{ truenas_memory }}
+              --cores {{ truenas_cores }}
+              --cpu host
+              --machine q35
+              --net0 virtio,bridge=vmbr0,firewall=0,queues=4
+              --ostype l26
+              --scsihw virtio-scsi-single
+              --onboot 1
+              --startup order=1,up=120
+              --tablet 0
+              --agent enabled=1
+          changed_when: true
+
+        - name: Add boot disk to VM (on local-lvm)
+          ansible.builtin.command:
+            cmd: >
+              qm set {{ truenas_vmid }}
+              --scsi0 local-lvm:{{ truenas_boot_disk_size }},discard=on,iothread=1,ssd=1
+          changed_when: true
+
+        - name: Attach TrueNAS ISO to VM
+          ansible.builtin.command:
+            cmd: >
+              qm set {{ truenas_vmid }}
+              --ide2 local:iso/{{ truenas_iso_filename }},media=cdrom
+          changed_when: true
+
+        - name: Set boot order (boot from CD first for installation)
+          ansible.builtin.command:
+            cmd: qm set {{ truenas_vmid }} --boot 'order=ide2;scsi0'
+          changed_when: true
+
+        - name: Pass through NVMe devices to VM
+          ansible.builtin.command:
+            cmd: >
+              qm set {{ truenas_vmid }}
+              --hostpci{{ idx }} {{ item }},pcie=1
+          loop: "{{ nvme_pci_addresses.stdout_lines }}"
+          loop_control:
+            index_var: idx
+          when: nvme_pci_addresses.stdout_lines | length > 0
+          changed_when: true
+
+        - name: Start TrueNAS VM
+          ansible.builtin.command:
+            cmd: "qm start {{ truenas_vmid }}"
+          changed_when: true
+
+        - name: Display next steps
+          ansible.builtin.debug:
+            msg:
+              - "=============================================="
+              - "TrueNAS VM created successfully!"
+              - "=============================================="
+              - ""
+              - "VM ID: {{ truenas_vmid }}"
+              - "VM Name: {{ truenas_name }}"
+              - "Version: TrueNAS SCALE {{ truenas_version }} (Fangtooth)"
+              - ""
+              - "Network Configuration:"
+              - "  Current network: 192.168.1.0/24"
+              - "  Temporary IP: 192.168.1.130 (set during installation)"
+              - "  Final IP (after VLAN): 192.168.30.3"
+              - ""
+              - "Next steps:"
+              - "1. Access Proxmox web UI: https://192.168.1.128:8006"
+              - "2. Open console for VM {{ truenas_vmid }} ({{ truenas_name }})"
+              - "3. Complete TrueNAS installation:"
+              - "   - Choose 'Install/Upgrade'"
+              - "   - Select the 32GB boot disk (local-lvm)"
+              - "   - Set root password"
+              - "   - Configure network: IP 192.168.1.130, netmask 255.255.255.0, gateway 192.168.1.1"
+              - "4. After reboot, access TrueNAS web UI: http://192.168.1.130"
+              - "5. Run the configuration playbook: ansible-playbook configure-truenas.yml"
+              - ""
+              - "NVMe devices passed through ({{ nvme_pci_addresses.stdout_lines | length }}):"
+              - "{{ nvme_pci_addresses.stdout_lines }}"
+              - ""
+              - "These will appear as /dev/sda, /dev/sdb, /dev/sdc in TrueNAS"
+              - "=============================================="
+
+    # ---- Reconciliation block: runs every time ----
+    #
+    # Three drift signals are checked:
+    #   - drift_qm_config: on-disk net0 differs from desired (managed
+    #                      fields overlaid onto current; unknown fields
+    #                      like tag, rate, link_down are preserved).
+    #   - drift_runtime:   running guest's ethtool Combined < expected
+    #                      queues (catches half-applied state from a
+    #                      prior failed run, or VM not yet rebooted).
+    #   - drift_cmdline:   options staged in TrueNAS's kernel_extra_options
+    #                      are not yet present in /proc/cmdline.
+    #
+    # If any drift is detected and the operator hasn't set
+    # truenas_allow_reboot=true, we fail-fast with a clear message.
+    # Otherwise we apply qm set (if needed), notify the Restart handler
+    # chain, then re-verify unconditionally so a half-applied state on
+    # a subsequent run surfaces loud rather than going silent.
+
+    - name: Read current net0 line from qm config
       ansible.builtin.shell:
         cmd: |
           set -o pipefail
-          # Get NVMe devices - exclude MAXIO controller (boot drive)
-          lspci -nn | grep 'Non-Volatile memory' | grep -v 'MAXIO' | awk '{print $1}'
+          qm config {{ truenas_vmid }} | awk '/^net0:/ { sub(/^net0:[[:space:]]*/, ""); print; exit }'
         executable: /bin/bash
-      register: nvme_pci_addresses
+      register: truenas_net0_read
       changed_when: false
+      check_mode: false  # read-only probe; always run, even in --check
 
-    - name: Validate NVMe device count
-      ansible.builtin.assert:
-        that:
-          - nvme_pci_addresses.stdout_lines | length == expected_nvme_count
-        fail_msg: "Expected {{ expected_nvme_count }} NVMe devices but found {{ nvme_pci_addresses.stdout_lines | length }}"
-        success_msg: "Found {{ expected_nvme_count }} NVMe devices for passthrough"
+    - name: Parse current net0 fields into a dict
+      # regex_findall with two groups returns a list of (key, value)
+      # tuples that dict() consumes directly. More robust than splitting
+      # on ',' then '=' (handles trailing commas, empty values).
+      ansible.builtin.set_fact:
+        truenas_net0_current: "{{ truenas_net0_read.stdout | trim }}"
+        truenas_net0_current_fields: >-
+          {{ dict(truenas_net0_read.stdout
+                  | trim
+                  | regex_findall('([^=,]+)=([^,]*)')) }}
 
-    - name: Display NVMe PCI addresses
-      ansible.builtin.debug:
-        msg: "Will pass through NVMe devices at PCI addresses: {{ nvme_pci_addresses.stdout_lines }}"
+    - name: Compute desired net0 fields (preserve unknown fields, override managed)
+      ansible.builtin.set_fact:
+        truenas_net0_desired_fields: "{{ truenas_net0_current_fields | combine(truenas_net0_managed_fields) }}"
 
-    - name: Create TrueNAS VM
-      ansible.builtin.shell:
-        cmd: >
-          qm create {{ truenas_vmid }}
-          --name {{ truenas_name }}
-          --memory {{ truenas_memory }}
-          --cores {{ truenas_cores }}
-          --cpu host
-          --machine q35
-          --net0 virtio,bridge=vmbr0,firewall=1
-          --ostype l26
-          --scsihw virtio-scsi-single
-          --onboot 1
-          --startup order=1,up=120
-          --tablet 0
-          --agent enabled=1
-      register: vm_create
-      changed_when: vm_create.rc == 0
+    - name: Render desired net0 string (sorted keys for stable comparison)
+      ansible.builtin.set_fact:
+        truenas_net0_desired: >-
+          {{ truenas_net0_desired_fields
+             | dict2items
+             | sort(attribute='key')
+             | map(attribute='key')
+             | zip(truenas_net0_desired_fields | dict2items | sort(attribute='key') | map(attribute='value'))
+             | map('join', '=')
+             | join(',') }}
 
-    - name: Add boot disk to VM (on local-lvm)
-      ansible.builtin.shell:
-        cmd: >
-          qm set {{ truenas_vmid }}
-          --scsi0 local-lvm:{{ truenas_boot_disk_size }},discard=on,iothread=1,ssd=1
-      when: vm_create is succeeded
-      changed_when: true
+    - name: Detect on-disk net0 drift (set comparison)
+      ansible.builtin.set_fact:
+        truenas_drift_qm_config: "{{ truenas_net0_current_fields != truenas_net0_desired_fields }}"
 
-    - name: Attach TrueNAS ISO to VM
-      ansible.builtin.shell:
-        cmd: >
-          qm set {{ truenas_vmid }}
-          --ide2 local:iso/{{ truenas_iso_filename }},media=cdrom
-      when: vm_create is succeeded
-      changed_when: true
-
-    - name: Set boot order (boot from CD first for installation)
-      ansible.builtin.shell:
-        cmd: qm set {{ truenas_vmid }} --boot 'order=ide2;scsi0'
-      when: vm_create is succeeded
-      changed_when: true
-
-    - name: Pass through NVMe devices to VM
-      ansible.builtin.shell:
-        cmd: >
-          qm set {{ truenas_vmid }}
-          --hostpci{{ idx }} {{ item }},pcie=1
-      loop: "{{ nvme_pci_addresses.stdout_lines }}"
-      loop_control:
-        index_var: idx
-      when: nvme_pci_addresses.stdout_lines | length > 0
-      changed_when: true
-
-    - name: Display VM configuration
+    - name: Read running guest's ethtool combined queue count
       ansible.builtin.command:
-        cmd: "qm config {{ truenas_vmid }}"
-      register: vm_config
+        cmd: ethtool -l {{ hostvars['tn-storage'].truenas_nic_name }}
+      register: truenas_ethtool_read
+      delegate_to: tn-storage
       changed_when: false
+      failed_when: false  # VM may be down; downstream treats failure as drift
+      check_mode: false
 
-    - name: Show TrueNAS VM configuration
-      ansible.builtin.debug:
-        msg: "{{ vm_config.stdout_lines }}"
+    - name: Extract current Combined queue count (Current hardware settings section)
+      # ethtool -l prints two "Combined:" lines (Pre-set maximums, then
+      # Current hardware settings). Split on the section header and
+      # search the trailing slice so we match the actual current value.
+      # regex_findall returns a list of capture-group matches; first()
+      # picks the value (regex_search with capture-arg returns a list,
+      # which int-coerces to 0 — known foot-gun).
+      ansible.builtin.set_fact:
+        truenas_combined_current: >-
+          {{ (truenas_ethtool_read.stdout | default(''))
+             .split('Current hardware settings:')
+             | last
+             | regex_findall('Combined:\s+(\d+)')
+             | first | default('0') }}
 
-    - name: Start TrueNAS VM
-      ansible.builtin.command:
-        cmd: "qm start {{ truenas_vmid }}"
-      changed_when: true
+    - name: Detect runtime queue drift (catches half-applied state and VM-down)
+      ansible.builtin.set_fact:
+        truenas_drift_runtime: >-
+          {{ truenas_ethtool_read.rc != 0
+             or (truenas_combined_current | int) < (truenas_net0_managed_fields.queues | int) }}
 
-    - name: Display next steps
+    - name: Read currently-staged kernel_extra_options
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call system.advanced.config | jq -r '.kernel_extra_options // ""'
+        executable: /bin/bash
+      register: truenas_kernel_extra_staged
+      delegate_to: tn-storage
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Read running guest /proc/cmdline
+      ansible.builtin.slurp:
+        src: /proc/cmdline
+      register: truenas_proc_cmdline
+      delegate_to: tn-storage
+      failed_when: false
+
+    - name: Detect cmdline drift (options staged via midclt not yet active)
+      ansible.builtin.set_fact:
+        truenas_drift_cmdline: >-
+          {{ (truenas_kernel_extra_staged.stdout | default('') | trim).split()
+             | reject('in', (truenas_proc_cmdline.content | default('') | b64decode).split())
+             | list | length > 0 }}
+
+    - name: Show reconciliation diff
       ansible.builtin.debug:
         msg:
-          - "=============================================="
-          - "TrueNAS VM created successfully!"
-          - "=============================================="
-          - ""
-          - "VM ID: {{ truenas_vmid }}"
-          - "VM Name: {{ truenas_name }}"
-          - "Version: TrueNAS SCALE {{ truenas_version }} (Fangtooth)"
-          - ""
-          - "Network Configuration:"
-          - "  Current network: 192.168.1.0/24"
-          - "  Temporary IP: 192.168.1.130 (set during installation)"
-          - "  Final IP (after VLAN): 192.168.30.3"
-          - ""
-          - "Next steps:"
-          - "1. Access Proxmox web UI: https://192.168.1.128:8006"
-          - "2. Open console for VM {{ truenas_vmid }} ({{ truenas_name }})"
-          - "3. Complete TrueNAS installation:"
-          - "   - Choose 'Install/Upgrade'"
-          - "   - Select the 32GB boot disk (local-lvm)"
-          - "   - Set root password"
-          - "   - Configure network: IP 192.168.1.130, netmask 255.255.255.0, gateway 192.168.1.1"
-          - "4. After reboot, access TrueNAS web UI: http://192.168.1.130"
-          - "5. Run the configuration playbook: ansible-playbook configure-truenas.yml"
-          - ""
-          - "NVMe devices passed through ({{ nvme_pci_addresses.stdout_lines | length }}):"
-          - "{{ nvme_pci_addresses.stdout_lines }}"
-          - ""
-          - "These will appear as /dev/sda, /dev/sdb, /dev/sdc in TrueNAS"
-          - "=============================================="
+          - "current net0:    {{ truenas_net0_current }}"
+          - "desired net0:    {{ truenas_net0_desired }}"
+          - "drift qm config: {{ truenas_drift_qm_config }}"
+          - "drift runtime:   {{ truenas_drift_runtime }}"
+          - "drift cmdline:   {{ truenas_drift_cmdline }}"
+
+    - name: Compute aggregate drift signal
+      ansible.builtin.set_fact:
+        truenas_drift_any: "{{ truenas_drift_qm_config or truenas_drift_runtime or truenas_drift_cmdline }}"
+
+    - name: Refuse to proceed without operator reboot gate when drift detected
+      ansible.builtin.fail:
+        msg: |
+          Drift detected on TrueNAS VM but `truenas_allow_reboot` is not set.
+          Rebooting takes every NFS-backed VM/LXC into IO wait for 2-5 min.
+          Re-run during a maintenance window with:
+            ansible-playbook provision-truenas.yml -e truenas_allow_reboot=true
+          See docs/infrastructure/truenas-virtio-tuning.md.
+      when:
+        - truenas_drift_any
+        - not (truenas_allow_reboot | default(false) | bool)
+
+    - name: Apply desired net0 (if on-disk drifted)
+      ansible.builtin.command:
+        cmd: qm set {{ truenas_vmid }} -net0 {{ truenas_net0_desired }}
+      register: truenas_net0_apply
+      when: truenas_drift_qm_config
+      changed_when: truenas_net0_apply.rc == 0
+      notify: Restart TrueNAS VM
+
+    - name: Notify restart for runtime/cmdline drift even if qm config already correct
+      # Recovery path for half-applied state: the prior run applied the
+      # qm config but its reboot failed, so on-disk state already matches
+      # desired but runtime / cmdline still diverge.
+      ansible.builtin.command:
+        cmd: 'true'
+      changed_when: true
+      when:
+        - not truenas_drift_qm_config
+        - (truenas_drift_runtime or truenas_drift_cmdline)
+      notify: Restart TrueNAS VM
+
+    - name: Flush handlers so the restart runs before the final verify
+      ansible.builtin.meta: flush_handlers
+
+    # ---- Always-run final verify (real runs only): catches half-applied state ----
+    # In --check the apply tasks are skipped, so re-reading state would
+    # always assert against the pre-change snapshot and fail uselessly.
+    # Skip the verify block in check mode; the diff output above already
+    # shows the operator what would happen.
+
+    - name: Final verify (real-run only)
+      when: not ansible_check_mode
+      block:
+        - name: Re-read ethtool after any potential restart
+          ansible.builtin.command:
+            cmd: ethtool -l {{ hostvars['tn-storage'].truenas_nic_name }}
+          register: truenas_ethtool_final
+          delegate_to: tn-storage
+          changed_when: false
+
+        - name: Re-read guest /proc/cmdline after any potential restart
+          ansible.builtin.slurp:
+            src: /proc/cmdline
+          register: truenas_proc_cmdline_final
+          delegate_to: tn-storage
+
+        - name: Extract final Combined queue count from ethtool output
+          ansible.builtin.set_fact:
+            truenas_combined_final: >-
+              {{ truenas_ethtool_final.stdout
+                 .split('Current hardware settings:')
+                 | last
+                 | regex_findall('Combined:\s+(\d+)')
+                 | first | default('0') }}
+
+        - name: Assert multiqueue active and cmdline applied
+          ansible.builtin.assert:
+            that:
+              - (truenas_combined_final | int) >= (truenas_net0_managed_fields.queues | int)
+              - >-
+                (truenas_kernel_extra_staged.stdout | default('') | trim).split()
+                | reject('in', (truenas_proc_cmdline_final.content | b64decode).split())
+                | list | length == 0
+            fail_msg: |
+              TrueNAS virtio-net tunables not fully active.
+                staged kernel_extra_options: {{ truenas_kernel_extra_staged.stdout | default('') }}
+                running /proc/cmdline:       {{ truenas_proc_cmdline_final.content | b64decode | trim }}
+                current ethtool Combined:    {{ truenas_combined_final }}
+              Investigate via Proxmox console; do not retry blindly.
+            success_msg: TrueNAS virtio-net tunables fully active.
+
+    - name: Display final VM configuration
+      ansible.builtin.command:
+        cmd: "qm config {{ truenas_vmid }}"
+      register: truenas_qm_config_final
+      changed_when: false
+      check_mode: false
+
+    - name: Show final VM configuration
+      ansible.builtin.debug:
+        msg: "{{ truenas_qm_config_final.stdout_lines }}"
+
+  handlers:
+    - name: Stop TrueNAS VM (graceful, via guest agent)
+      listen: Restart TrueNAS VM
+      ansible.builtin.command:
+        cmd: qm shutdown {{ truenas_vmid }} --timeout 120
+      register: truenas_handler_shutdown
+      failed_when: false
+      changed_when: truenas_handler_shutdown.rc == 0
+
+    - name: Force-stop TrueNAS VM if graceful shutdown failed
+      listen: Restart TrueNAS VM
+      ansible.builtin.command:
+        cmd: qm stop {{ truenas_vmid }}
+      when: truenas_handler_shutdown.rc | default(1) != 0
+      changed_when: true
+
+    - name: Start TrueNAS VM
+      listen: Restart TrueNAS VM
+      ansible.builtin.command:
+        cmd: qm start {{ truenas_vmid }}
+      changed_when: true
+
+    - name: Wait for TrueNAS SSH port to accept connections
+      # Two-stage readiness: poll TCP/22 from n5p first (doesn't require
+      # SSH credentials, survives the boot-time window where SSH isn't
+      # listening yet), then probe midclt via delegate_to. Without this,
+      # delegate_to during boot returns "unreachable" — which `until`
+      # retries don't cover.
+      listen: Restart TrueNAS VM
+      ansible.builtin.wait_for:
+        host: "{{ hostvars['tn-storage'].ansible_host }}"
+        port: 22
+        delay: 30
+        timeout: 600
+
+    - name: Wait for TrueNAS midclt API to come back
+      # SSH up alone says nothing about NFS/iSCSI/middleware state;
+      # midclt readiness is the right signal for downstream verify.
+      listen: Restart TrueNAS VM
+      ansible.builtin.command:
+        cmd: midclt call system.ready
+      register: truenas_handler_ready
+      delegate_to: tn-storage
+      until: truenas_handler_ready.rc == 0 and (truenas_handler_ready.stdout | trim) == 'True'
+      retries: 60
+      delay: 5
+      changed_when: false

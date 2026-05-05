@@ -10,6 +10,12 @@ truenas_web_password: "{{ vault_truenas_root_password }}"  # Using vault passwor
 ansible_user: root
 ansible_ssh_private_key_file: ~/.ssh/homelab_ansible
 
+# Guest NIC name. Predictable interface naming derives from PCI topology;
+# this value is what the kernel currently assigns. Update if the topology
+# changes (extra NVMe passthrough, machine type change). Used by the
+# virtio-net tuning reconciler in provision-truenas.yml.
+truenas_nic_name: enp6s18
+
 # VM Details
 truenas_vmid: 100
 truenas_hostname: tn-storage
