@@ -1,0 +1,133 @@
+---
+# Bind-mount lxcfs's per-cgroup loadavg over /proc/loadavg in each LXC on n5p.
+# Without this, /proc/loadavg in an unprivileged LXC returns the host's loadavg
+# (kernel global, not namespaced) — which causes node_exporter to report host
+# load as container load and trips the "High System Load" alert whenever the
+# dev VM is busy.
+#
+# Variables:
+#   proxmox_lxc_loadavg_targets  list of {name, vmid, node} — defaults to lxc_containers
+#   proxmox_lxc_loadavg_remove   bool — if true, remove the entry instead of adding (rollback)
+
+- name: Default lxc_loadavg target list to all configured LXCs
+  ansible.builtin.set_fact:
+    proxmox_lxc_loadavg_targets: "{{ proxmox_lxc_loadavg_targets | default(lxc_containers) }}"
+
+- name: Verify lxcfs exposes per-cgroup loadavg on this Proxmox host
+  ansible.builtin.stat:
+    path: /var/lib/lxcfs/proc/loadavg
+  register: proxmox_lxcfs_loadavg_source
+
+- name: Fail if lxcfs is not built with --enable-loadavg
+  ansible.builtin.fail:
+    msg: >-
+      /var/lib/lxcfs/proc/loadavg is missing on {{ inventory_hostname }}.
+      Proxmox's lxcfs build appears to lack loadavg support.
+      Remediation: rebuild lxcfs with --enable-loadavg, or upgrade pve-manager.
+  when: not proxmox_lxcfs_loadavg_source.stat.exists
+
+- name: Pre-flight - confirm AdGuard secondary on rpi4 is answering DNS
+  ansible.builtin.command:
+    argv:
+      - dig
+      - "@192.168.1.110"
+      - google.com
+      - +short
+      - +time=2
+      - +tries=1
+  register: proxmox_lxc_loadavg_dns_secondary
+  changed_when: false
+  failed_when: proxmox_lxc_loadavg_dns_secondary.rc != 0
+  when:
+    - not (proxmox_lxc_loadavg_remove | default(false))
+    - proxmox_lxc_loadavg_targets | selectattr('name', 'equalto', 'adguard') | list | length > 0
+
+- name: Ensure lxcfs loadavg bind-mount entry is configured in each LXC
+  ansible.builtin.lineinfile:
+    path: "/etc/pve/lxc/{{ item.vmid }}.conf"
+    regexp: '^lxc\.mount\.entry:\s*/var/lib/lxcfs/proc/loadavg\s+'
+    line: "lxc.mount.entry: /var/lib/lxcfs/proc/loadavg proc/loadavg none bind,create=file 0 0"
+    state: "{{ 'absent' if (proxmox_lxc_loadavg_remove | default(false)) else 'present' }}"
+  loop: "{{ proxmox_lxc_loadavg_targets }}"
+  loop_control:
+    label: "{{ item.name }} (vmid {{ item.vmid }})"
+  when: inventory_hostname == item.node | default(inventory_hostname)
+  register: proxmox_lxc_loadavg_config
+
+- name: Stop changed LXCs (deterministic transition before restart)  # noqa: no-handler
+  ansible.builtin.command:
+    argv:
+      - pct
+      - stop
+      - "{{ item.item.vmid | string }}"
+  loop: "{{ proxmox_lxc_loadavg_config.results }}"
+  loop_control:
+    label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
+  when: item.changed | default(false)
+  changed_when: true
+
+- name: Wait for stopped LXCs to reach status=stopped  # noqa: no-handler
+  ansible.builtin.command:
+    argv:
+      - pct
+      - status
+      - "{{ item.item.vmid | string }}"
+  loop: "{{ proxmox_lxc_loadavg_config.results }}"
+  loop_control:
+    label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
+  when: item.changed | default(false)
+  register: proxmox_lxc_loadavg_stop_status
+  until: "'status: stopped' in proxmox_lxc_loadavg_stop_status.stdout"
+  retries: 30
+  delay: 1
+  changed_when: false
+
+- name: Start changed LXCs (mount activates on container start)  # noqa: no-handler
+  ansible.builtin.command:
+    argv:
+      - pct
+      - start
+      - "{{ item.item.vmid | string }}"
+  loop: "{{ proxmox_lxc_loadavg_config.results }}"
+  loop_control:
+    label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
+  when: item.changed | default(false)
+  changed_when: true
+
+- name: Wait for restarted LXCs to be running and services ready  # noqa: no-handler
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ item.item.vmid | string }}"
+      - "--"
+      - systemctl
+      - is-system-running
+      - --wait
+  loop: "{{ proxmox_lxc_loadavg_config.results }}"
+  loop_control:
+    label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
+  when: item.changed | default(false)
+  register: proxmox_lxc_loadavg_ready
+  until: proxmox_lxc_loadavg_ready.rc == 0 or 'degraded' in proxmox_lxc_loadavg_ready.stdout
+  retries: 30
+  delay: 2
+  changed_when: false
+  failed_when: false
+
+- name: Verify /proc/loadavg in each LXC differs from host (sanity output)
+  ansible.builtin.shell: |
+    set -o pipefail
+    host_load=$(awk '{print $1}' /proc/loadavg)
+    ct_load=$(pct exec {{ item.vmid | string }} -- awk '{print $1}' /proc/loadavg)
+    echo "host=${host_load} ct=${ct_load}"
+  args:
+    executable: /bin/bash
+  loop: "{{ proxmox_lxc_loadavg_targets }}"
+  loop_control:
+    label: "{{ item.name }} (vmid {{ item.vmid }})"
+  when:
+    - inventory_hostname == item.node | default(inventory_hostname)
+    - not (proxmox_lxc_loadavg_remove | default(false))
+  register: proxmox_lxc_loadavg_compare
+  changed_when: false

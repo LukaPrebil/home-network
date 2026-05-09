@@ -6,7 +6,7 @@ current_ip: 192.168.1.128
 target_ip: 192.168.30.2  # Final IP in VLAN 30
 
 # Hardware details
-cpu_cores: 8
+cpu_cores: 12  # Ryzen AI 9 HX 370 - 12 cores / 24 threads
 memory_gb: 16
 primary_interface: enp197s0
 

@@ -14,6 +14,17 @@
   ansible.builtin.import_tasks: system.yml
   tags: system
 
+- name: Include LXC loadavg bind-mount tasks
+  ansible.builtin.include_tasks:
+    file: lxc_loadavg.yml
+    apply:
+      tags:
+        - lxc-loadavg
+        - proxmox
+  tags:
+    - lxc-loadavg
+    - proxmox
+
 - name: Include weekly VM snapshot cron tasks
   ansible.builtin.include_tasks:
     file: snapshot_cron.yml

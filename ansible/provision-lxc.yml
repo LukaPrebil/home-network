@@ -146,6 +146,18 @@
       become: true
       changed_when: true
 
+    - name: Add lxcfs loadavg bind-mount to newly created LXCs
+      ansible.builtin.lineinfile:
+        path: "/etc/pve/lxc/{{ item.vmid }}.conf"
+        regexp: '^lxc\.mount\.entry:\s*/var/lib/lxcfs/proc/loadavg\s+'
+        line: "lxc.mount.entry: /var/lib/lxcfs/proc/loadavg proc/loadavg none bind,create=file 0 0"
+        state: present
+      loop: "{{ containers_to_create }}"
+      loop_control:
+        label: "{{ item.name }} (vmid {{ item.vmid }})"
+      when: containers_to_create | length > 0
+      become: true
+
     - name: Check if any containers need NFS Docker volumes
       ansible.builtin.set_fact:
         need_nfs_mount: "{{ containers_to_create | selectattr('nfs_docker_volumes', 'defined') | selectattr('nfs_docker_volumes', 'equalto', true) | list | length > 0 }}"
