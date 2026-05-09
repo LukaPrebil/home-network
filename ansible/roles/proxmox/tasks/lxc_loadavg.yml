@@ -26,6 +26,52 @@
       Remediation: rebuild lxcfs with --enable-loadavg, or upgrade pve-manager.
   when: not proxmox_lxcfs_loadavg_source.stat.exists
 
+- name: Ensure lxcfs systemd drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/lxcfs.service.d
+    state: directory
+    mode: '0755'
+  when: not (proxmox_lxc_loadavg_remove | default(false))
+
+- name: Ensure lxcfs runs with --enable-loadavg (per-cgroup loadavg virtualization)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/lxcfs.service.d/loadavg.conf
+    content: |
+      # Managed by ansible roles/proxmox/tasks/lxc_loadavg.yml.
+      # Without --enable-loadavg, /var/lib/lxcfs/proc/loadavg just mirrors the
+      # host /proc/loadavg, defeating the per-LXC bind-mount.
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/lxcfs --enable-loadavg /var/lib/lxcfs
+    mode: '0644'
+    owner: root
+    group: root
+  register: proxmox_lxcfs_dropin
+  when: not (proxmox_lxc_loadavg_remove | default(false))
+
+- name: Remove lxcfs drop-in (rollback)
+  ansible.builtin.file:
+    path: /etc/systemd/system/lxcfs.service.d/loadavg.conf
+    state: absent
+  register: proxmox_lxcfs_dropin_removed
+  when: proxmox_lxc_loadavg_remove | default(false)
+
+- name: Reload systemd if lxcfs drop-in changed  # noqa: no-handler
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: >-
+    (proxmox_lxcfs_dropin.changed | default(false))
+    or (proxmox_lxcfs_dropin_removed.changed | default(false))
+
+- name: Restart lxcfs if drop-in changed (re-binds will reattach on container restart)  # noqa: no-handler
+  ansible.builtin.systemd:
+    name: lxcfs
+    state: restarted
+  register: proxmox_lxcfs_restarted
+  when: >-
+    (proxmox_lxcfs_dropin.changed | default(false))
+    or (proxmox_lxcfs_dropin_removed.changed | default(false))
+
 - name: Pre-flight - confirm AdGuard secondary on rpi4 is answering DNS
   ansible.builtin.command:
     argv:
@@ -63,7 +109,7 @@
   loop: "{{ proxmox_lxc_loadavg_config.results }}"
   loop_control:
     label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
-  when: item.changed | default(false)
+  when: (item.changed | default(false)) or (proxmox_lxcfs_restarted.changed | default(false))
   changed_when: true
 
 - name: Wait for stopped LXCs to reach status=stopped  # noqa: no-handler
@@ -75,7 +121,7 @@
   loop: "{{ proxmox_lxc_loadavg_config.results }}"
   loop_control:
     label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
-  when: item.changed | default(false)
+  when: (item.changed | default(false)) or (proxmox_lxcfs_restarted.changed | default(false))
   register: proxmox_lxc_loadavg_stop_status
   until: "'status: stopped' in proxmox_lxc_loadavg_stop_status.stdout"
   retries: 30
@@ -91,7 +137,7 @@
   loop: "{{ proxmox_lxc_loadavg_config.results }}"
   loop_control:
     label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
-  when: item.changed | default(false)
+  when: (item.changed | default(false)) or (proxmox_lxcfs_restarted.changed | default(false))
   changed_when: true
 
 - name: Wait for restarted LXCs to be running and services ready  # noqa: no-handler
@@ -107,7 +153,7 @@
   loop: "{{ proxmox_lxc_loadavg_config.results }}"
   loop_control:
     label: "{{ item.item.name }} (vmid {{ item.item.vmid }})"
-  when: item.changed | default(false)
+  when: (item.changed | default(false)) or (proxmox_lxcfs_restarted.changed | default(false))
   register: proxmox_lxc_loadavg_ready
   until: proxmox_lxc_loadavg_ready.rc == 0 or 'degraded' in proxmox_lxc_loadavg_ready.stdout
   retries: 30
