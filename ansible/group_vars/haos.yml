@@ -21,7 +21,7 @@ haos_vm:
 
   # Resources
   cores: 4
-  memory: 8192  # 8GB in MB (cap / max)
+  memory: 6144  # 6GB cap (max) — working set ~1.3GB, leaves 4.5x headroom
   balloon: 2048  # 2GB floor — pvestatd shrinks toward this under host pressure
   disk_size: "64G"
   storage: truenas-vms  # Store on TrueNAS NFS share
