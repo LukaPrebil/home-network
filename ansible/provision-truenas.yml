@@ -51,7 +51,9 @@
     truenas_name: "tn-storage"
     truenas_version: "25.04.2.4"
     truenas_iso_filename: "TrueNAS-SCALE-{{ truenas_version }}.iso"
-    truenas_memory: 20480  # 20GB RAM
+    truenas_memory: 16384  # 16GB RAM. Reduced from 20GB on 2026-05-11; ZFS ARC
+    # has plenty of room at 16GB for a 3x NVMe homelab pool. Takes effect on
+    # next TrueNAS reboot (gated by truenas_allow_reboot).
     truenas_cores: 4
     truenas_boot_disk_size: 32  # GB
     # NVMe devices to pass through (will be auto-detected on first run)

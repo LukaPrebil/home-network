@@ -24,9 +24,9 @@ vms_to_create:
     ip: 192.168.1.148
     gateway: 192.168.1.1
     cores: 6
-    memory: 16384  # 16GB cap. Tried floors of 4GB and 6GB: both caused OOM-kills
-    # of chrome/dbus/Claude session workers because peak working set spikes well
-    # above steady-state. Interactive dev environments do not tolerate ballooning.
+    memory: 12288  # 12GB cap. Working set ~5GB, 2x headroom. No ballooning
+    # (tried floors of 4GB and 6GB: both OOM-killed chrome/dbus/Claude workers
+    # because peak working set spikes well above steady-state).
     disk_size: "+90G"  # Template ships 10GB, final disk 100GB
     storage: truenas-vms
     startup: "order=3"  # Boot after tn-storage (order=1) and containers (order=2)
