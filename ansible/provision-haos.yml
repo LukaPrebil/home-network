@@ -90,6 +90,7 @@
           qm create {{ haos_vm.vmid }}
           --name {{ haos_vm.name }}
           --memory {{ haos_vm.memory }}
+          {% if haos_vm.balloon is defined %}--balloon {{ haos_vm.balloon }}{% endif %}
           --cores {{ haos_vm.cores }}
           --cpu {{ haos_vm.cpu }}
           --machine {{ haos_vm.machine }}
@@ -183,6 +184,35 @@
           - "The VM is starting now. Please wait ~2-3 minutes for HAOS to boot,"
           - "then follow the network configuration steps below."
           - "=============================================="
+
+# Reconcile balloon floor on every run. The "Create" play above ends the
+# host (`end_host`) when the VM already exists, so subsequent first-run
+# tasks (including the create-line --balloon flag) never apply to an
+# existing VM. This separate play runs unconditionally and converges drift.
+- name: Reconcile HAOS balloon floor
+  hosts: n5p
+  become: true
+  gather_facts: false
+  vars_files:
+    - group_vars/haos.yml
+  tasks:
+    - name: Read current HAOS balloon value
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ haos_vm.vmid }} | awk '/^balloon:/ { print $2; exit }'
+        executable: /bin/bash
+      register: haos_balloon_read
+      changed_when: false
+      check_mode: false
+
+    - name: Apply balloon floor if drifted
+      ansible.builtin.command:
+        cmd: qm set {{ haos_vm.vmid }} --balloon {{ haos_vm.balloon }}
+      when:
+        - haos_vm.balloon is defined
+        - (haos_balloon_read.stdout | default('') | trim | int) != (haos_vm.balloon | int)
+      changed_when: true
 
 - name: Display network configuration instructions
   hosts: localhost

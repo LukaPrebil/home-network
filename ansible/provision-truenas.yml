@@ -104,11 +104,16 @@
             msg: "Will pass through NVMe devices at PCI addresses: {{ nvme_pci_addresses.stdout_lines }}"
 
         - name: Create TrueNAS VM
+          # balloon=0 explicitly disables the virtio balloon driver. TrueNAS
+          # uses ZFS ARC which expects stable RAM bounds; ballooning fights
+          # ARC eviction and degrades NFS/iSCSI throughput. Keep TrueNAS at
+          # its full `truenas_memory` allocation always.
           ansible.builtin.command:
             cmd: >
               qm create {{ truenas_vmid }}
               --name {{ truenas_name }}
               --memory {{ truenas_memory }}
+              --balloon 0
               --cores {{ truenas_cores }}
               --cpu host
               --machine q35
@@ -188,6 +193,27 @@
               - ""
               - "These will appear as /dev/sda, /dev/sdb, /dev/sdc in TrueNAS"
               - "=============================================="
+
+    # ---- Balloon reconcile (no reboot, runs independently of net0 logic) ----
+    # qm set --balloon takes effect live without restarting the VM. Keep it
+    # decoupled from the net0/cmdline drift logic below so a balloon change
+    # never triggers an NFS-disrupting TrueNAS reboot.
+
+    - name: Read current TrueNAS balloon value
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ truenas_vmid }} | awk '/^balloon:/ { print $2; exit }'
+        executable: /bin/bash
+      register: truenas_balloon_read
+      changed_when: false
+      check_mode: false
+
+    - name: Enforce balloon=0 (TrueNAS must not be ballooned — ZFS ARC stability)
+      ansible.builtin.command:
+        cmd: qm set {{ truenas_vmid }} --balloon 0
+      when: (truenas_balloon_read.stdout | default('') | trim) != '0'
+      changed_when: true
 
     # ---- Reconciliation block: runs every time ----
     #

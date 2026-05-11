@@ -208,6 +208,19 @@
         label: "{{ item.name }} - {{ item.memory | default('default') }}MB RAM"
       changed_when: true
 
+    - name: Set balloon floor if specified
+      # PVE auto-balloon shrinks the VM toward `balloon` when host RAM
+      # crosses 80% pressure, inflates back toward `memory` when slack
+      # returns. With no balloon set, PVE defaults balloon=memory (no
+      # shrinking) and the host carries the full allocation forever.
+      ansible.builtin.command:
+        cmd: qm set {{ vm_vmid_map[item.name] }} --balloon {{ item.balloon }}
+      when: item.balloon is defined
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - balloon floor {{ item.balloon | default('unset') }}MB"
+      changed_when: true
+
     - name: Resize disk if specified
       ansible.builtin.command:
         cmd: qm resize {{ vm_vmid_map[item.name] }} scsi0 {{ item.disk_size }}
@@ -309,3 +322,42 @@
           - "  cloud-init status --long"
           - "=============================================="
       when: has_new_vms
+
+# Reconcile balloon floors on every run, not just first-provision.
+# The create-flow above only touches VMs in `vms_to_provision` (new VMs).
+# For existing VMs, PVE keeps whatever `balloon:` was set last, so a change
+# in group_vars/vms.yml would silently never apply without this block.
+- name: Reconcile VM balloon floors
+  hosts: n5p
+  become: true
+  gather_facts: false
+  vars_files:
+    - group_vars/vms.yml
+  tasks:
+    - name: Read each managed VM's current balloon value
+      # qm config emits `balloon: N` when set, or omits the line when PVE
+      # defaults balloon to memory. awk emits the raw value or empty.
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ item.vmid }} | awk '/^balloon:/ { print $2; exit }'
+        executable: /bin/bash
+      register: vm_balloon_read
+      changed_when: false
+      check_mode: false
+      loop: "{{ vms_to_create }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.vmid }})"
+
+    - name: Apply balloon floor where on-disk drifted from desired
+      # Treat unset == max (PVE default). Compare as integers to handle
+      # the unset-vs-explicit-equal-memory case uniformly.
+      ansible.builtin.command:
+        cmd: qm set {{ item.item.vmid }} --balloon {{ item.item.balloon }}
+      when:
+        - item.item.balloon is defined
+        - (item.stdout | default('') | trim | int) != (item.item.balloon | int)
+      loop: "{{ vm_balloon_read.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout | default('unset') | trim }} -> {{ item.item.balloon | default('skip') }}"
+      changed_when: true

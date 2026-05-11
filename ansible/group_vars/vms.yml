@@ -9,7 +9,8 @@ vms_to_create:
     ip: 192.168.1.140  # Temporary IP (will migrate to 192.168.30.4 when VLANs are active)
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
     cores: 4
-    memory: 8192  # 8GB
+    memory: 8192  # 8GB cap (max)
+    balloon: 2048  # 2GB floor — pvestatd shrinks toward this when host > 80% pressure
     disk_size: "+40G"  # Increase disk by 40GB (total 50GB)
     storage: truenas-vms
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
@@ -21,7 +22,8 @@ vms_to_create:
     ip: 192.168.1.148
     gateway: 192.168.1.1
     cores: 6
-    memory: 16384  # 16GB
+    memory: 16384  # 16GB cap (max)
+    balloon: 4096  # 4GB floor
     disk_size: "+90G"  # Template ships 10GB, final disk 100GB
     storage: truenas-vms
     startup: "order=3"  # Boot after tn-storage (order=1) and containers (order=2)
@@ -63,5 +65,9 @@ vms_to_create:
 vm_defaults:
   cores: 2
   memory: 2048
+  # No balloon default: each VM must declare its own floor or omit balloon
+  # entirely (omission = balloon = memory = no shrinking). Defaulting to a
+  # numeric floor here would silently push every future VM toward an
+  # under-provisioned state on its first provision.
   storage: truenas-vms
   network_bridge: vmbr0
