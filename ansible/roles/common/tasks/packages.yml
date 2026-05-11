@@ -13,6 +13,28 @@
     state: present
   when: ansible_os_family == "Debian"
 
+- name: Install qemu-guest-agent on KVM guests
+  # Required for Proxmox to read the guest's IPs, run `qm guest exec`, and
+  # do graceful shutdown via the agent channel. Gated on virtualization
+  # facts so it skips LXCs (lxc), the Proxmox host itself (role=host),
+  # and non-Debian targets. The agent service is path-activated by the
+  # virtio-serial unit, so the package's own dpkg trigger starts it; we
+  # just ensure it's running for the idempotent re-run case.
+  when:
+    - ansible_os_family == "Debian"
+    - ansible_virtualization_type | default('') == 'kvm'
+    - ansible_virtualization_role | default('') == 'guest'
+  block:
+    - name: Install qemu-guest-agent package
+      ansible.builtin.apt:
+        name: qemu-guest-agent
+        state: present
+
+    - name: Ensure qemu-guest-agent service is running
+      ansible.builtin.systemd:
+        name: qemu-guest-agent
+        state: started
+
 - name: Check if zsh is installed
   ansible.builtin.command: which zsh
   register: common_zsh_installed
