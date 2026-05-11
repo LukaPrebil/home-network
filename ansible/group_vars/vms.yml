@@ -9,8 +9,10 @@ vms_to_create:
     ip: 192.168.1.140  # Temporary IP (will migrate to 192.168.30.4 when VLANs are active)
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
     cores: 4
-    memory: 6144  # 6GB cap (max) — working set ~3GB, 2x headroom
-    balloon: 2048  # 2GB floor — pvestatd shrinks toward this when host > 80% pressure
+    memory: 8192  # 8GB cap. Tried ballooning down to 6GB cap / 2GB floor: pvestatd
+    # shrunk the live VM to ~2.6GB and the arr-stack (Radarr/qbittorrent/etc) plus
+    # autoheal got OOM-killed under transient allocation spikes. Bursty Docker
+    # workloads do not tolerate aggressive ballooning.
     disk_size: "+40G"  # Increase disk by 40GB (total 50GB)
     storage: truenas-vms
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
@@ -22,8 +24,9 @@ vms_to_create:
     ip: 192.168.1.148
     gateway: 192.168.1.1
     cores: 6
-    memory: 16384  # 16GB cap (max) — peak demand >7GB observed (chrome/node/Claude sessions)
-    balloon: 6144  # 6GB floor — kept generous after a 4GB floor caused an OOM under sustained host pressure
+    memory: 16384  # 16GB cap. Tried floors of 4GB and 6GB: both caused OOM-kills
+    # of chrome/dbus/Claude session workers because peak working set spikes well
+    # above steady-state. Interactive dev environments do not tolerate ballooning.
     disk_size: "+90G"  # Template ships 10GB, final disk 100GB
     storage: truenas-vms
     startup: "order=3"  # Boot after tn-storage (order=1) and containers (order=2)
