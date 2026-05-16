@@ -323,6 +323,56 @@
           - "=============================================="
       when: has_new_vms
 
+# Reconcile memory caps on every run, not just first-provision.
+# The create-flow above only touches VMs in `vms_to_provision` (new VMs);
+# editing `memory:` in group_vars/vms.yml does not retroactively change the
+# running VM's max. This play closes that drift.
+#
+# qm set --memory N updates the PENDING config — the cap takes effect at
+# next boot. A running VM keeps its current allocation until it restarts
+# (LXCs are different: pct set --memory is enforced live by cgroups).
+#
+# We set --balloon together with --memory so flat-cap VMs (balloon=memory)
+# stay flat after a shrink. The balloon-reconcile play below then refines
+# balloon for VMs that declare an explicit lower floor.
+- name: Reconcile VM memory caps
+  # Tagged `vm-memory-reconcile` so it can be run in isolation when the
+  # create-flow is not needed: ansible-playbook provision-vms.yml --tags vm-memory-reconcile
+  hosts: n5p
+  become: true
+  gather_facts: false
+  tags:
+    - vm-memory-reconcile
+  vars_files:
+    - group_vars/vms.yml
+  tasks:
+    - name: Read each managed VM's current memory cap
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ item.vmid }} | awk '/^memory:/ { print $2; exit }'
+        executable: /bin/bash
+      register: vm_memory_read
+      changed_when: false
+      check_mode: false
+      loop: "{{ vms_to_create }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.vmid }})"
+
+    - name: Apply memory cap where on-disk drifted from desired
+      # Set --balloon alongside --memory so the flat-cap shape (no auto-balloon)
+      # is preserved when shrinking. PVE rejects balloon > memory, so changing
+      # both atomically avoids the transient invalid state.
+      ansible.builtin.command:
+        cmd: qm set {{ item.item.vmid }} --memory {{ item.item.memory }} --balloon {{ item.item.memory }}
+      when:
+        - item.item.memory is defined
+        - (item.stdout | default('') | trim | int) != (item.item.memory | int)
+      loop: "{{ vm_memory_read.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout | default('?') | trim }} -> {{ item.item.memory }}"
+      changed_when: true
+
 # Reconcile balloon floors on every run, not just first-provision.
 # The create-flow above only touches VMs in `vms_to_provision` (new VMs).
 # For existing VMs, PVE keeps whatever `balloon:` was set last, so a change

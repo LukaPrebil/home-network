@@ -254,6 +254,56 @@
       become: true
       changed_when: true
 
+- name: Reconcile memory caps on existing LXC containers
+  # The create-step above only applies `memory:` at first provision.
+  # Editing memory in group_vars/lxc.yml does not retroactively change
+  # the running container's cgroup cap. This play closes that drift
+  # idempotently for every container declared in lxc_containers.
+  #
+  # Cores/swap/disk are intentionally NOT reconciled here — each has
+  # its own gotchas (cores: hot-add fine, disk: never shrink, swap:
+  # may require reboot). Memory is the most common drift target.
+  #
+  # Tagged `lxc-memory-reconcile` so it can be run in isolation when the
+  # create-flow is not needed: ansible-playbook provision-lxc.yml --tags lxc-memory-reconcile
+  hosts: proxmox_hosts
+  gather_facts: false
+  become: true
+  tags:
+    - lxc-memory-reconcile
+  vars_files:
+    - group_vars/lxc.yml
+
+  tasks:
+    - name: Read current memory cap for each declared LXC
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          if pct status {{ item.vmid }} >/dev/null 2>&1; then
+            pct config {{ item.vmid }} | awk '/^memory:/ {print $2}'
+          else
+            echo "MISSING"
+          fi
+        executable: /bin/bash
+      loop: "{{ lxc_containers }}"
+      loop_control:
+        label: "{{ item.name }} (vmid {{ item.vmid }})"
+      register: lxc_current_memory
+      changed_when: false
+
+    - name: Apply memory cap drift correction
+      ansible.builtin.command:
+        cmd: pct set {{ item.item.vmid }} --memory {{ item.item.memory }}
+      loop: "{{ lxc_current_memory.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout }} → {{ item.item.memory }}"
+      when:
+        - item.stdout is defined
+        - item.stdout != 'MISSING'
+        - item.stdout != ''
+        - (item.stdout | int) != (item.item.memory | int)
+      changed_when: true
+
 - name: Add new containers to in-memory inventory
   hosts: localhost
   gather_facts: false
