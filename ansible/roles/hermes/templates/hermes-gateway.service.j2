@@ -1,0 +1,35 @@
+[Unit]
+Description=Hermes Agent gateway
+Documentation=https://hermes-agent.nousresearch.com/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ hermes_user }}
+Group={{ hermes_user }}
+WorkingDirectory={{ hermes_user_home }}
+Environment=HOME={{ hermes_user_home }}
+Environment=HERMES_HOME={{ hermes_home }}
+EnvironmentFile={{ hermes_home }}/.env
+
+ExecStart={{ hermes_install_dir }}/venv/bin/hermes gateway start
+
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=0
+
+# Hardening — restrict the agent's filesystem reach to its own state dir.
+# Operator-level secrets in ~hermes/.hermes/.env are still in-scope; this
+# just stops the agent from clobbering /etc or peeking at other users.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=tmpfs
+BindPaths={{ hermes_user_home }}
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+---
+# Systemd unit for hermes gateway.
+#
+# `hermes gateway start` blocks until the gateway exits, which makes it a
+# clean systemd Type=simple unit. The unit runs as the hermes user, with
+# HERMES_HOME pointed at the state directory.
+
+- name: Template hermes-gateway systemd unit
+  ansible.builtin.template:
+    src: hermes-gateway.service.j2
+    dest: "/etc/systemd/system/{{ hermes_service_name }}.service"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Flush handlers so daemon-reload runs before enable/start
+  ansible.builtin.meta: flush_handlers
+
+- name: Manage hermes-gateway service
+  ansible.builtin.systemd:
+    name: "{{ hermes_service_name }}"
+    state: "{{ hermes_service_state }}"
+    enabled: "{{ hermes_service_enabled }}"

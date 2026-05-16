@@ -9,10 +9,12 @@ vms_to_create:
     ip: 192.168.1.140  # Temporary IP (will migrate to 192.168.30.4 when VLANs are active)
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
     cores: 4
-    memory: 8192  # 8GB cap. Tried ballooning down to 6GB cap / 2GB floor: pvestatd
-    # shrunk the live VM to ~2.6GB and the arr-stack (Radarr/qbittorrent/etc) plus
-    # autoheal got OOM-killed under transient allocation spikes. Bursty Docker
-    # workloads do not tolerate aggressive ballooning.
+    memory: 6144  # 6GB flat cap (no balloon). Working set ~2.6GB across 17 Docker
+    # containers; 6GB leaves 3.4GB headroom for paperless OCR bursts and Arr scans.
+    # An earlier attempt at 6GB cap / 2GB balloon FLOOR caused OOMs because pvestatd
+    # actively shrunk the live VM to ~2.6GB under host pressure and bursts then
+    # exceeded the floor. A flat cap (memory==balloon, no shrinking) is the safe
+    # shape — bursts go up to 6GB without pvestatd intervention.
     disk_size: "+40G"  # Increase disk by 40GB (total 50GB)
     storage: truenas-vms
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage

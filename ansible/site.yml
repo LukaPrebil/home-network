@@ -254,6 +254,17 @@
     - ddns_updater
     - octoeverywhere
 
+- name: Deploy Hermes Agent
+  hosts: hermes_hosts
+  become: true
+  tags:
+    - hermes
+  vars_files:
+    - secrets.yml
+  roles:
+    - common
+    - hermes
+
 - name: OS-level package upgrade (opt-in)
   hosts: linux_servers
   become: true

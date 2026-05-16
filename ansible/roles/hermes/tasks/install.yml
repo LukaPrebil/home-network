@@ -1,0 +1,80 @@
+---
+# Install Hermes via the upstream curl one-liner.
+#
+# The installer is idempotent in practice but heavy (downloads uv + Python 3.11
+# + Node + Playwright deps). We gate on the `hermes` entrypoint existing inside
+# the venv so we don't re-run unnecessarily. Upgrades go through `hermes update`
+# on the LXC, not through re-running this role.
+
+- name: Install prerequisites for Hermes installer
+  ansible.builtin.apt:
+    name:
+      - curl
+      - ca-certificates
+      - git
+      - build-essential
+      - python3
+      - python3-venv
+      - python3-dev
+      - libffi-dev
+      - ripgrep
+      - ffmpeg
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create hermes group
+  ansible.builtin.group:
+    name: "{{ hermes_user }}"
+    gid: "{{ hermes_user_uid }}"
+    state: present
+
+- name: Create hermes user
+  ansible.builtin.user:
+    name: "{{ hermes_user }}"
+    uid: "{{ hermes_user_uid }}"
+    group: "{{ hermes_user }}"
+    home: "{{ hermes_user_home }}"
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: Ensure HERMES_HOME state directory exists
+  ansible.builtin.file:
+    path: "{{ hermes_home }}"
+    state: directory
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0700'  # state dir holds secrets — restrict to user
+
+- name: Check whether Hermes is already installed
+  ansible.builtin.stat:
+    path: "{{ hermes_install_dir }}/venv/bin/hermes"
+  register: hermes_binary
+
+- name: Download Hermes installer
+  ansible.builtin.get_url:
+    url: "{{ hermes_installer_url }}"
+    dest: "/tmp/hermes-install.sh"
+    mode: '0755'
+  when: not hermes_binary.stat.exists
+
+- name: Run Hermes installer as hermes user
+  # --skip-setup avoids the interactive wizard; we template config.yaml and
+  # .env ourselves in configure.yml. --no-venv would force a system install,
+  # which we DON'T want — we want the uv-managed venv under HERMES_HOME.
+  ansible.builtin.command:
+    cmd: /bin/bash /tmp/hermes-install.sh --skip-setup
+    creates: "{{ hermes_install_dir }}/venv/bin/hermes"
+  become: true
+  become_user: "{{ hermes_user }}"
+  environment:
+    HOME: "{{ hermes_user_home }}"
+    HERMES_HOME: "{{ hermes_home }}"
+  when: not hermes_binary.stat.exists
+
+- name: Remove installer download
+  ansible.builtin.file:
+    path: "/tmp/hermes-install.sh"
+    state: absent
+  when: not hermes_binary.stat.exists

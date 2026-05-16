@@ -1,0 +1,37 @@
+{# Hermes config.yaml — managed by Ansible. Hand-edits will be overwritten. #}
+# Hermes Agent configuration
+# Source: roles/hermes/templates/config.yaml.j2
+
+# ── Model / inference ────────────────────────────────────────────────
+# Auth is via CLAUDE_CODE_OAUTH_TOKEN in ~/.hermes/.env. The Anthropic
+# provider plugin picks it up automatically.
+model:
+  default: "anthropic:claude-opus-4-7"
+
+# ── Security gate ────────────────────────────────────────────────────
+approvals:
+  mode: "{{ hermes_approvals_mode }}"
+
+# ── Terminal sandbox ─────────────────────────────────────────────────
+terminal:
+  backend: "{{ hermes_terminal_backend }}"
+
+# ── Gateway / platforms ──────────────────────────────────────────────
+# Each platform is enabled via its env vars in .env. Listing here is
+# advisory — the gateway reads the env directly. Disabling a platform
+# is done by leaving its token unset.
+gateway:
+  dashboard:
+    host: "{{ hermes_dashboard_bind }}"
+    port: {{ hermes_dashboard_port }}
+
+# ── MCP servers ──────────────────────────────────────────────────────
+# Home Assistant MCP is bridged from the containers VM. It exposes HA
+# device control as tools — useful for "turn off the heat pump" style
+# requests from Telegram. Empty `include`/`exclude` = all tools.
+mcp_servers:
+  ha-mcp:
+    url: "http://{{ hostvars['containers']['ansible_host'] }}:8087/sse"
+    enabled: {{ hermes_enable_homeassistant | lower }}
+    sampling:
+      enabled: false  # Don't let the MCP server initiate LLM calls on our budget

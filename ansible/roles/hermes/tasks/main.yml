@@ -1,0 +1,20 @@
+---
+# Hermes Agent role main entry
+
+- name: Include install tasks
+  ansible.builtin.include_tasks: install.yml
+  tags:
+    - hermes
+    - install
+
+- name: Include configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags:
+    - hermes
+    - config
+
+- name: Include systemd service tasks
+  ansible.builtin.include_tasks: service.yml
+  tags:
+    - hermes
+    - service

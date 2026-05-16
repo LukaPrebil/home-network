@@ -17,7 +17,9 @@ lxc_containers:
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
     netmask: 24
     cores: 4
-    memory: 16384  # 16GB in MB
+    memory: 8192  # 8GB cap. Working set ~3GB (postgres+ML+server idle); 8GB gives 2.5x
+    # headroom for ML re-indexing bursts. Earlier 16GB allocation was over-provisioned
+    # and locked up ~10GB of n5p RAM that never got used.
     swap: 4096  # 4GB swap
     disk: 64  # 64GB root disk (for large Docker images, especially ROCm ML)
     storage: truenas-vms
@@ -120,7 +122,9 @@ lxc_containers:
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
     netmask: 24
     cores: 4
-    memory: 8192  # 8GB in MB (Prometheus + Grafana + Loki need memory for time-series data)
+    memory: 4096  # 4GB cap. Working set ~3.5GB (prom 447MB + loki 85MB + grafana 143MB +
+    # cadvisor + exporters). Tight on the upper bound — if Prometheus TSDB or Loki chunks
+    # grow past current footprint, bump back to 5-6GB before this OOMs.
     swap: 2048  # 2GB swap
     disk: 32  # 32GB root disk (for metrics and log storage on NFS)
     storage: truenas-vms
@@ -147,7 +151,8 @@ lxc_containers:
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
     netmask: 24
     cores: 4
-    memory: 8192  # 8GB in MB (Jellyfin transcoding can be memory-intensive)
+    memory: 4096  # 4GB cap. Jellyfin idle at ~160MB, hardware-transcoded streams don't blow
+    # RAM (GPU does the work). Earlier 8GB allocation was ~25x actual usage.
     swap: 2048  # 2GB swap
     disk: 32  # 32GB root disk (Jellyfin metadata cache)
     storage: truenas-vms
@@ -168,6 +173,34 @@ lxc_containers:
     # Custom NFS mounts for media
     nfs_plex_apps: true   # Mount plex-apps pool for config
     nfs_plex_bulk: true   # Mount plex-bulk pool for media
+
+  - name: hermes
+    vmid: 206
+    node: n5p
+    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.149  # Temporary IP (will migrate to 192.168.30.12 when VLANs are active)
+    gateway: 192.168.1.1
+    netmask: 24
+    cores: 4
+    memory: 6144  # 6GB cap. Baseline 0.5-1.5GB at idle, 2-4GB during streaming
+    # tool calls or parallel kanban subagents. 6GB leaves comfortable headroom
+    # for the projected steady state; bump to 8GB only if code-orchestration
+    # workloads start hitting the cap during multi-worker runs.
+    swap: 1024  # 1GB swap
+    disk: 20  # 20GB root disk: install footprint ~1GB, SQLite session DB grows
+    # slowly (~50MB/month at expected use), logs rotate. 20GB is generous.
+    storage: truenas-vms
+    description: "Hermes Agent - autonomous AI daemon (Nous Research)"
+    unprivileged: true
+    features:
+      - nesting=1   # Required for systemd 257+ in unprivileged containers
+      - keyctl=1    # Required for systemd
+      - fuse=1      # Required for FUSE filesystems
+    onboot: true
+    startup: "order=3"  # Boot after TrueNAS + containers VM (needs ha-mcp reachable)
+    gpu_passthrough: false
+    nfs_docker_volumes: false  # State stays on local rootfs — SQLite locking on NFS is banned
 
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:

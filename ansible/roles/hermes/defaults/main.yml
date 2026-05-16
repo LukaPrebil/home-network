@@ -1,0 +1,57 @@
+---
+# Hermes Agent role defaults
+#
+# Hermes is an autonomous AI agent (Nous Research, MIT) installed via the
+# upstream curl one-liner into a per-user uv-managed venv. We run it as a
+# dedicated `hermes` user under systemd, with state under ~hermes/.hermes/.
+#
+# The agent reaches Anthropic via OAuth (CLAUDE_CODE_OAUTH_TOKEN), talks to
+# Home Assistant over the WS API, and surfaces a Telegram bot.
+
+# ── Local user and install paths ─────────────────────────────────────
+hermes_user: hermes
+hermes_user_uid: 10000
+hermes_user_home: "/home/{{ hermes_user }}"
+hermes_home: "{{ hermes_user_home }}/.hermes"          # HERMES_HOME (state + config + skills + session DB)
+hermes_install_dir: "{{ hermes_home }}/hermes-agent"    # uv venv + checkout
+
+# ── Upstream installer ───────────────────────────────────────────────
+# The official installer pins versions internally; we don't track an explicit
+# Hermes release here. `hermes update` is the supported upgrade path. Re-running
+# this role does NOT auto-upgrade — the install task is gated on binary presence.
+hermes_installer_url: "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
+
+# ── Gateway platforms ────────────────────────────────────────────────
+# Telegram is the primary messaging surface. Home Assistant gateway is enabled
+# so HA state_changed events can wake the agent (event-driven incident response).
+# Other platforms left disabled — flip to true and supply secrets to enable.
+hermes_enable_telegram: true
+hermes_enable_homeassistant: true
+hermes_enable_discord: false
+hermes_enable_slack: false
+hermes_enable_signal: false
+
+# ── Home Assistant ───────────────────────────────────────────────────
+# Pulls the HAOS host's address from inventory rather than hardcoding.
+hermes_hass_url: "http://{{ hostvars['haos']['ansible_host'] }}:8123"
+
+# ── Security ─────────────────────────────────────────────────────────
+# approvals.mode "on" requires the operator to confirm dangerous commands
+# (terminal writes, network ops, etc.) before execution. Single-tenant trust
+# model is already loose; this is the load-bearing security gate.
+hermes_approvals_mode: "on"
+
+# Terminal backend: local execution inside this LXC. The LXC IS the sandbox.
+# Use "docker" instead if we ever stand up MCP servers that need container
+# isolation beyond what the LXC already provides.
+hermes_terminal_backend: "local"
+
+# Dashboard (web UI) and API server: localhost only. Reach via SSH tunnel or
+# Tailscale, never expose on LAN — dashboard stores API keys.
+hermes_dashboard_bind: "127.0.0.1"
+hermes_dashboard_port: 9119
+
+# ── systemd ──────────────────────────────────────────────────────────
+hermes_service_name: "hermes-gateway"
+hermes_service_state: "started"  # started | stopped | restarted
+hermes_service_enabled: true
