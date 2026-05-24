@@ -45,12 +45,13 @@ Consolidated from two previous automations (`close_blinds_in_luka_s_room` + `ope
 
 ## Upstairs Bathroom
 
-Single automation with two trigger paths:
+Single automation with three trigger paths feeding a shared open branch:
 
 ```
-Morning — open:
-  → Trigger: sun elevation crosses above 5°
-  → Conditions: after 06:00, before 12:00
+Morning — open (whichever fires first after 06:00):
+  → Trigger A: sun elevation crosses above 5°
+  → Trigger B: 06:00 local (catch-up for summer mornings)
+  → Conditions: after 06:00, before 12:00, sun elevation > 5°
   → Action: open cover for area bathroo_upstairs
 
 Evening — close:
@@ -58,7 +59,9 @@ Evening — close:
   → Action: close cover for area bathroo_upstairs
 ```
 
-Uses sun elevation instead of fixed sunrise offset — adapts naturally to seasons. The area ID `bathroo_upstairs` is a typo in HA config (missing "m").
+06:00 is a hard floor — the blind never opens earlier. From late May to mid-July the sun crosses 5° elevation before 06:00 local, so the elevation trigger fires and is blocked by the time condition; the 06:00 time trigger then takes over and opens the blind. Outside that window the elevation trigger fires after 06:00 and opens directly; the 06:00 catch-up fires too but is blocked by the elevation condition until the sun is actually up.
+
+The area ID `bathroo_upstairs` is a typo in HA config (missing "m").
 
 Consolidated from two previous automations (`close_blinds_in_upstairs_bathroom` + `open_blinds_in_upstairs_bathroom`).
 
