@@ -32,7 +32,12 @@ ota:
     password: !secret ota_password
 
 external_components:
-  - source: github://echavet/MitsubishiCN105ESPHome
+  # Pin to a known-good revision per repo policy (no mutable infrastructure).
+  # Bump deliberately when you want upstream changes.
+  - source:
+      type: git
+      url: https://github.com/echavet/MitsubishiCN105ESPHome
+      ref: 458aa3c300670bb5885714a660004b14d6b2f79a
 
 uart:
   id: HP_UART
@@ -53,9 +58,9 @@ climate:
       dual_setpoint: true
 
     # Sensors
-    compressor_frequency_sensor:
-      name: AC Compressor Frequency
-      id: ac_compressor_frequency
+    # Note: compressor_frequency_sensor intentionally omitted — the MSZ-AY42
+    # always reports byte 3 as 0 over CN105. Use ac_input_power / ac_stage /
+    # climate.air_conditioner_air_conditioner.hvac_action as proxies.
     input_power_sensor:
       name: AC Input Power
       id: ac_input_power

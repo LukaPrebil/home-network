@@ -6,6 +6,10 @@ Mitsubishi MSZ-AY42 controlled via ESP32-CAM + CN105 connector using [Mitsubishi
 
 `climate.air_conditioner_air_conditioner` (dual setpoint, all modes)
 
+## Compressor frequency is not exposed
+
+The MSZ-AY42 always returns 0 for the compressor-frequency byte in the CN105 status response, even while the compressor is actively running. This is a known limitation of the unit (the upstream MitsubishiCN105ESPHome component notes that some Mitsubishi models do not populate this field). The `compressor_frequency_sensor` was therefore removed from `esphome/airconditioner.yaml`. Use `sensor.air_conditioner_ac_input_power`, `sensor.air_conditioner_ac_stage`, and the climate entity's `hvac_action` attribute as proxies for compressor activity.
+
 ## Remote Temperature
 
 The AC's internal sensor sits in the return air path inside the stairwell unit, which causes short cycling — it reads the target temperature quickly while the rest of the house is still warm/cold.
