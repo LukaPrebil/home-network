@@ -37,7 +37,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/echavet/MitsubishiCN105ESPHome
-      ref: 458aa3c300670bb5885714a660004b14d6b2f79a
+      ref: 50bd943f274b125955b0c5ddcc105c35b27053b5
 
 uart:
   id: HP_UART
@@ -137,7 +137,7 @@ sensor:
     id: ac_uart_connected
     entity_category: DIAGNOSTIC
     lambda: |-
-      return (bool) id(ac).isUARTConnected_;
+      return id(ac).isHeatpumpConnected();
     update_interval: 30s
 
   - platform: template

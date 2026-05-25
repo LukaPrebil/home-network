@@ -39,9 +39,13 @@ The ESP32-CAM is powered directly from the CN105 5V rail. No voltage regulator o
 **First flash (USB):**
 
 ```bash
-brew install esphome
+cd esphome
+python3 -m venv .venv && source .venv/bin/activate   # first time only
+pip install -r requirements.txt
 esphome run airconditioner.yaml
 ```
+
+The pinned ESPHome version lives in `requirements.txt` — bump it there and reinstall, do not edit the venv directly.
 
 The ESP32-CAM requires bridging IO0 to GND to enter download mode. Hold the bridge, press RST, then run the upload command. Remove the bridge after flashing completes.
 
@@ -81,5 +85,5 @@ A web server is available at `http://airconditioner.local` (or the device IP) fo
 ## Setup
 
 1. Copy `secrets.yaml.example` to `secrets.yaml` and fill in your values
-2. Install ESPHome: `brew install esphome`
+2. Install ESPHome into a local venv: `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`
 3. Flash the device: `esphome run <config>.yaml`
