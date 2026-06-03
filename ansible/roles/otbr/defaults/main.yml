@@ -36,3 +36,13 @@ otbr_timezone: "{{ timezone | default('UTC') }}"
 
 # Home Assistant integration info (for documentation in output)
 otbr_home_assistant_host: "{{ hostvars['haos']['ansible_host'] }}"
+
+# Auto-recovery watchdog (systemd timer)
+# Safety net for the failure mode where a power event re-enumerates the USB
+# Thread radio, otbr-agent dies on an HDLC I/O error, the container exits, and
+# nothing brings it back: Docker abandons restart attempts while the device is
+# absent, and `unless-stopped` skips the already-exited container on the next
+# boot. The watchdog restarts the container as soon as the radio is present.
+otbr_watchdog_check_interval: "60s"   # how often the timer fires
+otbr_watchdog_boot_delay: "90s"       # first run after boot (let docker + USB settle)
+otbr_watchdog_remove: false           # set true to remove the watchdog (rollback)

@@ -1,0 +1,95 @@
+---
+# OTBR auto-recovery watchdog (systemd timer).
+#
+# Restores the Thread border router after a power event re-enumerates the USB
+# radio (otbr-agent dies on an HDLC I/O error, the container exits, and Docker's
+# unless-stopped policy can't recover it - see otbr-watchdog.sh.j2 for the full
+# failure analysis). Keyed off the container NAME, so it is independent of the
+# compose project location.
+#
+# Variables:
+#   otbr_watchdog_check_interval  timer cadence (default 60s)
+#   otbr_watchdog_boot_delay      first run after boot (default 90s)
+#   otbr_watchdog_remove          bool - if true, remove the watchdog (rollback)
+
+- name: Install OTBR watchdog script
+  ansible.builtin.template:
+    src: otbr-watchdog.sh.j2
+    dest: /usr/local/sbin/otbr-watchdog.sh
+    owner: root
+    group: root
+    mode: '0755'
+  when: not (otbr_watchdog_remove | default(false))
+  tags:
+    - otbr
+    - otbr-watchdog
+
+- name: Install OTBR watchdog systemd service
+  ansible.builtin.template:
+    src: otbr-watchdog.service.j2
+    dest: /etc/systemd/system/otbr-watchdog.service
+    owner: root
+    group: root
+    mode: '0644'
+  when: not (otbr_watchdog_remove | default(false))
+  tags:
+    - otbr
+    - otbr-watchdog
+
+- name: Install OTBR watchdog systemd timer
+  ansible.builtin.template:
+    src: otbr-watchdog.timer.j2
+    dest: /etc/systemd/system/otbr-watchdog.timer
+    owner: root
+    group: root
+    mode: '0644'
+  when: not (otbr_watchdog_remove | default(false))
+  tags:
+    - otbr
+    - otbr-watchdog
+
+- name: Enable and start OTBR watchdog timer
+  ansible.builtin.systemd:
+    name: otbr-watchdog.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: not (otbr_watchdog_remove | default(false))
+  tags:
+    - otbr
+    - otbr-watchdog
+
+- name: Stop and disable OTBR watchdog timer (rollback)
+  ansible.builtin.systemd:
+    name: otbr-watchdog.timer
+    enabled: false
+    state: stopped
+  failed_when: false
+  when: otbr_watchdog_remove | default(false)
+  tags:
+    - otbr
+    - otbr-watchdog
+
+- name: Remove OTBR watchdog units and script (rollback)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/otbr-watchdog.timer
+    - /etc/systemd/system/otbr-watchdog.service
+    - /usr/local/sbin/otbr-watchdog.sh
+  register: otbr_watchdog_removed
+  when: otbr_watchdog_remove | default(false)
+  tags:
+    - otbr
+    - otbr-watchdog
+
+- name: Reload systemd after watchdog removal (rollback)  # noqa: no-handler
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - otbr_watchdog_remove | default(false)
+    - otbr_watchdog_removed.changed | default(false)
+  tags:
+    - otbr
+    - otbr-watchdog

@@ -21,3 +21,9 @@
   tags:
     - otbr
     - deploy
+
+- name: Include auto-recovery watchdog tasks
+  ansible.builtin.include_tasks: watchdog.yml
+  tags:
+    - otbr
+    - otbr-watchdog
