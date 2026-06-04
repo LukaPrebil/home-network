@@ -1,0 +1,13 @@
+{{ ansible_managed | comment }}
+# OTBR auto-recovery watchdog timer - see roles/otbr/tasks/watchdog.yml.
+[Unit]
+Description=Run the OTBR watchdog every {{ otbr_watchdog_check_interval }}
+
+[Timer]
+OnBootSec={{ otbr_watchdog_boot_delay }}
+OnUnitActiveSec={{ otbr_watchdog_check_interval }}
+AccuracySec=10s
+Unit=otbr-watchdog.service
+
+[Install]
+WantedBy=timers.target

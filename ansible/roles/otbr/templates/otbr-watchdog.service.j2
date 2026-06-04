@@ -1,0 +1,10 @@
+{{ ansible_managed | comment }}
+# OTBR auto-recovery watchdog - see roles/otbr/tasks/watchdog.yml.
+[Unit]
+Description=OTBR watchdog (restart Thread border router when radio is present)
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/otbr-watchdog.sh

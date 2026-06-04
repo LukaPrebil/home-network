@@ -1,0 +1,36 @@
+#!/bin/sh
+# Managed by Ansible (roles/otbr/tasks/watchdog.yml) - DO NOT EDIT MANUALLY.
+#
+# Auto-recovery safety net for the OTBR Thread border router.
+#
+# After a power event the USB Thread radio re-enumerates on the bus; otbr-agent
+# loses its serial link and dies with an HDLC "Input/output error", and the
+# container exits. Docker's `unless-stopped` policy cannot recover this:
+#   - while the device is mid-re-enumeration, `docker start` fails (missing
+#     --device) and the restart loop gives up;
+#   - on the next boot, `unless-stopped` skips the container entirely because it
+#     was already in the exited state at the last daemon shutdown.
+# Result: OTBR - and the entire Thread/Matter network - stays down until a human
+# notices. This script (fired every {{ otbr_watchdog_check_interval }} by
+# otbr-watchdog.timer) brings the container back as soon as the radio is present.
+set -eu
+
+DEVICE='{{ otbr_thread_usb_device }}'
+CONTAINER='{{ otbr_container_name }}'
+
+# Nothing we can do until the radio re-enumerates - starting the container
+# without its --device would just fail. The symlink disappears when the dongle
+# is gone, so -e is the reliable presence check.
+if [ ! -e "$DEVICE" ]; then
+  echo "otbr-watchdog: Thread radio ${DEVICE} not present; waiting for it to re-enumerate."
+  exit 0
+fi
+
+state="$(docker inspect -f '{% raw %}{{.State.Status}}{% endraw %}' "$CONTAINER" 2>/dev/null || echo absent)"
+
+if [ "$state" = "running" ]; then
+  exit 0
+fi
+
+echo "otbr-watchdog: radio present but container '${CONTAINER}' is '${state}' - starting it."
+docker start "$CONTAINER"
