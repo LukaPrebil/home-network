@@ -45,4 +45,5 @@ otbr_home_assistant_host: "{{ hostvars['haos']['ansible_host'] }}"
 # boot. The watchdog restarts the container as soon as the radio is present.
 otbr_watchdog_check_interval: "60s"   # how often the timer fires
 otbr_watchdog_boot_delay: "90s"       # first run after boot (let docker + USB settle)
+otbr_watchdog_startup_grace_seconds: 120  # don't judge functional health until container has been up this long
 otbr_watchdog_remove: false           # set true to remove the watchdog (rollback)

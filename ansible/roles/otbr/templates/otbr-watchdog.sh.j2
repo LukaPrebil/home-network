@@ -1,36 +1,74 @@
 #!/bin/sh
 # Managed by Ansible (roles/otbr/tasks/watchdog.yml) - DO NOT EDIT MANUALLY.
 #
-# Auto-recovery safety net for the OTBR Thread border router.
+# Auto-recovery safety net for the OTBR Thread border router. Covers two
+# failure modes, both seen in production:
 #
-# After a power event the USB Thread radio re-enumerates on the bus; otbr-agent
-# loses its serial link and dies with an HDLC "Input/output error", and the
-# container exits. Docker's `unless-stopped` policy cannot recover this:
-#   - while the device is mid-re-enumeration, `docker start` fails (missing
-#     --device) and the restart loop gives up;
-#   - on the next boot, `unless-stopped` skips the container entirely because it
-#     was already in the exited state at the last daemon shutdown.
-# Result: OTBR - and the entire Thread/Matter network - stays down until a human
-# notices. This script (fired every {{ otbr_watchdog_check_interval }} by
-# otbr-watchdog.timer) brings the container back as soon as the radio is present.
+#   A) Container exited. A power event re-enumerates the USB Thread radio,
+#      otbr-agent dies on an HDLC "Input/output error", and the container
+#      exits. Docker's unless-stopped policy can't recover it (gives up while
+#      the device is absent; skips the already-exited container on next boot).
+#
+#   B) Container running but otbr-agent is dead. After a `docker restart` (or a
+#      bad init) otbr-agent gets stuck in a D-Bus EMERG crash loop: ot-ctl
+#      returns "Connection refused", yet the container stays "running" and even
+#      reports docker-healthy. Neither the restart policy nor autoheal recover
+#      this - and autoheal's `docker restart` would only reproduce the EMERG.
+#
+# Remediation for BOTH is the same: force-recreate the container so it gets a
+# pristine /run (clean dbus). We discover the compose file from the container's
+# own labels so this is independent of where the compose project lives.
 set -eu
 
 DEVICE='{{ otbr_thread_usb_device }}'
 CONTAINER='{{ otbr_container_name }}'
+STARTUP_GRACE={{ otbr_watchdog_startup_grace_seconds }}
+FALLBACK_COMPOSE='{{ otbr_compose_dir }}/docker-compose.yml'
 
-# Nothing we can do until the radio re-enumerates - starting the container
-# without its --device would just fail. The symlink disappears when the dongle
-# is gone, so -e is the reliable presence check.
+log() { echo "otbr-watchdog: $*"; }
+
+recover() {
+  # Discover the live compose file from the container's labels so we are immune
+  # to compose-project-dir drift; fall back to the role default if unavailable.
+  compose_file="$(docker inspect "$CONTAINER" -f '{% raw %}{{ index .Config.Labels "com.docker.compose.project.config_files" }}{% endraw %}' 2>/dev/null || true)"
+  if [ -z "$compose_file" ] || [ ! -f "$compose_file" ]; then
+    compose_file="$FALLBACK_COMPOSE"
+  fi
+  log "recovering ($1) via force-recreate using ${compose_file}"
+  docker compose -f "$compose_file" up -d --force-recreate "$CONTAINER"
+}
+
+# 1) Need the radio present - a (re)create without its --device just fails.
 if [ ! -e "$DEVICE" ]; then
-  echo "otbr-watchdog: Thread radio ${DEVICE} not present; waiting for it to re-enumerate."
+  log "Thread radio ${DEVICE} not present; waiting for it to re-enumerate."
   exit 0
 fi
 
+# 2) Container must exist and be running (covers mode A).
 state="$(docker inspect -f '{% raw %}{{.State.Status}}{% endraw %}' "$CONTAINER" 2>/dev/null || echo absent)"
-
-if [ "$state" = "running" ]; then
+if [ "$state" != "running" ]; then
+  recover "container state=${state}"
   exit 0
 fi
 
-echo "otbr-watchdog: radio present but container '${CONTAINER}' is '${state}' - starting it."
-docker start "$CONTAINER"
+# 3) Give a freshly-(re)started container time to bring up dbus + RCP + attach
+#    before judging it, so we never recreate-loop during normal initialisation.
+started_at="$(docker inspect -f '{% raw %}{{.State.StartedAt}}{% endraw %}' "$CONTAINER" 2>/dev/null || echo '')"
+if [ -n "$started_at" ]; then
+  started_epoch="$(date -d "$started_at" +%s 2>/dev/null || echo 0)"
+  now_epoch="$(date +%s)"
+  up_secs=$(( now_epoch - started_epoch ))
+  if [ "$started_epoch" -gt 0 ] && [ "$up_secs" -lt "$STARTUP_GRACE" ]; then
+    log "container up ${up_secs}s (< ${STARTUP_GRACE}s grace); deferring functional check."
+    exit 0
+  fi
+fi
+
+# 4) Functional check (covers mode B): otbr-agent's control socket must answer
+#    with a real Thread role. In the EMERG state ot-ctl returns "Connection
+#    refused" - no role keyword - so this fails and we force-recreate.
+if docker exec "$CONTAINER" ot-ctl state 2>/dev/null | grep -qiE 'disabled|detached|child|router|leader'; then
+  exit 0
+fi
+
+recover "running but otbr-agent unresponsive (ot-ctl)"

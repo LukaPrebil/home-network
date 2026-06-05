@@ -41,11 +41,15 @@ services:
     # Note: sysctls cannot be used with network_mode: host
     # IP forwarding is configured on the host via prerequisites.yml
     healthcheck:
-      # Check if otbr-agent process is running (state can be 'disabled' until network is formed)
-      test: ["CMD-SHELL", "pgrep -x otbr-agent > /dev/null"]
+      # Functional check: otbr-agent's control socket must answer with a real
+      # Thread role. A bare `pgrep otbr-agent` is not enough - in the D-Bus
+      # EMERG crash loop the process exists but ot-ctl returns "Connection
+      # refused", so a pgrep check reports healthy while the agent is dead.
+      test: ["CMD-SHELL", "ot-ctl state | grep -qiE 'disabled|detached|child|router|leader'"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
-    labels:
-      - "autoheal=true"
+      start_period: 90s
+    # No autoheal label on purpose: autoheal's only action is `docker restart`,
+    # which reproduces the EMERG loop. The otbr-watchdog systemd timer on the
+    # host owns recovery and force-recreates (clean /run) instead.
