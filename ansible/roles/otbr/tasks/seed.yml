@@ -1,0 +1,88 @@
+---
+# Restore the Thread Active Operational Dataset onto an EMPTY persisted store.
+#
+# The Thread network identity (the secret Network Key + PSKc, the Mesh-Local
+# Prefix and the original timestamp) lives ONLY in the dataset at
+# /var/lib/thread. otbr-agent does NOT self-form a network on an empty store -
+# it sits `disabled`. This restores the vaulted full dataset TLV when (and only
+# when) the store is empty and the node is not attached, so a fresh data dir
+# (disaster recovery, or the /opt/otbr migration) rebuilds the SAME network
+# instead of needing a manual dataset copy. It NEVER overwrites a live dataset
+# (guarded on `disabled` + no committed dataset), so it is safe on every run.
+
+- name: Assert OTBR data dir is on an NFS mount before judging it empty
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: assert_nfs_mount
+  vars:
+    common_nfs_mount_path: "{{ otbr_data_dir }}"
+
+- name: Wait for the ot-ctl control socket to respond
+  ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl state
+  register: otbr_state_probe
+  changed_when: false
+  failed_when: false
+  retries: 12
+  delay: 5
+  until: otbr_state_probe.rc == 0
+
+- name: Read current Thread role
+  ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl state
+  register: otbr_state
+  changed_when: false
+  failed_when: false
+
+- name: Probe whether an active dataset is already committed
+  ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl dataset active -x
+  register: otbr_dataset_probe
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Restore Thread dataset from vault onto the empty store
+  when:
+    - otbr_thread_active_dataset | length > 0
+    - "'disabled' in otbr_state.stdout"
+    - otbr_dataset_probe.stdout is not search('[0-9a-fA-F]{40,}')
+  block:
+    - name: Set the active dataset from the vaulted TLV
+      ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl dataset set active {{ otbr_thread_active_dataset }}
+      changed_when: true
+      no_log: true
+
+    - name: Bring the Thread interface up
+      ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl ifconfig up
+      changed_when: true
+
+    - name: Start the Thread protocol
+      ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl thread start
+      changed_when: true
+
+    - name: Wait for the border router to attach (leader/router)
+      ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl state
+      register: otbr_attach
+      changed_when: false
+      retries: 18
+      delay: 5
+      until: "'leader' in otbr_attach.stdout or 'router' in otbr_attach.stdout"
+
+- name: Read live dataset for drift comparison
+  ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl dataset active -x
+  register: otbr_dataset_live
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when:
+    - otbr_thread_active_dataset | length > 0
+    - otbr_dataset_probe.stdout is search('[0-9a-fA-F]{40,}')
+
+- name: Warn if the vaulted dataset has drifted from the live network
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: vault_thread_active_dataset differs from the live OTBR dataset
+      (Active-Timestamp excluded). Re-capture with `ot-ctl dataset active -x`
+      and update the vault. See docs/infrastructure/otbr-thread-recovery.md
+  when:
+    - otbr_thread_active_dataset | length > 0
+    - otbr_dataset_probe.stdout is search('[0-9a-fA-F]{40,}')
+    - (otbr_dataset_live.stdout | default('') | regex_search('[0-9a-fA-F]{40,}') | default(''))[20:] != otbr_thread_active_dataset[20:]

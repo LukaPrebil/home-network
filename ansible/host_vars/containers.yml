@@ -10,9 +10,11 @@ otbr_thread_usb_device: "/dev/serial/by-id/usb-ITEAD_SONOFF_Zigbee_3.0_USB_Dongl
 otbr_backbone_interface: "eth0"
 
 # Thread Network Configuration (actual running values)
-# IMPORTANT: These values match the existing, operational Thread network
+# IMPORTANT: These values are descriptive only and match the existing,
+# operational Thread network. The source of truth and recovery artifact is the
+# full Active Operational Dataset TLV, vaulted as vault_thread_active_dataset
+# (see secrets.example.yml) - the role auto-restores it onto an empty store.
 otbr_thread_channel: 15
 otbr_thread_network_name: "OpenThreadHA"
 otbr_thread_panid: "0x1234"
 otbr_thread_extpanid: "1111111122222222"
-# otbr_thread_network_key is stored in secrets.yml vault

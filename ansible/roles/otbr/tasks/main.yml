@@ -22,6 +22,12 @@
     - otbr
     - deploy
 
+- name: Include dataset seed tasks
+  ansible.builtin.include_tasks: seed.yml
+  tags:
+    - otbr
+    - otbr-seed
+
 - name: Include auto-recovery watchdog tasks
   ansible.builtin.include_tasks: watchdog.yml
   tags:

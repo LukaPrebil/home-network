@@ -2,12 +2,11 @@
 # Handlers for OTBR role
 
 - name: Restart otbr
+  # A plain `state: restarted` (= `docker restart`) lands otbr-agent in a D-Bus
+  # EMERG crash loop: ot-ctl returns "Connection refused" while the container
+  # still reports running/healthy. Force-recreate gives a pristine /run so the
+  # D-Bus socket comes up clean.
   community.docker.docker_compose_v2:
     project_src: "{{ otbr_compose_dir }}"
-    state: restarted
-
-- name: Restart otbr container
-  community.docker.docker_container:
-    name: "{{ otbr_container_name }}"
-    state: started
-    restart: true
+    state: present
+    recreate: always

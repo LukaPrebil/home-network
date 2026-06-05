@@ -20,6 +20,14 @@ otbr_data_dir: "{{ otbr_base_dir }}/data"
 otbr_thread_usb_device: "/dev/serial/by-id/usb-ITEAD_SONOFF_Zigbee_3.0_USB_Dongle_Plus_V2_20221029081826-if00"
 
 # Thread Network Configuration
+#
+# The full Active Operational Dataset TLV (otbr_thread_active_dataset, captured
+# with `ot-ctl dataset active -x`) is the source of truth and the recovery
+# artifact. The individual channel/network_name/panid/extpanid/network_key vars
+# below are descriptive only - rebuilding a dataset from them would randomize
+# PSKc + the Mesh-Local Prefix and orphan every commissioned Matter device, so
+# they must NOT be used to reconstruct the network.
+otbr_thread_active_dataset: "{{ vault_thread_active_dataset | default('') }}"
 otbr_thread_channel: 15                          # Thread channel (default 15, avoids Zigbee channel 20)
 otbr_thread_network_name: "OpenThreadHA"         # Thread network name
 otbr_thread_panid: "0x1234"                      # PAN ID (16-bit hex)
