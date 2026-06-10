@@ -1,17 +1,46 @@
 ---
 # Bind-mount lxcfs's per-cgroup loadavg over /proc/loadavg in each LXC on n5p.
 # Without this, /proc/loadavg in an unprivileged LXC returns the host's loadavg
-# (kernel global, not namespaced) — which causes node_exporter to report host
+# (kernel global, not namespaced) - which causes node_exporter to report host
 # load as container load and trips the "High System Load" alert whenever the
 # dev VM is busy.
 #
 # Variables:
-#   proxmox_lxc_loadavg_targets  list of {name, vmid, node} — defaults to lxc_containers
-#   proxmox_lxc_loadavg_remove   bool — if true, remove the entry instead of adding (rollback)
+#   proxmox_lxc_loadavg_targets  list of {name, vmid, node} - defaults to lxc_containers
+#   proxmox_lxc_loadavg_remove   bool - if true, remove the entry instead of adding (rollback)
 
 - name: Default lxc_loadavg target list to all configured LXCs
   ansible.builtin.set_fact:
-    proxmox_lxc_loadavg_targets: "{{ proxmox_lxc_loadavg_targets | default(lxc_containers) }}"
+    proxmox_lxc_loadavg_targets_declared: "{{ proxmox_lxc_loadavg_targets | default(lxc_containers) }}"
+
+- name: Find LXC configs present on this node
+  ansible.builtin.find:
+    paths: /etc/pve/lxc
+    patterns: '*.conf'
+  register: proxmox_lxc_loadavg_confs
+
+# Declared-but-not-yet-provisioned containers (IaC merged before
+# provision-lxc.yml was run, e.g. hermes) must not fail this play; the
+# downstream stop/start cascade also iterates these targets when lxcfs
+# restarts, so the list itself is filtered rather than per-task whens.
+# provision-lxc.yml writes the bind entry itself at creation time.
+- name: Limit loadavg targets to LXCs that exist on this node
+  ansible.builtin.set_fact:
+    proxmox_lxc_loadavg_targets: >-
+      {{ proxmox_lxc_loadavg_targets_declared
+         | selectattr('vmid', 'in', proxmox_lxc_loadavg_confs.files
+             | map(attribute='path') | map('basename')
+             | map('regex_replace', '[.]conf$', '') | map('int') | list)
+         | list }}
+
+- name: Note declared LXCs skipped because they are not provisioned yet
+  ansible.builtin.debug:
+    msg: >-
+      Skipping loadavg bind for unprovisioned LXCs:
+      {{ (proxmox_lxc_loadavg_targets_declared | map(attribute='name') | list)
+         | difference(proxmox_lxc_loadavg_targets | map(attribute='name') | list)
+         | join(', ') }}
+  when: (proxmox_lxc_loadavg_targets | length) < (proxmox_lxc_loadavg_targets_declared | length)
 
 - name: Verify lxcfs exposes per-cgroup loadavg on this Proxmox host
   ansible.builtin.stat:
