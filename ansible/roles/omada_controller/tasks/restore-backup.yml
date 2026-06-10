@@ -36,7 +36,7 @@
 
 - name: Stop Omada Controller before restore
   ansible.builtin.systemd:
-    name: omada
+    name: tpeap
     state: stopped
 
 - name: Create restore directory on target
@@ -68,5 +68,5 @@
 
 - name: Start Omada Controller after restore
   ansible.builtin.systemd:
-    name: omada
+    name: tpeap
     state: started

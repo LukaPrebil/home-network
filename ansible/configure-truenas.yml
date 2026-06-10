@@ -115,18 +115,31 @@
   vars_files:
     - secrets.yml
   tasks:
+    - name: Query NFS service enable/running state
+      # jq emits exactly two tokens (enable, state) even if the service is
+      # missing from the query, so the split()-based when conditions below
+      # never index into an empty list.
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call service.query | jq -r '[.[] | select(.service == "nfs")][0] | "\(.enable // false) \(.state // "UNKNOWN")"'
+        executable: /bin/bash
+      register: nfs_service_state
+      changed_when: false
+
     - name: Enable NFS service
       ansible.builtin.shell:
         cmd: 'midclt call service.update nfs ''{"enable": true}'''
       register: nfs_enabled
-      changed_when: nfs_enabled.stdout != "null"
+      when: nfs_service_state.stdout.split() | first != 'true'
+      changed_when: nfs_enabled.rc == 0
 
     - name: Start NFS service
       ansible.builtin.command:
         cmd: midclt call service.start nfs
       register: nfs_started
-      failed_when: false
-      changed_when: nfs_started.stdout == "true"
+      when: nfs_service_state.stdout.split() | last != 'RUNNING'
+      changed_when: nfs_started.rc == 0
 
     - name: Get existing NFS shares
       ansible.builtin.shell:
@@ -142,10 +155,13 @@
         cmd: |
           midclt call sharing.nfs.create '{
             "path": "{{ item.path }}",
-            "comment": "{{ item.name }}",
+            "comment": "{{ item.comment | default(item.name) }}",
             "networks": {{ item.allowed_networks | to_json }},
-            "maproot_user": "root",
-            "maproot_group": "root"
+            "ro": {{ item.ro | default(false) | to_json }},
+            "maproot_user": {{ item.maproot_user | default(none) | to_json }},
+            "maproot_group": {{ item.maproot_group | default(none) | to_json }},
+            "mapall_user": {{ item.mapall_user | default(none) | to_json }},
+            "mapall_group": {{ item.mapall_group | default(none) | to_json }}
           }'
       loop: "{{ nfs_shares }}"
       when: item.path not in existing_nfs_shares.stdout_lines
@@ -165,18 +181,31 @@
       ansible.builtin.meta: end_play
       when: iscsi_zvols is not defined or iscsi_zvols | length == 0
 
+    - name: Query iSCSI service enable/running state
+      # jq emits exactly two tokens (enable, state) even if the service is
+      # missing from the query, so the split()-based when conditions below
+      # never index into an empty list.
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call service.query | jq -r '[.[] | select(.service == "iscsitarget")][0] | "\(.enable // false) \(.state // "UNKNOWN")"'
+        executable: /bin/bash
+      register: iscsi_service_state
+      changed_when: false
+
     - name: Enable iSCSI service
       ansible.builtin.shell:
         cmd: 'midclt call service.update iscsitarget ''{"enable": true}'''
       register: iscsi_enabled
-      changed_when: iscsi_enabled.stdout != "null"
+      when: iscsi_service_state.stdout.split() | first != 'true'
+      changed_when: iscsi_enabled.rc == 0
 
     - name: Start iSCSI service
       ansible.builtin.command:
         cmd: midclt call service.start iscsitarget
       register: iscsi_started
-      failed_when: false
-      changed_when: iscsi_started.stdout == "true"
+      when: iscsi_service_state.stdout.split() | last != 'RUNNING'
+      changed_when: iscsi_started.rc == 0
 
     - name: Get existing datasets and zvols
       ansible.builtin.shell:
@@ -246,7 +275,19 @@
       register: existing_targets
       changed_when: false
 
-    - name: Create iSCSI initiator groups for new targets
+    - name: Get existing iSCSI initiator group comments
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.initiator.query | jq -r '.[].comment'
+        executable: /bin/bash
+      register: existing_initiator_groups
+      changed_when: false
+
+    - name: Create missing iSCSI initiator groups
+      # Gated on the group's own existence (not the target's): a run that
+      # created the group but died before target creation must not create
+      # a duplicate group on rerun.
       ansible.builtin.shell:
         cmd: |
           midclt call iscsi.initiator.create '{
@@ -254,14 +295,16 @@
             "comment": "{{ item.target_name }} initiators"
           }'
       loop: "{{ iscsi_zvols }}"
-      when: item.target_name not in existing_targets.stdout_lines
+      when: (item.target_name ~ ' initiators') not in existing_initiator_groups.stdout_lines
       changed_when: true
 
     - name: Get all initiator group IDs by comment
+      # first(.id) keeps the lookup deterministic (a single id) even if
+      # duplicate groups exist from runs predating the gating fix above.
       ansible.builtin.shell:
         cmd: |
           set -o pipefail
-          midclt call iscsi.initiator.query | jq -r '.[] | select(.comment == "{{ item.target_name }} initiators") | .id'
+          midclt call iscsi.initiator.query | jq -r '[.[] | select(.comment == "{{ item.target_name }} initiators") | .id] | first'
         executable: /bin/bash
       loop: "{{ iscsi_zvols }}"
       register: initiator_ids_by_name

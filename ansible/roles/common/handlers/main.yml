@@ -1,7 +1,9 @@
 ---
 # Handlers for common role
 
+# Canonical unit on Debian/Ubuntu is ssh; the sshd alias is not present on
+# all targets (Ubuntu 24.04 cloud images socket-activate ssh.service).
 - name: Restart SSH service
   ansible.builtin.systemd:
-    name: sshd
+    name: ssh
     state: restarted

@@ -40,9 +40,7 @@
     create_home: true
     state: present
   loop: "{{ admin_users | default([]) }}"
-  when:
-    - admin_users is defined
-    - "'proxmox_hosts' not in group_names"
+  when: admin_users is defined
 
 - name: Set up SSH directory for admin users
   ansible.builtin.file:
@@ -52,9 +50,7 @@
     group: "{{ item.name }}"
     mode: '0700'
   loop: "{{ admin_users | default([]) }}"
-  when:
-    - admin_users is defined
-    - "'proxmox_hosts' not in group_names"
+  when: admin_users is defined
 
 - name: Add SSH authorized keys for admin users
   ansible.posix.authorized_key:
@@ -62,6 +58,4 @@
     key: "{{ item.ssh_key }}"
     state: present
   loop: "{{ admin_users | default([]) }}"
-  when:
-    - admin_users is defined
-    - "'proxmox_hosts' not in group_names"
+  when: admin_users is defined

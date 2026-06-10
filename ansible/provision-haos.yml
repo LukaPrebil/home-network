@@ -309,7 +309,6 @@
           - "  2. Go to Settings > Devices & Services"
           - "  3. Verify all integrations are working:"
           - "     - ZHA (Zigbee Home Automation) - check USB device is connected"
-          - "     - MQTT - should be pointing to 192.168.1.110 (rpi4)"
           - "  4. Test controlling some Zigbee devices"
           - ""
           - "Step 5: Update mobile apps and clients"
@@ -340,4 +339,3 @@
           - "- You can enable SSH via the 'SSH & Web Terminal' add-on in HAOS"
           - "- For now, manage HAOS through the web UI and Proxmox console"
           - "=============================================="
-      when: ha_ready is succeeded

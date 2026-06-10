@@ -1,8 +1,11 @@
 ---
 # Handlers for Omada Controller role
 
+# Unit name is tpeap: the .deb ships only an LSB init script (/etc/init.d/tpeap)
+# that systemd's sysv generator turns into tpeap.service; omada.service is just
+# an alias on the live host and may not exist on a rebuilt one.
 - name: Restart Omada Controller
   ansible.builtin.systemd:
-    name: omada
+    name: tpeap
     state: restarted
   listen: "Restart Omada Controller"

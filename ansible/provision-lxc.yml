@@ -136,16 +136,6 @@
       become: true
       changed_when: true
 
-    - name: Add NFS mount capability to containers (if needed)
-      ansible.builtin.shell:
-        cmd: |
-          pct set {{ item.vmid }} -features nesting=1,keyctl=1,fuse=1,mknod=1
-      loop: "{{ containers_to_create }}"
-      when:
-        - containers_to_create | length > 0
-      become: true
-      changed_when: true
-
     - name: Add lxcfs loadavg bind-mount to newly created LXCs
       ansible.builtin.lineinfile:
         path: "/etc/pve/lxc/{{ item.vmid }}.conf"
@@ -260,7 +250,7 @@
   # the running container's cgroup cap. This play closes that drift
   # idempotently for every container declared in lxc_containers.
   #
-  # Cores/swap/disk are intentionally NOT reconciled here — each has
+  # Cores/swap/disk are intentionally NOT reconciled here - each has
   # its own gotchas (cores: hot-add fine, disk: never shrink, swap:
   # may require reboot). Memory is the most common drift target.
   #

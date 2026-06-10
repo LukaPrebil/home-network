@@ -8,6 +8,7 @@ set -euo pipefail
 
 LABEL="auto-$(date +%Y-%m-%d)"
 KEEP=4
+PRUNE_FAILED=0
 
 VMIDS=({% for vm in vms_to_create | selectattr('snapshot_weekly', 'defined') | selectattr('snapshot_weekly', 'equalto', true) | list %}{{ vm.vmid }} {% endfor %})
 
@@ -26,13 +27,23 @@ for vmid in "${VMIDS[@]}"; do
   fi
 
   # Prune: keep only the most recent $KEEP "auto-*" snapshots.
+  # qm listsnapshot prefixes each line with a tree glyph as field 1, so the
+  # snapshot name is not at a fixed position; match the auto-* token itself.
   mapfile -t old < <(qm listsnapshot "$vmid" 2>/dev/null \
-    | awk '/auto-[0-9]/ {print $1}' \
+    | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^auto-[0-9]/) { print $i; break } }' \
     | sort \
     | head -n -"$KEEP" || true)
   for snap in "${old[@]}"; do
     [[ -z "$snap" ]] && continue
     echo "[snapshot-vms] pruning $vmid:$snap"
-    qm delsnapshot "$vmid" "$snap" || echo "[snapshot-vms] WARN: prune failed for $vmid:$snap"
+    if ! qm delsnapshot "$vmid" "$snap"; then
+      echo "[snapshot-vms] ERROR: prune failed for $vmid:$snap"
+      PRUNE_FAILED=1
+    fi
   done
 done
+
+if [[ "$PRUNE_FAILED" -ne 0 ]]; then
+  echo "[snapshot-vms] $(date -Iseconds) finished with prune failures (see ERROR lines above)"
+  exit 1
+fi

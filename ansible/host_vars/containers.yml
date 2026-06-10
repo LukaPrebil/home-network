@@ -5,6 +5,11 @@
 # Role: Docker host for containerized services
 # IP: 192.168.1.140 (temporary, will migrate to 192.168.30.4)
 
+# iSCSI initiator identity for the pds / uptime_kuma zvol mounts. Declarative so
+# a VM rebuild keeps matching allowed_initiators in host_vars/tn-storage.yml
+# instead of regenerating a random IQN that silently fails the allowlist.
+iscsi_initiator_iqn: "iqn.2004-10.com.ubuntu:01:8297a10ca"
+
 # OTBR Configuration (containers VM hosts the USB dongle and OTBR)
 otbr_thread_usb_device: "/dev/serial/by-id/usb-ITEAD_SONOFF_Zigbee_3.0_USB_Dongle_Plus_V2_20221029081826-if00"
 otbr_backbone_interface: "eth0"

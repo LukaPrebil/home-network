@@ -58,7 +58,7 @@
 
 - name: Start Omada Controller after upgrade
   ansible.builtin.systemd:
-    name: omada
+    name: tpeap
     state: started
 
 - name: Wait for Omada Controller to be ready

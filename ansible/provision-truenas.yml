@@ -211,7 +211,7 @@
       changed_when: false
       check_mode: false
 
-    - name: Enforce balloon=0 (TrueNAS must not be ballooned — ZFS ARC stability)
+    - name: Enforce balloon=0 (TrueNAS must not be ballooned - ZFS ARC stability)
       ansible.builtin.command:
         cmd: qm set {{ truenas_vmid }} --balloon 0
       when: (truenas_balloon_read.stdout | default('') | trim) != '0'
@@ -282,6 +282,9 @@
       delegate_to: tn-storage
       changed_when: false
       failed_when: false  # VM may be down; downstream treats failure as drift
+      # failed_when does not cover connection-level UNREACHABLE; without
+      # this the play aborts when the VM is down instead of counting drift.
+      ignore_unreachable: true
       check_mode: false
 
     - name: Extract current Combined queue count (Current hardware settings section)
@@ -290,7 +293,7 @@
       # search the trailing slice so we match the actual current value.
       # regex_findall returns a list of capture-group matches; first()
       # picks the value (regex_search with capture-arg returns a list,
-      # which int-coerces to 0 — known foot-gun).
+      # which int-coerces to 0 - known foot-gun).
       ansible.builtin.set_fact:
         truenas_combined_current: >-
           {{ (truenas_ethtool_read.stdout | default(''))
@@ -300,9 +303,11 @@
              | first | default('0') }}
 
     - name: Detect runtime queue drift (catches half-applied state and VM-down)
+      # rc is absent when the probe came back UNREACHABLE; default(1) makes
+      # an unreachable guest count as drift instead of erroring here.
       ansible.builtin.set_fact:
         truenas_drift_runtime: >-
-          {{ truenas_ethtool_read.rc != 0
+          {{ truenas_ethtool_read.rc | default(1) != 0
              or (truenas_combined_current | int) < (truenas_net0_managed_fields.queues | int) }}
 
     - name: Read currently-staged kernel_extra_options
@@ -315,6 +320,7 @@
       delegate_to: tn-storage
       changed_when: false
       failed_when: false
+      ignore_unreachable: true
       check_mode: false
 
     - name: Read running guest /proc/cmdline
@@ -323,6 +329,7 @@
       register: truenas_proc_cmdline
       delegate_to: tn-storage
       failed_when: false
+      ignore_unreachable: true
 
     - name: Detect cmdline drift (options staged via midclt not yet active)
       ansible.builtin.set_fact:
@@ -463,7 +470,7 @@
       # Two-stage readiness: poll TCP/22 from n5p first (doesn't require
       # SSH credentials, survives the boot-time window where SSH isn't
       # listening yet), then probe midclt via delegate_to. Without this,
-      # delegate_to during boot returns "unreachable" — which `until`
+      # delegate_to during boot returns "unreachable" - which `until`
       # retries don't cover.
       listen: Restart TrueNAS VM
       ansible.builtin.wait_for:

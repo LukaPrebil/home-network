@@ -20,6 +20,54 @@
     state: directory
     mode: '0755'
 
+- name: Read configured iSCSI initiator IQN
+  ansible.builtin.command:
+    cmd: grep -E '^InitiatorName=' /etc/iscsi/initiatorname.iscsi
+  register: pds_iscsi_initiator_current
+  changed_when: false
+  failed_when: false
+
+- name: Check for active iSCSI sessions before touching initiator identity
+  ansible.builtin.command:
+    cmd: iscsiadm -m session
+  register: pds_iscsi_active_sessions
+  changed_when: false
+  failed_when: false
+
+- name: Refuse to change initiator IQN under active iSCSI sessions
+  ansible.builtin.fail:
+    msg: >-
+      /etc/iscsi/initiatorname.iscsi reads '{{ pds_iscsi_initiator_current.stdout | default('') }}'
+      but iscsi_initiator_iqn is '{{ iscsi_initiator_iqn }}' and this host has active iSCSI
+      sessions. Rewriting the initiator identity under live sessions would desync the
+      TrueNAS allowed_initiators allowlist mid-flight. Log out of all sessions first
+      (iscsiadm -m node --logoutall=all) or align iscsi_initiator_iqn with the live value.
+  when:
+    - pds_iscsi_initiator_current.stdout | default('') != 'InitiatorName=' ~ iscsi_initiator_iqn
+    - pds_iscsi_active_sessions.rc == 0
+
+- name: Ensure declarative iSCSI initiator IQN
+  # A rebuilt VM regenerates a random IQN and silently falls off the TrueNAS
+  # allowed_initiators allowlist; pin the identity from host_vars instead
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/initiatorname.iscsi
+    regexp: '^InitiatorName='
+    line: "InitiatorName={{ iscsi_initiator_iqn }}"
+    create: true
+    owner: root
+    group: root
+    mode: '0600'
+  register: pds_iscsi_initiator_config
+
+- name: Restart iscsid to load the declarative initiator IQN  # noqa: no-handler
+  # iscsid reads initiatorname.iscsi only at startup; the identity must be live
+  # before the discovery/login tasks below present it to TrueNAS, so an
+  # end-of-play handler would be too late
+  ansible.builtin.systemd:
+    name: iscsid
+    state: restarted
+  when: pds_iscsi_initiator_config is changed
+
 - name: Discover iSCSI targets on TrueNAS
   ansible.builtin.command:
     cmd: iscsiadm -m discovery -t sendtargets -p {{ pds_iscsi_target_ip }}
@@ -64,17 +112,19 @@
   register: pds_iscsi_device
   changed_when: false
 
-- name: Check if filesystem exists on iSCSI device
+- name: Probe filesystem type on iSCSI device
+  # blkid exits non-zero for both "no filesystem" and transient probe errors, so
+  # gating mkfs on its rc could reformat a momentarily unreadable LUN. lsblk
+  # separates the two: a failed probe aborts the play, empty FSTYPE means blank
   ansible.builtin.command:
-    cmd: blkid {{ pds_iscsi_device.stdout }}
-  register: pds_blkid_result
+    cmd: lsblk -no FSTYPE {{ pds_iscsi_device.stdout }}
+  register: pds_iscsi_fstype
   changed_when: false
-  failed_when: false
 
 - name: Format iSCSI device with ext4
   ansible.builtin.command:
     cmd: mkfs.ext4 -L pds-data {{ pds_iscsi_device.stdout }}
-  when: pds_blkid_result.rc != 0
+  when: pds_iscsi_fstype.stdout | trim | length == 0
   changed_when: true
 
 - name: Create mount point

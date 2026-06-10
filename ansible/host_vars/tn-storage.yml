@@ -69,81 +69,87 @@ zfs_datasets:
     compression: zstd  # Documents compress well
 
 # NFS Share Configuration
+# Fields mirror the TrueNAS Scale sharing.nfs API (ro, maproot_*, mapall_*).
+# Classic exports options (sync/async, no_subtree_check, ...) are NOT
+# representable per-share in that API - the middleware renders /etc/exports
+# itself - so they cannot be declared here. Values below were captured from
+# the live system via sharing.nfs.query on 2026-06-10; export behavior
+# changes are deferred to the VLAN migration.
 nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/proxmox-vms"
     name: proxmox-vms
     allowed_networks:
       - 192.168.1.0/24  # Current network
       - 192.168.30.0/24  # Future VLAN
-    options:
-      - rw
-      - sync
-      - no_subtree_check
-      - no_root_squash
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
   - path: "/mnt/{{ zfs_pool_name }}/proxmox-templates"
     name: proxmox-templates
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - sync
-      - no_subtree_check
-      - no_root_squash
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
   - path: "/mnt/{{ zfs_pool_name }}/docker-volumes"
     name: docker-volumes
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - sync
-      - no_subtree_check
-      - no_root_squash
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
   - path: "/mnt/{{ zfs_pool_name }}/media"
     name: media
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - async  # Better performance for media
-      - no_subtree_check
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
   - path: "/mnt/{{ zfs_pool_name }}/backups"
     name: backups
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - sync
-      - no_subtree_check
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
   - path: "/mnt/{{ zfs_pool_name }}/immich-photos"
     name: immich-photos
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - async  # Better performance for photo library
-      - no_subtree_check
-      - no_root_squash  # Immich container needs root access
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
   - path: "/mnt/{{ zfs_pool_name }}/paperless"
     name: paperless
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - sync
-      - no_subtree_check
-      - no_root_squash  # Paperless container needs root access
+    ro: false
+    maproot_user: root
+    maproot_group: root
+
+  # Backing dataset was created manually and is not in zfs_datasets; on a
+  # fresh rebuild create tank/external-data before running the NFS play.
+  - path: "/mnt/{{ zfs_pool_name }}/external-data"
+    name: external-data
+    comment: "Old photos and documents"
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    ro: false
+    mapall_user: root
+    mapall_group: root
 
   # Separate pool for Plex and arr stack application configs
   - path: "/mnt/plex-apps"
@@ -151,11 +157,9 @@ nfs_shares:
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - sync
-      - no_subtree_check
-      - no_root_squash  # Docker containers need root access
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
   # Separate pool for Plex media library (movies, TV shows, downloads)
   - path: "/mnt/plex-bulk"
@@ -163,11 +167,9 @@ nfs_shares:
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24
-    options:
-      - rw
-      - async  # Better performance for media streaming
-      - no_subtree_check
-      - no_root_squash  # Plex and arr containers need root access
+    ro: false
+    maproot_user: root
+    maproot_group: root
 
 # iSCSI Configuration
 # Used for services that require POSIX file locking (e.g., SQLite)
