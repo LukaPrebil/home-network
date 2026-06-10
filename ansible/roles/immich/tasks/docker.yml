@@ -21,7 +21,6 @@
     src: env.j2
     dest: "{{ immich_env_file }}"
     mode: '0600'
-  notify: restart immich
 
 - name: Deploy hardware acceleration config files
   ansible.builtin.copy:
@@ -37,4 +36,3 @@
     src: docker-compose.yml.j2
     dest: "{{ immich_compose_file }}"
     mode: '0644'
-  notify: restart immich

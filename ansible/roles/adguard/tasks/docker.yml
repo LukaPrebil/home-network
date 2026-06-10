@@ -1,30 +1,25 @@
 ---
 # AdGuard Home Docker deployment (for rpi4 and other Docker hosts)
 
+- name: Assert AdGuard admin credentials are present in vault
+  ansible.builtin.assert:
+    that:
+      - vault_adguard_username is defined
+      - vault_adguard_username | length > 0
+      - vault_adguard_password is defined
+      - vault_adguard_password | length > 0
+    fail_msg: >-
+      vault_adguard_username and vault_adguard_password must be defined and
+      non-empty in secrets.yml. Refusing to deploy: without them the AdGuard
+      config would render with no admin users (unauthenticated admin UI).
+    quiet: true
+
 - name: Assert AdGuard Docker path is an NFS mount
   ansible.builtin.include_role:
     name: common
     tasks_from: assert_nfs_mount
   vars:
     common_nfs_mount_path: "{{ adguard_docker_dir }}"
-
-- name: Install apache2-utils for htpasswd
-  ansible.builtin.apt:
-    name: apache2-utils
-    state: present
-    update_cache: true
-  when: vault_adguard_username is defined and vault_adguard_password is defined
-
-- name: Generate bcrypt hash for AdGuard password using htpasswd
-  ansible.builtin.shell:
-    cmd: |
-      set -o pipefail
-      htpasswd -nbB -C 10 '{{ vault_adguard_username }}' '{{ vault_adguard_password }}' | cut -d: -f2
-    executable: /bin/bash
-  register: adguard_password_hash
-  changed_when: false
-  no_log: true
-  when: vault_adguard_username is defined and vault_adguard_password is defined
 
 - name: Create AdGuard Docker directory
   ansible.builtin.file:
@@ -35,37 +30,113 @@
     - work
     - conf
 
+- name: Install apache2-utils for htpasswd
+  ansible.builtin.apt:
+    name: apache2-utils
+    state: present
+    update_cache: true
+
+- name: Check for a previously deployed AdGuard configuration
+  ansible.builtin.stat:
+    path: "{{ adguard_docker_dir }}/conf/AdGuardHome.yaml"
+  register: adguard_deployed_config_stat
+
+- name: Read deployed AdGuard configuration
+  ansible.builtin.slurp:
+    src: "{{ adguard_docker_dir }}/conf/AdGuardHome.yaml"
+  register: adguard_deployed_config
+  no_log: true
+  when: adguard_deployed_config_stat.stat.exists
+
+- name: Extract existing admin password hash from deployed configuration
+  ansible.builtin.set_fact:
+    adguard_existing_hash: >-
+      {{ ((adguard_deployed_config.content | b64decode | from_yaml).users | default([], true))
+         | selectattr('name', 'equalto', vault_adguard_username)
+         | map(attribute='password') | list | first | default('')
+         if adguard_deployed_config_stat.stat.exists else '' }}
+  no_log: true
+
+# htpasswd -v only reads hashes from a file; secrets travel via environment so
+# they never appear in the templated command string
+- name: Verify vault password against the deployed hash
+  ansible.builtin.shell:
+    cmd: |
+      tmpfile=$(mktemp)
+      trap 'rm -f "$tmpfile"' EXIT
+      printf '%s:%s\n' "$ADGUARD_USER" "$ADGUARD_HASH" > "$tmpfile"
+      htpasswd -vbB "$tmpfile" "$ADGUARD_USER" "$ADGUARD_PASS"
+    executable: /bin/bash
+  environment:
+    ADGUARD_USER: "{{ vault_adguard_username }}"
+    ADGUARD_HASH: "{{ adguard_existing_hash }}"
+    ADGUARD_PASS: "{{ vault_adguard_password }}"
+  register: adguard_hash_verify
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when: adguard_existing_hash | length > 0
+
+# bcrypt salts differ per run: regenerating unconditionally would change the
+# rendered config (and restart DNS) on every converge with zero real changes
+- name: Determine whether a new password hash is needed
+  ansible.builtin.set_fact:
+    adguard_hash_stale: "{{ adguard_existing_hash | length == 0 or (adguard_hash_verify.rc | default(1)) != 0 }}"
+  no_log: true
+
+- name: Generate bcrypt hash for AdGuard password using htpasswd
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      htpasswd -nbB -C 10 "$ADGUARD_USER" "$ADGUARD_PASS" | cut -d: -f2
+    executable: /bin/bash
+  environment:
+    ADGUARD_USER: "{{ vault_adguard_username }}"
+    ADGUARD_PASS: "{{ vault_adguard_password }}"
+  register: adguard_new_hash
+  changed_when: false
+  no_log: true
+  when: adguard_hash_stale
+
+- name: Select admin password hash for the rendered configuration
+  ansible.builtin.set_fact:
+    adguard_password_hash: "{{ adguard_new_hash.stdout if (adguard_hash_stale | bool) else adguard_existing_hash }}"
+  no_log: true
+
 - name: Create AdGuard docker-compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ adguard_docker_dir }}/docker-compose.yml"
     mode: '0644'
 
-- name: Check if AdGuard container is running
-  community.docker.docker_container_info:
-    name: "{{ adguard_docker_container_name }}"
-  register: adguard_container_info
-  ignore_errors: true
-
-- name: Stop AdGuard Home container if running (to update config)
-  community.docker.docker_compose_v2:
-    project_src: "{{ adguard_docker_dir }}"
-    state: stopped
-  when: adguard_container_info.exists | default(false)
-
+# AdGuardHome.yaml is bind-mounted, so compose cannot see its drift: a config
+# change must notify the restart itself. no_log: the rendered file (and its
+# diff) embeds the admin bcrypt hash
 - name: Create AdGuard configuration file
   ansible.builtin.template:
     src: AdGuardHome.yaml.j2
     dest: "{{ adguard_docker_dir }}/conf/AdGuardHome.yaml"
-    mode: '0644'
+    # 0600 matches what the AdGuard binary chmods the file to at runtime;
+    # 0644 here makes the template task report changed on every converge
+    mode: '0600'
+  no_log: true
+  notify: Restart AdGuard Home container
 
 - name: Start AdGuard Home container
   community.docker.docker_compose_v2:
     project_src: "{{ adguard_docker_dir }}"
     state: present
 
-- name: Wait for AdGuard Home to be ready
-  ansible.builtin.wait_for:
-    port: "{{ adguard_bind_port }}"
-    delay: 5
-    timeout: 60
+- name: Flush handlers so a config change restarts AdGuard before the readiness check
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for AdGuard Home web UI to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ adguard_bind_port }}/"
+    method: GET
+    status_code: [200, 302]
+  register: adguard_web_ready
+  until: adguard_web_ready.status in [200, 302]
+  retries: 30
+  delay: 5
+  changed_when: false

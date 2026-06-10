@@ -6,6 +6,9 @@
     name: "{{ pds_docker_network }}"
     state: present
 
+# No notify on the env/compose templates: pds.env is an env_file, so the
+# compose deploy task (state: present) recreates on changes to either;
+# `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy PDS environment file
   ansible.builtin.template:
     src: pds.env.j2
@@ -13,7 +16,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0600'
-  notify: Restart PDS
 
 - name: Deploy Docker Compose file
   ansible.builtin.template:
@@ -22,7 +24,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart PDS
 
 - name: Pull and start PDS service
   community.docker.docker_compose_v2:

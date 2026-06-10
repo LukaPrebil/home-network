@@ -1,6 +1,8 @@
 ---
 # Deploy and manage ddns-updater with Docker Compose
 
+# No notify: the compose deploy task (state: present) recreates on template
+# changes; `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -8,7 +10,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart ddns-updater
 
 - name: Pull ddns-updater Docker image
   community.docker.docker_compose_v2:
@@ -24,11 +25,15 @@
   when: ddns_updater_service_state != 'stopped'
 
 - name: Wait for ddns-updater to be ready
-  ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: "{{ ddns_updater_port }}"
-    timeout: 60
-    delay: 5
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ ddns_updater_port }}/health"
+    method: GET
+    status_code: 200
+  register: ddns_updater_health
+  until: ddns_updater_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
   when: ddns_updater_service_state == 'started'
 
 - name: Display ddns-updater deployment status

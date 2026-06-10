@@ -22,3 +22,16 @@
     name: "{{ hermes_service_name }}"
     state: "{{ hermes_service_state }}"
     enabled: "{{ hermes_service_enabled }}"
+
+# Dashboard binds 127.0.0.1 only; this runs on the target host, so it reaches it.
+- name: Wait for hermes dashboard to be ready
+  ansible.builtin.uri:
+    url: "http://{{ hermes_dashboard_bind }}:{{ hermes_dashboard_port }}/"
+    method: GET
+    status_code: 200
+  register: hermes_health
+  until: hermes_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: hermes_service_state != 'stopped'

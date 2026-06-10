@@ -6,3 +6,8 @@
     name: AdGuardHome
     state: restarted
     daemon_reload: true
+
+- name: Restart AdGuard Home container
+  community.docker.docker_compose_v2:
+    project_src: "{{ adguard_docker_dir }}"
+    state: restarted

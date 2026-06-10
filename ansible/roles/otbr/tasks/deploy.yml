@@ -16,6 +16,10 @@
   register: otbr_pull
 
 - name: Start OTBR service
+  # Never restart otbr in place (docker restart / compose restart): otbr-agent
+  # lands in a D-Bus EMERG crash loop where ot-ctl gets "Connection refused"
+  # while the container reports healthy. Recreate-on-drift via state: present
+  # (or an explicit force-recreate) is the only safe apply mechanism.
   community.docker.docker_compose_v2:
     project_src: "{{ otbr_compose_dir }}"
     state: present

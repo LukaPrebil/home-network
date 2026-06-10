@@ -10,6 +10,8 @@
     mode: '0644'
   notify: Restart Traefik
 
+# No notify: the compose deploy task (state: present) recreates on template
+# changes; `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -17,7 +19,6 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart Traefik
 
 - name: Deploy dynamic configuration (middlewares, routers, etc.)
   ansible.builtin.template:

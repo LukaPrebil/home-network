@@ -1,7 +1,0 @@
----
-# Arr Stack handlers
-
-- name: Restart Arr Stack
-  community.docker.docker_compose_v2:
-    project_src: "{{ arr_stack_compose_dir }}"
-    state: restarted

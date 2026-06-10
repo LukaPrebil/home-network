@@ -12,6 +12,51 @@
 - name: Deploy Immich Docker Compose stack
   community.docker.docker_compose_v2:
     project_src: "{{ immich_base_dir }}"
+    state: present
     pull: "missing"  # Don't pull locally-built images (immich-ml-rocm-custom)
-  register: immich_pull
-  notify: restart immich
+
+- name: Wait for Immich to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:2283/api/server/ping"
+    method: GET
+    status_code: 200
+  register: immich_ping
+  until: immich_ping.status == 200
+  retries: 30
+  delay: 10
+  changed_when: false
+
+- name: Verify deployed version
+  ansible.builtin.uri:
+    url: "http://localhost:2283/api/server/about"
+    method: GET
+    return_content: true
+  register: immich_about
+  failed_when: false
+  changed_when: false
+
+- name: Display Immich deployment status
+  ansible.builtin.debug:
+    msg:
+      - "✅ Immich is now running!"
+      - "Access: http://{{ ansible_host }}:2283"
+      - "Expected version: {{ immich_version }}"
+      - "Deployed version: {{ immich_about.json.version }}"
+      - "FFmpeg: {{ immich_about.json.ffmpeg }}"
+      - "Node.js: {{ immich_about.json.nodejs }}"
+  when: immich_about.status == 200
+
+- name: Check version mismatch
+  ansible.builtin.fail:
+    msg: "⚠️  Version mismatch! Expected {{ immich_version }} but deployed {{ immich_about.json.version }}"
+  when:
+    - immich_about.status == 200
+    - immich_about.json.version != immich_version
+
+- name: Display basic status if version check failed
+  ansible.builtin.debug:
+    msg:
+      - "⚠️  Immich is running but version check failed"
+      - "Access: http://{{ ansible_host }}:2283"
+      - "Expected version: {{ immich_version }}"
+  when: immich_about.status != 200

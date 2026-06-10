@@ -1,6 +1,0 @@
----
-- name: Restart ha-mcp
-  community.docker.docker_compose_v2:
-    project_src: "{{ ha_mcp_base_dir }}"
-    state: restarted
-  listen: "Restart ha-mcp"

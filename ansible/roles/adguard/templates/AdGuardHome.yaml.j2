@@ -8,13 +8,9 @@ http:
     enabled: false
   address: {{ adguard_bind_host }}:{{ adguard_bind_port }}
   session_ttl: {{ adguard_session_ttl }}
-{% if vault_adguard_username is defined and adguard_password_hash is defined %}
 users:
   - name: {{ vault_adguard_username }}
-    password: {{ adguard_password_hash.stdout }}
-{% else %}
-users: []
-{% endif %}
+    password: {{ adguard_password_hash }}
 
 auth_attempts: 5
 block_auth_min: 15

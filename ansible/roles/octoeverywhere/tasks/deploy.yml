@@ -8,7 +8,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart OctoEverywhere
 
 - name: Pull OctoEverywhere Docker image
   community.docker.docker_compose_v2:
@@ -23,11 +22,13 @@
   register: octoeverywhere_deploy
   when: octoeverywhere_service_state != 'stopped'
 
+# `exists` guards the State lookup - `container` is null until the engine has
+# created the container, which races the first retries on a fresh deploy
 - name: Wait for OctoEverywhere container to be running
   community.docker.docker_container_info:
     name: "{{ octoeverywhere_container_name }}"
   register: octoeverywhere_info
-  until: octoeverywhere_info.container.State.Status == "running"
+  until: octoeverywhere_info.exists and octoeverywhere_info.container.State.Status == "running"
   retries: 12
   delay: 5
   when: octoeverywhere_service_state == 'started'

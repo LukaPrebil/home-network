@@ -1,8 +1,0 @@
----
-# Handlers for Uptime Kuma role
-
-- name: Restart Uptime Kuma
-  community.docker.docker_compose_v2:
-    project_src: "{{ uptime_kuma_base_dir }}"
-    state: restarted
-  listen: "Restart Uptime Kuma"

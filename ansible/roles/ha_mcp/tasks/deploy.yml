@@ -1,4 +1,7 @@
 ---
+# No notify on the env/compose templates: ha-mcp.env is an env_file, so the
+# compose deploy task (state: present) recreates on changes to either;
+# `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy ha-mcp environment file
   ansible.builtin.template:
     src: ha-mcp.env.j2
@@ -6,7 +9,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0600'
-  notify: Restart ha-mcp
 
 - name: Deploy ha-mcp Docker Compose file
   ansible.builtin.template:
@@ -15,7 +17,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart ha-mcp
 
 - name: Pull ha-mcp Docker image
   community.docker.docker_compose_v2:
@@ -30,12 +31,18 @@
   register: ha_mcp_deploy
   when: ha_mcp_service_state != 'stopped'
 
+# MCP streamable-http rejects plain GET (needs POST + SSE Accept header), so
+# any HTTP status from the listed set proves the server is up and answering.
 - name: Wait for ha-mcp to be ready
-  ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: "{{ ha_mcp_port }}"
-    timeout: 60
-    delay: 5
+  ansible.builtin.uri:
+    url: "http://{{ ansible_host }}:{{ ha_mcp_port }}/mcp"
+    method: GET
+    status_code: [200, 400, 405, 406]
+  register: ha_mcp_health
+  until: ha_mcp_health.status in [200, 400, 405, 406]
+  retries: 30
+  delay: 5
+  changed_when: false
   when: ha_mcp_service_state == 'started'
 
 - name: Display ha-mcp deployment status

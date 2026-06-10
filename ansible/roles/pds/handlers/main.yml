@@ -1,7 +1,0 @@
----
-# Handlers for ATProto PDS role
-
-- name: Restart PDS
-  community.docker.docker_compose_v2:
-    project_src: "{{ pds_base_dir }}"
-    state: restarted

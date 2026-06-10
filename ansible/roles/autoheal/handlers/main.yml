@@ -1,7 +1,0 @@
----
-# Handlers for autoheal role
-
-- name: Restart autoheal
-  community.docker.docker_compose_v2:
-    project_src: "{{ autoheal_compose_dir }}"
-    state: restarted

@@ -13,7 +13,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart Uptime Kuma
 
 - name: Pull Uptime Kuma Docker image
   community.docker.docker_compose_v2:
@@ -28,12 +27,17 @@
   register: uptime_kuma_deploy
   when: uptime_kuma_service_state != 'stopped'
 
+# 302 covers the redirect to /dashboard when redirect-following is off
 - name: Wait for Uptime Kuma to be ready
-  ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: "{{ uptime_kuma_port }}"
-    timeout: 60
-    delay: 5
+  ansible.builtin.uri:
+    url: "http://localhost:{{ uptime_kuma_port }}/"
+    method: GET
+    status_code: [200, 302]
+  register: uptime_kuma_health
+  until: uptime_kuma_health.status in [200, 302]
+  retries: 30
+  delay: 5
+  changed_when: false
   when: uptime_kuma_service_state == 'started'
 
 - name: Display Uptime Kuma deployment status

@@ -26,7 +26,6 @@
     src: docker-compose.yml.j2
     dest: "{{ arr_stack_compose_file }}"
     mode: '0644'
-  notify: Restart Arr Stack
   tags:
     - arr-stack
     - deploy
@@ -36,6 +35,30 @@
     project_src: "{{ arr_stack_compose_dir }}"
     state: present
   register: arr_stack_deploy
+  tags:
+    - arr-stack
+    - deploy
+
+- name: Wait for Arr Stack services to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ item.port }}{{ item.path }}"
+    method: GET
+    status_code: "{{ item.status }}"
+  register: arr_stack_health
+  until: arr_stack_health.status == item.status
+  retries: 30
+  delay: 5
+  changed_when: false
+  loop:
+    - { name: prowlarr, port: "{{ arr_stack_prowlarr_port }}", path: /ping, status: 200 }
+    - { name: sonarr, port: "{{ arr_stack_sonarr_port }}", path: /ping, status: 200 }
+    - { name: radarr, port: "{{ arr_stack_radarr_port }}", path: /ping, status: 200 }
+    - { name: bazarr, port: "{{ arr_stack_bazarr_port }}", path: /, status: 200 }
+    - { name: qbittorrent, port: "{{ arr_stack_qbittorrent_port_web }}", path: /, status: 200 }
+    - { name: flaresolverr, port: "{{ arr_stack_flaresolverr_port }}", path: /, status: 200 }
+    - { name: seerr, port: "{{ arr_stack_seerr_port }}", path: /api/v1/status, status: 200 }
+  loop_control:
+    label: "{{ item.name }}"
   tags:
     - arr-stack
     - deploy

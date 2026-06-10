@@ -1,5 +1,0 @@
----
-# Handlers for Immich role
-
-- name: Restart immich
-  ansible.builtin.include_tasks: restart.yml

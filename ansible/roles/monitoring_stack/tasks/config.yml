@@ -70,12 +70,13 @@
     - config
     - grafana
 
+# No notify: the compose deploy task (state: present) recreates on template
+# changes; `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_stack_compose_file }}"
     mode: '0644'
-  notify: Restart Monitoring Stack
   tags:
     - monitoring-stack
     - config

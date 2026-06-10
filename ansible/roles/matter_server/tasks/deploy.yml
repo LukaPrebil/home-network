@@ -15,7 +15,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart matter-server
 
 - name: Pull Docker images
   community.docker.docker_compose_v2:

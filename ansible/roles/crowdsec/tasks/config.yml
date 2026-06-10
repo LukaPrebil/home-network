@@ -1,6 +1,8 @@
 ---
 # Deploy CrowdSec configuration files
 
+# No notify: the compose deploy task (state: present) recreates on template
+# changes; `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy CrowdSec Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -8,7 +10,6 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart CrowdSec
 
 - name: Deploy CrowdSec config overlay (Prometheus metrics)
   ansible.builtin.template:

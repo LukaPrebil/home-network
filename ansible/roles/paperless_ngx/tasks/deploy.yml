@@ -27,7 +27,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart Paperless-ngx
 
 - name: Deploy Paperless-ngx stack
   community.docker.docker_compose_v2:
@@ -36,12 +35,17 @@
     state: present
   register: paperless_ngx_deploy
 
+# 302 covers the redirect to the login page when redirect-following is off
 - name: Wait for Paperless-ngx to be ready
-  ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: "{{ paperless_ngx_port }}"
-    timeout: 120
-    delay: 10
+  ansible.builtin.uri:
+    url: "http://localhost:{{ paperless_ngx_port }}/"
+    method: GET
+    status_code: [200, 302]
+  register: paperless_ngx_health
+  until: paperless_ngx_health.status in [200, 302]
+  retries: 30
+  delay: 5
+  changed_when: false
 
 - name: Display Paperless-ngx deployment status
   ansible.builtin.debug:

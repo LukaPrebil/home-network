@@ -1,8 +1,0 @@
----
-# Handlers for ddns-updater role
-
-- name: Restart ddns-updater
-  community.docker.docker_compose_v2:
-    project_src: "{{ ddns_updater_base_dir }}"
-    state: restarted
-  listen: "Restart ddns-updater"

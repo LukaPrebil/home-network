@@ -8,7 +8,6 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  notify: Restart Jellyfin
 
 - name: Pull Jellyfin Docker image
   community.docker.docker_compose_v2:
@@ -23,11 +22,15 @@
   register: jellyfin_deploy
 
 - name: Wait for Jellyfin to be ready
-  ansible.builtin.wait_for:
-    host: "{{ ansible_host }}"
-    port: "{{ jellyfin_port }}"
-    timeout: 60
-    delay: 5
+  ansible.builtin.uri:
+    url: "http://localhost:{{ jellyfin_port }}/health"
+    method: GET
+    status_code: 200
+  register: jellyfin_health
+  until: jellyfin_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
 
 - name: Display Jellyfin deployment status
   ansible.builtin.debug:

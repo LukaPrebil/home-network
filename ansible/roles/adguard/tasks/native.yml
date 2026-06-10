@@ -1,6 +1,19 @@
 ---
 # AdGuard Home native installation (for LXC/bare metal)
 
+- name: Assert AdGuard admin credentials are present in vault
+  ansible.builtin.assert:
+    that:
+      - vault_adguard_username is defined
+      - vault_adguard_username | length > 0
+      - vault_adguard_password is defined
+      - vault_adguard_password | length > 0
+    fail_msg: >-
+      vault_adguard_username and vault_adguard_password must be defined and
+      non-empty in secrets.yml. Refusing to deploy: without them the AdGuard
+      config would render with no admin users (unauthenticated admin UI).
+    quiet: true
+
 - name: Install prerequisites
   ansible.builtin.apt:
     name:
@@ -104,24 +117,83 @@
     name: apache2-utils
     state: present
     update_cache: true
-  when: vault_adguard_username is defined and vault_adguard_password is defined
+
+- name: Check for a previously deployed AdGuard configuration
+  ansible.builtin.stat:
+    path: "{{ adguard_work_dir }}/AdGuardHome.yaml"
+  register: adguard_deployed_config_stat
+
+- name: Read deployed AdGuard configuration
+  ansible.builtin.slurp:
+    src: "{{ adguard_work_dir }}/AdGuardHome.yaml"
+  register: adguard_deployed_config
+  no_log: true
+  when: adguard_deployed_config_stat.stat.exists
+
+- name: Extract existing admin password hash from deployed configuration
+  ansible.builtin.set_fact:
+    adguard_existing_hash: >-
+      {{ ((adguard_deployed_config.content | b64decode | from_yaml).users | default([], true))
+         | selectattr('name', 'equalto', vault_adguard_username)
+         | map(attribute='password') | list | first | default('')
+         if adguard_deployed_config_stat.stat.exists else '' }}
+  no_log: true
+
+# htpasswd -v only reads hashes from a file; secrets travel via environment so
+# they never appear in the templated command string
+- name: Verify vault password against the deployed hash
+  ansible.builtin.shell:
+    cmd: |
+      tmpfile=$(mktemp)
+      trap 'rm -f "$tmpfile"' EXIT
+      printf '%s:%s\n' "$ADGUARD_USER" "$ADGUARD_HASH" > "$tmpfile"
+      htpasswd -vbB "$tmpfile" "$ADGUARD_USER" "$ADGUARD_PASS"
+    executable: /bin/bash
+  environment:
+    ADGUARD_USER: "{{ vault_adguard_username }}"
+    ADGUARD_HASH: "{{ adguard_existing_hash }}"
+    ADGUARD_PASS: "{{ vault_adguard_password }}"
+  register: adguard_hash_verify
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when: adguard_existing_hash | length > 0
+
+# bcrypt salts differ per run: regenerating unconditionally would change the
+# rendered config (and restart DNS) on every converge with zero real changes
+- name: Determine whether a new password hash is needed
+  ansible.builtin.set_fact:
+    adguard_hash_stale: "{{ adguard_existing_hash | length == 0 or (adguard_hash_verify.rc | default(1)) != 0 }}"
+  no_log: true
 
 - name: Generate bcrypt hash for AdGuard password using htpasswd
   ansible.builtin.shell:
     cmd: |
       set -o pipefail
-      htpasswd -nbB -C 10 '{{ vault_adguard_username }}' '{{ vault_adguard_password }}' | cut -d: -f2
+      htpasswd -nbB -C 10 "$ADGUARD_USER" "$ADGUARD_PASS" | cut -d: -f2
     executable: /bin/bash
-  register: adguard_password_hash
+  environment:
+    ADGUARD_USER: "{{ vault_adguard_username }}"
+    ADGUARD_PASS: "{{ vault_adguard_password }}"
+  register: adguard_new_hash
   changed_when: false
   no_log: true
-  when: vault_adguard_username is defined and vault_adguard_password is defined
+  when: adguard_hash_stale
 
+- name: Select admin password hash for the rendered configuration
+  ansible.builtin.set_fact:
+    adguard_password_hash: "{{ adguard_new_hash.stdout if (adguard_hash_stale | bool) else adguard_existing_hash }}"
+  no_log: true
+
+# no_log: the rendered file (and its diff) embeds the admin bcrypt hash
 - name: Create AdGuard Home configuration
   ansible.builtin.template:
     src: AdGuardHome.yaml.j2
     dest: "{{ adguard_work_dir }}/AdGuardHome.yaml"
-    mode: '0644'
+    # 0600 matches what the AdGuard binary chmods the file to at runtime;
+    # 0644 here makes the template task report changed on every converge
+    mode: '0600'
+  no_log: true
   notify: Restart AdGuard Home
 
 - name: Install AdGuard Home systemd service
@@ -135,3 +207,17 @@
     enabled: "{{ adguard_service_enabled }}"
     state: "{{ adguard_service_state }}"
     daemon_reload: true
+
+- name: Flush handlers so a config change restarts AdGuard before the readiness check
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for AdGuard Home web UI to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ adguard_bind_port }}/"
+    method: GET
+    status_code: [200, 302]
+  register: adguard_web_ready
+  until: adguard_web_ready.status in [200, 302]
+  retries: 30
+  delay: 5
+  changed_when: false

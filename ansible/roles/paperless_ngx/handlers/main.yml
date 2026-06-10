@@ -1,8 +1,0 @@
----
-# Handlers for Paperless-ngx role
-
-- name: Restart Paperless-ngx
-  community.docker.docker_compose_v2:
-    project_src: "{{ paperless_ngx_base_dir }}"
-    state: restarted
-  listen: "Restart Paperless-ngx"
