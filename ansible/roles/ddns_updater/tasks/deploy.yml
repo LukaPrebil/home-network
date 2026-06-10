@@ -24,9 +24,12 @@
   register: ddns_updater_deploy
   when: ddns_updater_service_state != 'stopped'
 
+# ddns-updater publishes only its web UI on this port; /health 404s here (its
+# health server is a separate internal port the compose file does not expose).
+# The UI root returning 200 is the readiness signal.
 - name: Wait for ddns-updater to be ready
   ansible.builtin.uri:
-    url: "http://{{ ansible_host }}:{{ ddns_updater_port }}/health"
+    url: "http://{{ ansible_host }}:{{ ddns_updater_port }}/"
     method: GET
     status_code: 200
   register: ddns_updater_health
@@ -42,5 +45,4 @@
       - "ddns-updater deployment complete!"
       - "State: {{ ddns_updater_service_state }}"
       - "Access ddns-updater at: http://{{ ansible_host }}:{{ ddns_updater_port }}"
-      - "Health endpoint: http://{{ ansible_host }}:{{ ddns_updater_port }}/health"
   when: ddns_updater_service_state == 'started'
