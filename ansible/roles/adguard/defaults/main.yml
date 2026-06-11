@@ -7,6 +7,19 @@ adguard_install_dir: "/opt/adguardhome"
 adguard_work_dir: "/var/lib/adguardhome"
 adguard_config_dir: "/etc/adguardhome"
 
+# Maps Ansible's reported CPU architecture to the AdGuard release asset suffix.
+# The native install runs on both amd64 (adguard LXC) and arm64 (rpi4 secondary);
+# an unmapped arch fails loudly in native.yml rather than fetching the wrong binary.
+adguard_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: armv7
+  armv6l: armv6
+
+# One-time teardown of a pre-existing AdGuard Docker deployment before the native
+# service binds port 53. Set true only on a host migrating Docker -> native (rpi4).
+adguard_migrate_from_docker: false
+
 # Network configuration
 adguard_bind_host: "0.0.0.0"
 adguard_bind_port: 3000  # Web UI port

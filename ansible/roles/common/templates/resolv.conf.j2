@@ -1,9 +1,16 @@
 # DNS configuration managed by Ansible
 # DO NOT EDIT MANUALLY - Changes will be overwritten
-# Generated on {{ ansible_date_time.iso8601 }}
+#
+# glibc reads at most the first 3 nameservers (MAXNS), so only the first three
+# dns_servers entries are rendered - the rest are documented in group_vars but
+# never consulted here. No generated-on timestamp: it changed every converge and
+# made this template report 'changed' with no real drift.
+# timeout:2 attempts:1 caps the degrade-to-fallback delay at ~2s per server.
 
-{% for nameserver in dns_servers %}
+{% for nameserver in dns_servers[:3] %}
 nameserver {{ nameserver }}
 {% endfor %}
+
+options timeout:2 attempts:1
 
 search {{ domain }}

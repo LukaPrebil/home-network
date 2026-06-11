@@ -1,12 +1,21 @@
 ---
 # DNS configuration tasks
-# Configures system DNS resolvers to use AdGuard Home
+# Configures system DNS resolvers to use AdGuard Home.
+#
+# proxmox_hosts and adguard_hosts are excluded: each owns its own resolv.conf via
+# its role (the proxmox role for n5p, the adguard role's static resolver for the
+# DNS servers themselves). Letting common write here too created a last-writer
+# race that pointed those hosts at the wrong resolver - including a DNS server at
+# itself.
 
 - name: Check if resolv.conf is a symlink
   ansible.builtin.stat:
     path: /etc/resolv.conf
   register: common_resolv_conf_stat
-  when: ansible_os_family == "Debian"
+  when:
+    - ansible_os_family == "Debian"
+    - "'proxmox_hosts' not in group_names"
+    - "'adguard_hosts' not in group_names"
 
 - name: Remove resolv.conf symlink if present
   ansible.builtin.file:
@@ -14,6 +23,8 @@
     state: absent
   when:
     - ansible_os_family == "Debian"
+    - "'proxmox_hosts' not in group_names"
+    - "'adguard_hosts' not in group_names"
     - common_resolv_conf_stat.stat.islnk is defined
     - common_resolv_conf_stat.stat.islnk
 
@@ -22,4 +33,7 @@
     src: resolv.conf.j2
     dest: /etc/resolv.conf
     mode: '0644'
-  when: ansible_os_family == "Debian"
+  when:
+    - ansible_os_family == "Debian"
+    - "'proxmox_hosts' not in group_names"
+    - "'adguard_hosts' not in group_names"

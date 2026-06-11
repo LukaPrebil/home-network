@@ -14,6 +14,20 @@
       config would render with no admin users (unauthenticated admin UI).
     quiet: true
 
+- name: Resolve AdGuard release architecture from the host CPU
+  ansible.builtin.set_fact:
+    adguard_arch: "{{ adguard_arch_map[ansible_architecture] | default('') }}"
+
+- name: Fail fast on an unmapped CPU architecture
+  ansible.builtin.assert:
+    that:
+      - adguard_arch | length > 0
+    fail_msg: >-
+      ansible_architecture '{{ ansible_architecture }}' has no entry in
+      adguard_arch_map. Add it before deploying, or the wrong binary would be
+      downloaded.
+    quiet: true
+
 - name: Install prerequisites
   ansible.builtin.apt:
     name:
@@ -82,7 +96,7 @@
 
 - name: Download AdGuard Home
   ansible.builtin.get_url:
-    url: "https://github.com/AdguardTeam/AdGuardHome/releases/download/{{ adguard_version }}/AdGuardHome_linux_amd64.tar.gz"
+    url: "https://github.com/AdguardTeam/AdGuardHome/releases/download/{{ adguard_version }}/AdGuardHome_linux_{{ adguard_arch }}.tar.gz"
     dest: "/tmp/adguardhome.tar.gz"
     mode: '0644'
   when: adguard_needs_install
@@ -200,6 +214,25 @@
   ansible.builtin.command:
     cmd: "{{ adguard_install_dir }}/AdGuardHome -s install -w {{ adguard_work_dir }} -c {{ adguard_work_dir }}/AdGuardHome.yaml"
     creates: /etc/systemd/system/AdGuardHome.service
+
+# Docker->native migration (rpi4): the old container still answers DNS on :53.
+# Tear ONLY it down here - immediately before the native service starts - so the
+# secondary-DNS blip is as short as possible. docker.service, matter-server and
+# the NFS-gate drop-in are left untouched. Idempotent: a no-op once the project
+# is gone, and skipped entirely on hosts that were always native.
+- name: Stat the pre-existing AdGuard Docker compose project
+  ansible.builtin.stat:
+    path: "{{ adguard_docker_dir }}/docker-compose.yml"
+  register: adguard_docker_compose_stat
+  when: adguard_migrate_from_docker | bool
+
+- name: Tear down the old AdGuard Docker container before binding port 53
+  community.docker.docker_compose_v2:
+    project_src: "{{ adguard_docker_dir }}"
+    state: absent
+  when:
+    - adguard_migrate_from_docker | bool
+    - adguard_docker_compose_stat.stat.exists | default(false)
 
 - name: Ensure AdGuard Home service is enabled and started
   ansible.builtin.systemd:

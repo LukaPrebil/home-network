@@ -6,6 +6,13 @@ http:
   pprof:
     port: 6060
     enabled: false
+  doh:
+    routes:
+      - GET /dns-query
+      - POST /dns-query
+      - GET /dns-query/{ClientID}
+      - POST /dns-query/{ClientID}
+    insecure_enabled: false
   address: {{ adguard_bind_host }}:{{ adguard_bind_port }}
   session_ttl: {{ adguard_session_ttl }}
 users:
@@ -94,7 +101,6 @@ tls:
   port_dns_over_quic: 853
   port_dnscrypt: 0
   dnscrypt_config_file: ""
-  allow_unencrypted_doh: false
   certificate_chain: ""
   private_key: ""
   certificate_path: ""
@@ -107,6 +113,7 @@ querylog:
   interval: {{ adguard_querylog_interval }}
   size_memory: 1000
   enabled: {{ adguard_querylog_enabled | lower }}
+  ignored_enabled: false
   file_enabled: true
 
 statistics:
@@ -114,6 +121,7 @@ statistics:
   ignored: []
   interval: {{ adguard_statistics_interval }}
   enabled: true
+  ignored_enabled: false
 
 filters:
 {% for filter in adguard_filters %}
@@ -211,4 +219,4 @@ os:
   user: ""
   rlimit_nofile: 0
 
-schema_version: 32
+schema_version: 34

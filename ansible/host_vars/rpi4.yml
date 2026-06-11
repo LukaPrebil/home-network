@@ -5,10 +5,18 @@
 # Role: Secondary DNS server and IoT services
 # IP: 192.168.1.110
 
-# AdGuard Home configuration for rpi4 (Secondary DNS)
-adguard_deployment_method: "docker"  # Use Docker instead of native binary
-adguard_data_dir: "/srv/docker/adguard/data"
-adguard_config_dir: "/srv/docker/adguard/config"
+# AdGuard Home configuration for rpi4 (Secondary DNS).
+# Native binary with state on the local SD card (defaults: /opt/adguardhome +
+# /var/lib/adguardhome), which removes Docker and the NFS mount from the
+# secondary-DNS failure chain - rpi4 boots slower than TrueNAS, so an NFS-backed
+# secondary could come up with empty state during the boot race. arm64 binary is
+# selected automatically via adguard_arch_map.
+adguard_deployment_method: "native"
+adguard_migrate_from_docker: true  # one-time teardown of the old adguard container
+
+# Shorter retention than the 90d/30d defaults to limit SD-card write wear.
+adguard_querylog_interval: "168h"    # 7 days
+adguard_statistics_interval: "168h"  # 7 days
 
 # Matter Server Configuration (rpi4 hosts Matter Server)
 matter_server_port: 5580

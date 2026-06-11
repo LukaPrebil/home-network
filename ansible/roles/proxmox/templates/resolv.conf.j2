@@ -1,9 +1,18 @@
-# Managed by Ansible - DNS configuration
-# Using public DNS until internal AdGuard Home is deployed
+# DNS configuration managed by Ansible - DO NOT EDIT MANUALLY
+#
+# n5p is the Proxmox host. It must resolve DNS even when the primary AdGuard LXC
+# is down, and that LXC runs ON this host - so n5p cannot depend on it for boot
+# DNS. Point first at the secondary AdGuard on the independent rpi4, then fall
+# back to public resolvers. The proxmox role is the sole owner of this file
+# (n5p is excluded from the common role's DNS tasks) to avoid a last-writer race
+# that previously pointed n5p at itself.
+#
+# timeout:2 attempts:1 caps the degrade-to-public delay at ~2s when rpi4 is down.
 
-nameserver 193.110.81.0
-nameserver 185.253.5.0
-nameserver 8.8.8.8
-nameserver 1.1.1.1
+nameserver 192.168.1.110   # AdGuard secondary (rpi4, independent host)
+nameserver 1.1.1.1         # Cloudflare (fallback)
+nameserver 1.0.0.1         # Cloudflare (fallback)
+
+options timeout:2 attempts:1
 
 search {{ domain }}
