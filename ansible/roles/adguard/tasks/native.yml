@@ -49,10 +49,19 @@
     masked: true
   when: "'systemd-resolved.service' in ansible_facts.services"
 
-- name: Remove the existing resolv.conf before writing the static one
+- name: Check whether resolv.conf is a symlink
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+  register: adguard_resolv_conf_stat
+
+# Remove only a symlink (e.g. systemd-resolved's stub link) so the copy below
+# writes a real file. A regular file is left in place so the copy is idempotent
+# instead of delete-and-recreate bouncing 'changed' on every converge.
+- name: Remove the resolv.conf symlink if present
   ansible.builtin.file:
     path: /etc/resolv.conf
     state: absent
+  when: adguard_resolv_conf_stat.stat.islnk | default(false)
 
 - name: Create static resolv.conf for AdGuard
   ansible.builtin.copy:
