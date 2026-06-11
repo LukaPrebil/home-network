@@ -24,6 +24,16 @@ truenas_plex_bulk_share: "/mnt/plex-bulk"  # Separate pool
 # - x-systemd.idle-timeout=0: never auto-unmount on idle
 nfs_common_opts: "defaults,nofail,_netdev,x-systemd.automount,x-systemd.mount-timeout=60s,x-systemd.idle-timeout=0"
 
+# Docker socket proxy contract (served by the docker_socket_proxy role on each
+# docker host; consumed by autoheal + uptime_kuma). The proxy is the only
+# container that mounts the raw /var/run/docker.sock; consumers reach the scoped
+# Docker API over tcp on this internal-only network. Kept here so the role and
+# its consumers share one source of truth for the name/port/endpoint.
+docker_socket_proxy_network: "socket-proxy"
+docker_socket_proxy_container_name: "docker-socket-proxy"
+docker_socket_proxy_port: 2375
+docker_socket_proxy_endpoint: "tcp://{{ docker_socket_proxy_container_name }}:{{ docker_socket_proxy_port }}"
+
 # Timezone
 timezone: Europe/Ljubljana
 

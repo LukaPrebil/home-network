@@ -8,12 +8,14 @@ services:
     restart: unless-stopped
     volumes:
       - {{ uptime_kuma_data_dir }}:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # For Docker monitoring
     ports:
       - "{{ uptime_kuma_port }}:3001"
     networks:
       - {{ uptime_kuma_docker_network }}
+      - {{ docker_socket_proxy_network }}
 
 networks:
   {{ uptime_kuma_docker_network }}:
+    external: true
+  {{ docker_socket_proxy_network }}:
     external: true

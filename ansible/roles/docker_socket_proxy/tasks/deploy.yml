@@ -1,0 +1,36 @@
+---
+# Deploy the docker-socket-proxy container
+
+# The consumers (autoheal, Uptime Kuma) join this network as external, so it must
+# exist before any of them deploy. This role runs before them in each play.
+- name: Create the docker-socket-proxy network
+  community.docker.docker_network:
+    name: "{{ docker_socket_proxy_network }}"
+    driver: bridge
+    state: present
+
+# No notify: state: present recreates on compose drift; the proxy has no
+# mounted config to hot-reload.
+- name: Deploy docker-socket-proxy docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ docker_socket_proxy_compose_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Start docker-socket-proxy service
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_socket_proxy_compose_dir }}"
+    state: present
+
+# Port 2375 is internal to the proxy network by design (never published to the
+# host), so the running container state is the readiness signal. The default('')
+# keeps the until null-safe while compose recreates.
+- name: Wait for docker-socket-proxy container to be running
+  community.docker.docker_container_info:
+    name: "{{ docker_socket_proxy_container_name }}"
+  register: docker_socket_proxy_info
+  until: docker_socket_proxy_info.exists and (docker_socket_proxy_info.container.State.Status | default('')) == 'running'
+  retries: 30
+  delay: 5

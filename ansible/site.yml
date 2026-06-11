@@ -83,13 +83,14 @@
   roles:
     - alloy
 
-- name: Deploy Autoheal container health monitor
-  hosts: docker_hosts
+- name: Deploy docker-socket-proxy and Autoheal container health monitor
+  hosts: docker_runtime_hosts
   become: true
   tags:
     - autoheal
   roles:
     - docker
+    - docker_socket_proxy
     - autoheal
 
 - name: Deploy monitoring stack
@@ -250,6 +251,9 @@
     - secrets.yml
   roles:
     - docker
+    # Ensures the socket-proxy + network exist when this play runs standalone
+    # (--tags containers-services) so uptime_kuma can join the external network.
+    - docker_socket_proxy
     - uptime_kuma
     - ddns_updater
     - octoeverywhere

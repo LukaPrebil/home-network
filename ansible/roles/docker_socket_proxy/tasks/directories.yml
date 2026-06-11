@@ -1,0 +1,10 @@
+---
+# Directory setup for the docker-socket-proxy compose project
+
+- name: Create docker-socket-proxy compose directory
+  ansible.builtin.file:
+    path: "{{ docker_socket_proxy_compose_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

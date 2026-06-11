@@ -1,0 +1,28 @@
+---
+# Docker Compose for the Docker Socket Proxy (tecnativa/docker-socket-proxy)
+# Managed by Ansible - DO NOT EDIT MANUALLY
+#
+# The only container that mounts the raw Docker socket. Consumers reach the
+# scoped Docker API at {{ docker_socket_proxy_endpoint }} on the
+# {{ docker_socket_proxy_network }} network. The socket is mounted read-only; the
+# proxy enforces the allowed endpoints (HAProxy) regardless.
+
+services:
+  docker-socket-proxy:
+    image: {{ docker_socket_proxy_image_ref }}
+    container_name: {{ docker_socket_proxy_container_name }}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      TZ: {{ docker_socket_proxy_timezone }}
+      CONTAINERS: "{{ docker_socket_proxy_containers }}"
+      ALLOW_RESTARTS: "{{ docker_socket_proxy_allow_restarts }}"
+    networks:
+      - {{ docker_socket_proxy_network }}
+
+networks:
+  {{ docker_socket_proxy_network }}:
+    external: true

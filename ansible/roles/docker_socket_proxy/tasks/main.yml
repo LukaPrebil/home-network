@@ -1,0 +1,15 @@
+---
+# Docker Socket Proxy role - deploys tecnativa/docker-socket-proxy in front of
+# the raw Docker socket on each docker host.
+
+- name: Include directory setup tasks
+  ansible.builtin.include_tasks: directories.yml
+  tags:
+    - docker-socket-proxy
+    - directories
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - docker-socket-proxy
+    - deploy
