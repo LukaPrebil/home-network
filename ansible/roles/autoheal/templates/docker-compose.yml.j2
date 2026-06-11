@@ -7,7 +7,7 @@
 
 services:
   autoheal:
-    image: {{ autoheal_image }}:{{ autoheal_version }}
+    image: {{ autoheal_image_ref }}
     container_name: {{ autoheal_container_name }}
     restart: unless-stopped
     volumes:

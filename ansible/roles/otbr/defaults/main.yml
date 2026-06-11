@@ -1,9 +1,14 @@
 ---
 # OpenThread Border Router (OTBR) Role - Default Configuration
 
-# Docker images
+# Docker images. Pinned to a digest: otbr_version is the tag the digest was
+# captured from (kept for readability in `docker ps`), otbr_image_digest is the
+# immutable pin actually pulled. Upgrade = re-capture the running digest and bump
+# both deliberately. Dropping the digest falls back to the tag.
 otbr_image: "openthread/otbr"
 otbr_version: "latest"
+otbr_image_digest: "sha256:e91620a133100c7852251b509853d1224d549ad5129c0c325e75aae25c6cf922"
+otbr_image_ref: "{{ otbr_image }}:{{ otbr_version }}{{ ('@' + otbr_image_digest) if otbr_image_digest else '' }}"
 
 # Container names
 otbr_container_name: "otbr"

@@ -7,7 +7,7 @@
 
 services:
   otbr:
-    image: {{ otbr_image }}:{{ otbr_version }}
+    image: {{ otbr_image_ref }}
     container_name: {{ otbr_container_name }}
     restart: unless-stopped
     # OTBR requires privileged mode for:

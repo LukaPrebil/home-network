@@ -9,12 +9,10 @@
     group: "{{ ansible_user }}"
     mode: '0644'
 
-- name: Pull Docker images
-  community.docker.docker_compose_v2:
-    project_src: "{{ otbr_compose_dir }}"
-    pull: always
-  register: otbr_pull
-
+# No pull: always - the image is pinned to a digest (otbr_image_digest), so
+# `state: present` below pulls that exact digest only if it is missing locally.
+# Upgrades are deliberate digest bumps, never an implicit :latest re-pull onto
+# the Thread border router.
 - name: Start OTBR service
   # Never restart otbr in place (docker restart / compose restart): otbr-agent
   # lands in a D-Bus EMERG crash loop where ot-ctl gets "Connection refused"

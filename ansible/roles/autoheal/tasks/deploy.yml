@@ -11,12 +11,8 @@
     group: "{{ ansible_user }}"
     mode: '0644'
 
-- name: Pull autoheal Docker image
-  community.docker.docker_compose_v2:
-    project_src: "{{ autoheal_compose_dir }}"
-    pull: always
-  register: autoheal_pull
-
+# No pull: always - the image is pinned to a digest (autoheal_image_digest), so
+# `state: present` below pulls that exact digest only if it is missing locally.
 - name: Start autoheal service
   community.docker.docker_compose_v2:
     project_src: "{{ autoheal_compose_dir }}"

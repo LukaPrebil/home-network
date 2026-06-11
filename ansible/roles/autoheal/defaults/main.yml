@@ -2,9 +2,13 @@
 # Autoheal Role - Default Configuration
 # Monitors Docker containers with healthchecks and restarts unhealthy ones
 
-# Docker image
+# Docker image. Pinned to a digest: autoheal_version is the tag the digest was
+# captured from (kept for readability), autoheal_image_digest is the immutable
+# pin actually pulled. Upgrade = re-capture the running digest and bump both.
 autoheal_image: "willfarrell/autoheal"
 autoheal_version: "latest"
+autoheal_image_digest: "sha256:9e55551fa5b4d082f40effefcdb27d9f400a4e43f11e3acf05a068a32457ca5c"
+autoheal_image_ref: "{{ autoheal_image }}:{{ autoheal_version }}{{ ('@' + autoheal_image_digest) if autoheal_image_digest else '' }}"
 
 # Container name
 autoheal_container_name: "autoheal"
