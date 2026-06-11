@@ -36,17 +36,20 @@
     state: present
     update_cache: true
 
-- name: Stop systemd-resolved (conflicts with AdGuard on port 53)
+# systemd-resolved owns :53 on the adguard LXC (Ubuntu) but is absent on rpi4
+# (Raspberry Pi OS), where the Docker container held the port instead. Guard the
+# stop+mask on the unit actually existing so the native path works on both.
+- name: Gather installed service units
+  ansible.builtin.service_facts:
+
+- name: Stop and mask systemd-resolved where it exists (frees port 53)
   ansible.builtin.systemd:
     name: systemd-resolved
     state: stopped
-
-- name: Mask systemd-resolved to prevent it from starting
-  ansible.builtin.systemd:
-    name: systemd-resolved
     masked: true
+  when: "'systemd-resolved.service' in ansible_facts.services"
 
-- name: Remove systemd-resolved resolv.conf symlink
+- name: Remove the existing resolv.conf before writing the static one
   ansible.builtin.file:
     path: /etc/resolv.conf
     state: absent
