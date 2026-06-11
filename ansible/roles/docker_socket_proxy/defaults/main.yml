@@ -1,27 +1,43 @@
 ---
 # Docker Socket Proxy Role - Default Configuration
 #
-# tecnativa/docker-socket-proxy sits in front of the raw Docker socket so that
-# consumers (autoheal, Uptime Kuma) never mount /var/run/docker.sock directly.
-# This is the ONLY container that touches the raw socket; it serves a scoped
-# subset of the Docker API over tcp on an internal-only bridge network.
+# wollomatic/socket-proxy fronts the raw Docker socket so consumers (autoheal,
+# Uptime Kuma) never mount /var/run/docker.sock. It is the ONLY container that
+# touches the raw socket and exposes ONLY the exact method+path pairs the
+# consumers need - per-method regex allowlists, default-deny everything else.
 #
-# The cross-role contract (network name, container name, port, endpoint) lives in
+# Why not tecnativa/docker-socket-proxy: it cannot express "list + restart-only".
+# Its global POST-deny rule runs before its ALLOW_RESTARTS allow, so restarts
+# require POST=1, which (with CONTAINERS=1) also permits POST /containers/create
+# - a privileged-create host-escape vector. wollomatic's per-method regexes avoid
+# that entirely.
+#
+# The cross-role contract (network, container name, port, endpoint) lives in
 # group_vars/all.yml so this role and its consumers cannot drift.
 
-# Image pinned to a multi-arch manifest digest (works on amd64 LXCs and rpi4
-# arm64). Upgrade = re-capture the running digest and bump deliberately.
-docker_socket_proxy_image: "tecnativa/docker-socket-proxy"
-docker_socket_proxy_version: "0.3.0"
-docker_socket_proxy_image_digest: "sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2"
+# Pinned to a multi-arch manifest digest (amd64 LXCs + rpi4 arm64). Upgrade =
+# re-capture the running digest and bump deliberately.
+docker_socket_proxy_image: "wollomatic/socket-proxy"
+docker_socket_proxy_version: "1"
+docker_socket_proxy_image_digest: "sha256:ad9df81849436b5ddae36396e2aefd6562d4cd587d1b65fcb5ac71e4578c9da3"
 docker_socket_proxy_image_ref: "{{ docker_socket_proxy_image }}:{{ docker_socket_proxy_version }}{{ ('@' + docker_socket_proxy_image_digest) if docker_socket_proxy_image_digest else '' }}"
 
 docker_socket_proxy_compose_dir: "/opt/docker-socket-proxy"
-docker_socket_proxy_timezone: "{{ timezone | default('UTC') }}"
+docker_socket_proxy_loglevel: "INFO"
 
-# API surface. CONTAINERS=1: GET /containers (autoheal's unhealthy filter +
-# Kuma's docker monitors). ALLOW_RESTARTS=1: POST /containers/{id}/restart only
-# (autoheal's action) without opening POST globally. Everything else stays at the
-# image's secure-by-default deny.
-docker_socket_proxy_containers: 1
-docker_socket_proxy_allow_restarts: 1
+# Runs as nobody (65534); the primary group is set to the host's Docker socket
+# gid at deploy time (looked up in deploy.yml) so it can read the socket without
+# running as root. Combined with cap_drop ALL + read_only + no-new-privileges.
+docker_socket_proxy_uid: "65534"
+
+# Source allowlist. The proxy is published only on the internal socket-proxy
+# network (never to the host), so network membership is the access boundary;
+# 0.0.0.0/0 trusts any container already on that isolated network.
+docker_socket_proxy_allowfrom: "0.0.0.0/0"
+
+# Method+path allowlists (anchored regex; every other method/path is denied).
+#   GET  : _ping/version/info, container list (autoheal + Kuma), container
+#          inspect (Kuma docker monitors)
+#   POST : container restart only (autoheal) - NOT create/kill/stop/exec/etc.
+docker_socket_proxy_allow_get: "^(/v[0-9.]+)?/(_ping|version|info|containers/json|containers/[a-zA-Z0-9_.-]+/json)$"
+docker_socket_proxy_allow_post: "^(/v[0-9.]+)?/containers/[a-zA-Z0-9_.-]+/restart$"

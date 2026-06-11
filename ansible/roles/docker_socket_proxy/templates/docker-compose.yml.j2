@@ -1,25 +1,34 @@
 ---
-# Docker Compose for the Docker Socket Proxy (tecnativa/docker-socket-proxy)
+# Docker Compose for the Docker Socket Proxy (wollomatic/socket-proxy)
 # Managed by Ansible - DO NOT EDIT MANUALLY
 #
 # The only container that mounts the raw Docker socket. Consumers reach the
-# scoped Docker API at {{ docker_socket_proxy_endpoint }} on the
-# {{ docker_socket_proxy_network }} network. The socket is mounted read-only; the
-# proxy enforces the allowed endpoints (HAProxy) regardless.
+# allowlisted Docker API at {{ docker_socket_proxy_endpoint }} on the
+# {{ docker_socket_proxy_network }} network. The socket is mounted read-only and
+# the proxy enforces a per-method+path allowlist (default-deny) on top.
 
 services:
   docker-socket-proxy:
     image: {{ docker_socket_proxy_image_ref }}
     container_name: {{ docker_socket_proxy_container_name }}
     restart: unless-stopped
+    # Hardened per wollomatic's reference: non-root (nobody + the Docker socket
+    # gid for read access), no caps, read-only rootfs, no privilege escalation.
+    user: "{{ docker_socket_proxy_uid }}:{{ docker_socket_proxy_socket_gid }}"
+    read_only: true
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
+    command:
+      - "-loglevel={{ docker_socket_proxy_loglevel }}"
+      - "-listenip=0.0.0.0"
+      - "-proxyport={{ docker_socket_proxy_port }}"
+      - "-allowfrom={{ docker_socket_proxy_allowfrom }}"
+      - "-allowGET={{ docker_socket_proxy_allow_get }}"
+      - "-allowPOST={{ docker_socket_proxy_allow_post }}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      TZ: {{ docker_socket_proxy_timezone }}
-      CONTAINERS: "{{ docker_socket_proxy_containers }}"
-      ALLOW_RESTARTS: "{{ docker_socket_proxy_allow_restarts }}"
     networks:
       - {{ docker_socket_proxy_network }}
 

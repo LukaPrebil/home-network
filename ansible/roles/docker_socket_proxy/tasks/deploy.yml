@@ -9,6 +9,25 @@
     driver: bridge
     state: present
 
+# The proxy runs as nobody and reaches the root:docker socket via group perms,
+# so it needs the host's Docker socket gid as its group. That gid varies per host
+# (and per LXC), so resolve it from the live socket instead of hardcoding.
+- name: Stat the Docker socket to resolve its group id
+  ansible.builtin.stat:
+    path: /var/run/docker.sock
+  register: docker_socket_proxy_sock_stat
+
+- name: Fail if the Docker socket is missing
+  ansible.builtin.assert:
+    that:
+      - docker_socket_proxy_sock_stat.stat.exists
+    fail_msg: "/var/run/docker.sock not found - is Docker installed and running on this host?"
+    quiet: true
+
+- name: Set the Docker socket gid for the proxy's group
+  ansible.builtin.set_fact:
+    docker_socket_proxy_socket_gid: "{{ docker_socket_proxy_sock_stat.stat.gid }}"
+
 # No notify: state: present recreates on compose drift; the proxy has no
 # mounted config to hot-reload.
 - name: Deploy docker-socket-proxy docker-compose.yml
