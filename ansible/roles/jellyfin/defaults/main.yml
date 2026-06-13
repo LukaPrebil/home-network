@@ -5,7 +5,10 @@
 jellyfin_version: "10.11.8"
 
 # Base directories
-jellyfin_base_dir: "/mnt/plex-apps"  # NFS mount point for app configs
+# Config (holds library.db, a SQLite database) lives on the local LXC rootfs, NOT
+# the /mnt/plex-apps NFS bind: SQLite needs correct POSIX locking that NFS lacks,
+# and an NFS-bind drop silently empties the path. Media stays on NFS (read-only).
+jellyfin_base_dir: "/opt/jellyfin/data"
 jellyfin_media_dir: "/mnt/plex-bulk"  # NFS mount point for media library
 jellyfin_config_dir: "{{ jellyfin_base_dir }}/jellyfin"
 jellyfin_cache_dir: "{{ jellyfin_config_dir }}/cache"

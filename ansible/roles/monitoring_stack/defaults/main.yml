@@ -1,8 +1,12 @@
 ---
 # Monitoring Stack role default variables
 
-# Base directory for monitoring stack
-monitoring_stack_base_dir: "/srv/docker"
+# Base directory for monitoring stack data.
+# Local LXC rootfs (ext4 disk image on truenas-vms), NOT the /srv/docker NFS bind:
+# Prometheus TSDB + Loki chunks + Grafana SQLite need correct POSIX locking, which
+# NFS does not provide reliably, and an NFS-bind drop on the host silently empties
+# the path (see the 2026-06-12 outage). Compose file still lives under the same /opt tree.
+monitoring_stack_base_dir: "/opt/monitoring/data"
 
 # Component-specific directories
 monitoring_stack_grafana_data_dir: "{{ monitoring_stack_base_dir }}/grafana"
@@ -63,7 +67,7 @@ monitoring_stack_speedtest_exporter_port: 9469
 # Server IDs (comma-separated for multiple servers):
 #   Slovenia: 41998 (Telekom), 11367 (T-2), 53146 (Telemach), 54112 (A1)
 #   Frankfurt: 19034 (Vodafone), 54504 (Deutsche Glasfaser), 32298 (SYNLINQ)
-# Using T-2 Slovenia only — 19034 (Vodafone Frankfurt) never produced data
+# Using T-2 Slovenia only - 19034 (Vodafone Frankfurt) never produced data
 # under the billimek exporter; dropped to stop claiming what we don't measure.
 monitoring_stack_speedtest_server_ids: "11367"
 monitoring_stack_speedtest_scrape_interval: "30m"

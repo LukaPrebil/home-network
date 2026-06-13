@@ -10,45 +10,39 @@
     - monitoring-stack
     - setup
 
-- name: Create monitoring directories on Proxmox host (for unprivileged LXCs)
+# Data dirs live on the local LXC rootfs (see monitoring_stack_base_dir) - no
+# host-delegated NFS dirs: the prior /mnt/pve/truenas-docker path was the source
+# of the silent-empty-stub failure mode and is gone after the relocation.
+# 0777 preserves the existing writability for the non-root container uids
+# (grafana 472, prometheus 65534/nobody, loki 10001), which create their own
+# files under these roots. Tightening to per-uid ownership is a wave-6 task.
+- name: Create monitoring data directories
   ansible.builtin.file:
-    path: "/mnt/pve/truenas-docker/{{ item }}"
+    path: "{{ item }}"
     state: directory
     mode: '0777'
   loop:
-    - grafana
-    - grafana/provisioning
-    - grafana/provisioning/datasources
-    - grafana/provisioning/dashboards
-    - grafana/provisioning/dashboards/definitions
-    - grafana/provisioning/alerting
-    - prometheus
-    - prometheus/config
-    - loki
-    - loki/config
-  delegate_to: "{{ groups['proxmox_hosts'][0] }}"
-  when: inventory_hostname in groups.get('lxc_containers', [])
+    - "{{ monitoring_stack_grafana_data_dir }}"
+    - "{{ monitoring_stack_prometheus_data_dir }}"
+    - "{{ monitoring_stack_loki_data_dir }}"
   tags:
     - monitoring-stack
     - setup
 
-- name: Create monitoring directories locally (for VMs)
+# Config + provisioning hold root-owned files the containers only read.
+- name: Create monitoring config and provisioning directories
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
   loop:
-    - "{{ monitoring_stack_grafana_data_dir }}"
     - "{{ monitoring_stack_grafana_data_dir }}/provisioning"
     - "{{ monitoring_stack_grafana_data_dir }}/provisioning/datasources"
     - "{{ monitoring_stack_grafana_data_dir }}/provisioning/dashboards"
     - "{{ monitoring_stack_grafana_data_dir }}/provisioning/dashboards/definitions"
     - "{{ monitoring_stack_grafana_data_dir }}/provisioning/alerting"
-    - "{{ monitoring_stack_prometheus_data_dir }}"
     - "{{ monitoring_stack_prometheus_config_dir }}"
-    - "{{ monitoring_stack_loki_data_dir }}"
     - "{{ monitoring_stack_loki_config_dir }}"
-  when: inventory_hostname not in groups.get('lxc_containers', [])
   tags:
     - monitoring-stack
     - setup

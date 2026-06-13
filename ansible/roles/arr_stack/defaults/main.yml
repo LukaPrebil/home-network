@@ -11,7 +11,9 @@ arr_stack_seerr_version: "v3.2.0"
 arr_stack_flaresolverr_version: "v3.4.6"
 
 # Base directories
-arr_stack_base_dir: "/srv/docker"  # NFS mount for configs (docker-volumes on TrueNAS)
+# Configs (Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent SQLite) live on the local VM
+# rootfs, NOT NFS: SQLite needs correct POSIX locking that NFS does not provide.
+arr_stack_base_dir: "/opt/arr-stack/config"
 arr_stack_media_dir: "/mnt/plex-bulk"  # NFS mount for media (plex-bulk pool on TrueNAS)
 arr_stack_nfs_opts: "{{ nfs_common_opts }}"
 

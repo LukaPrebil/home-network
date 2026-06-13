@@ -7,7 +7,7 @@
     state: directory
     mode: '0755'
 
-- name: Ensure Jellyfin config directory exists on NFS
+- name: Ensure Jellyfin config directory exists on local rootfs
   ansible.builtin.file:
     path: "{{ jellyfin_config_dir }}"
     state: directory

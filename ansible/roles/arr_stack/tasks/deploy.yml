@@ -11,16 +11,6 @@
     - arr-stack
     - deploy
 
-- name: Assert Docker volumes path is an NFS mount
-  ansible.builtin.include_role:
-    name: common
-    tasks_from: assert_nfs_mount
-  vars:
-    common_nfs_mount_path: "{{ arr_stack_base_dir }}"
-  tags:
-    - arr-stack
-    - deploy
-
 - name: Deploy arr-stack docker-compose.yml
   ansible.builtin.template:
     src: docker-compose.yml.j2

@@ -1,6 +1,18 @@
 ---
 # Deploy and manage Jellyfin with Docker Compose
 
+# Media stays on NFS post-relocation; guard it so a stale-stub bind (empty media
+# tree) fails fast instead of Jellyfin coming up with an empty library.
+- name: Assert media library path is an NFS mount
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: assert_nfs_mount
+  vars:
+    common_nfs_mount_path: "{{ jellyfin_media_dir }}"
+  tags:
+    - jellyfin
+    - deploy
+
 - name: Deploy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
