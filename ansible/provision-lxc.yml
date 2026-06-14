@@ -158,6 +158,7 @@
     - name: Check if any declared containers need NFS Docker volumes
       ansible.builtin.set_fact:
         need_nfs_mount: "{{ lxc_containers | selectattr('nfs_docker_volumes', 'defined') | selectattr('nfs_docker_volumes', 'equalto', true) | list | length > 0 }}"
+      tags: nfs-host-mounts
 
     - name: Ensure NFS mount point exists on Proxmox host for Docker volumes
       ansible.builtin.file:
@@ -166,6 +167,7 @@
         mode: '0755'
       become: true
       when: need_nfs_mount | default(false)
+      tags: nfs-host-mounts
 
     - name: Mount TrueNAS Docker volumes NFS share on Proxmox host
       ansible.posix.mount:
@@ -176,6 +178,7 @@
         state: mounted
       become: true
       when: need_nfs_mount | default(false)
+      tags: nfs-host-mounts
 
     - name: Configure bind mount for Docker volumes in containers
       ansible.builtin.shell:
@@ -192,6 +195,7 @@
       ansible.builtin.set_fact:
         need_plex_apps_mount: "{{ lxc_containers | selectattr('nfs_plex_apps', 'defined') | selectattr('nfs_plex_apps', 'equalto', true) | list | length > 0 }}"
         need_plex_bulk_mount: "{{ lxc_containers | selectattr('nfs_plex_bulk', 'defined') | selectattr('nfs_plex_bulk', 'equalto', true) | list | length > 0 }}"
+      tags: nfs-host-mounts
 
     - name: Ensure NFS mount point exists on Proxmox host for plex-apps
       ansible.builtin.file:
@@ -200,6 +204,7 @@
         mode: '0755'
       become: true
       when: need_plex_apps_mount | default(false)
+      tags: nfs-host-mounts
 
     - name: Mount TrueNAS plex-apps NFS share on Proxmox host
       ansible.posix.mount:
@@ -210,6 +215,7 @@
         state: mounted
       become: true
       when: need_plex_apps_mount | default(false)
+      tags: nfs-host-mounts
 
     - name: Ensure NFS mount point exists on Proxmox host for plex-bulk
       ansible.builtin.file:
@@ -218,6 +224,7 @@
         mode: '0755'
       become: true
       when: need_plex_bulk_mount | default(false)
+      tags: nfs-host-mounts
 
     - name: Mount TrueNAS plex-bulk NFS share on Proxmox host
       ansible.posix.mount:
@@ -228,6 +235,7 @@
         state: mounted
       become: true
       when: need_plex_bulk_mount | default(false)
+      tags: nfs-host-mounts
 
     - name: Configure bind mount for plex-apps in containers
       ansible.builtin.shell:
