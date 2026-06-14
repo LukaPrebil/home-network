@@ -14,5 +14,13 @@ docker_base_dir: "/srv/docker"
 # Network configuration
 docker_mtu: 1492  # PPPoE max MTU - prevents fragmentation on 1Gb fiber
 
+# Keep containers running across a dockerd restart/upgrade. Without this, any
+# daemon.json change bounces every container - including OTBR, whose in-place
+# restart triggers a D-Bus EMERG crash loop. The first restart that enables it
+# still bounces (live-restore is not yet active during that restart), which is
+# why activation is a maintenance-window event. Set false (-e docker_live_restore=false)
+# to roll back.
+docker_live_restore: true
+
 docker_nfs_mount_point: "{{ docker_base_dir }}"
 docker_nfs_opts: "{{ nfs_common_opts }}"

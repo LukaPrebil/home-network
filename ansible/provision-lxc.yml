@@ -148,9 +148,16 @@
       when: containers_to_create | length > 0
       become: true
 
-    - name: Check if any containers need NFS Docker volumes
+    # Host-mount reconciliation is driven by ALL declared containers, not just
+    # containers_to_create - the host NFS mounts must re-apply their hardened opts
+    # (x-systemd.automount, retry) on every converge, not only at first creation.
+    # An NFS blip that drops a non-automount mount otherwise never gets repaired
+    # and binds an empty stub into the LXC (the 2026-06-12 outage). The pct-set
+    # bind-into-container tasks below stay gated on containers_to_create - those
+    # binds are a one-time, container-stopped operation.
+    - name: Check if any declared containers need NFS Docker volumes
       ansible.builtin.set_fact:
-        need_nfs_mount: "{{ containers_to_create | selectattr('nfs_docker_volumes', 'defined') | selectattr('nfs_docker_volumes', 'equalto', true) | list | length > 0 }}"
+        need_nfs_mount: "{{ lxc_containers | selectattr('nfs_docker_volumes', 'defined') | selectattr('nfs_docker_volumes', 'equalto', true) | list | length > 0 }}"
 
     - name: Ensure NFS mount point exists on Proxmox host for Docker volumes
       ansible.builtin.file:
@@ -165,7 +172,7 @@
         path: /mnt/pve/truenas-docker
         src: "{{ truenas_nfs_server }}:{{ truenas_docker_volumes_share }}"
         fstype: nfs
-        opts: defaults,nofail,_netdev
+        opts: "{{ nfs_common_opts }}"
         state: mounted
       become: true
       when: need_nfs_mount | default(false)
@@ -181,10 +188,10 @@
       become: true
       changed_when: true
 
-    - name: Check if any containers need Plex NFS mounts
+    - name: Check if any declared containers need Plex NFS mounts
       ansible.builtin.set_fact:
-        need_plex_apps_mount: "{{ containers_to_create | selectattr('nfs_plex_apps', 'defined') | selectattr('nfs_plex_apps', 'equalto', true) | list | length > 0 }}"
-        need_plex_bulk_mount: "{{ containers_to_create | selectattr('nfs_plex_bulk', 'defined') | selectattr('nfs_plex_bulk', 'equalto', true) | list | length > 0 }}"
+        need_plex_apps_mount: "{{ lxc_containers | selectattr('nfs_plex_apps', 'defined') | selectattr('nfs_plex_apps', 'equalto', true) | list | length > 0 }}"
+        need_plex_bulk_mount: "{{ lxc_containers | selectattr('nfs_plex_bulk', 'defined') | selectattr('nfs_plex_bulk', 'equalto', true) | list | length > 0 }}"
 
     - name: Ensure NFS mount point exists on Proxmox host for plex-apps
       ansible.builtin.file:
@@ -199,7 +206,7 @@
         path: /mnt/pve/plex-apps
         src: "{{ truenas_nfs_server }}:{{ truenas_plex_apps_share }}"
         fstype: nfs
-        opts: defaults,nofail,_netdev
+        opts: "{{ nfs_common_opts }}"
         state: mounted
       become: true
       when: need_plex_apps_mount | default(false)
@@ -217,7 +224,7 @@
         path: /mnt/pve/plex-bulk
         src: "{{ truenas_nfs_server }}:{{ truenas_plex_bulk_share }}"
         fstype: nfs
-        opts: defaults,nofail,_netdev
+        opts: "{{ nfs_common_opts }}"
         state: mounted
       become: true
       when: need_plex_bulk_mount | default(false)

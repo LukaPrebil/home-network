@@ -48,7 +48,8 @@
         },
         "data-root": "/var/lib/docker",
         "dns": {{ dns_servers | to_json }},
-        "mtu": {{ docker_mtu }}
+        "mtu": {{ docker_mtu }},
+        "live-restore": {{ docker_live_restore | to_json }}
       }
     dest: /etc/docker/daemon.json
     mode: '0644'
