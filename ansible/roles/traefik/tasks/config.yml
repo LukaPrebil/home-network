@@ -10,6 +10,17 @@
     mode: '0644'
   notify: Restart Traefik
 
+# No notify: the env_file is read by the compose deploy task (state: present),
+# which recreates on env_file content drift - same apply path as the compose file.
+- name: Deploy Traefik secrets env file
+  ansible.builtin.template:
+    src: traefik.env.j2
+    dest: "{{ traefik_base_dir }}/traefik.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true  # don't print the rendered secret under --check --diff
+
 # No notify: the compose deploy task (state: present) recreates on template
 # changes; `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy Docker Compose file
@@ -26,7 +37,7 @@
     dest: "{{ traefik_file_provider_directory }}/dynamic.yml"
     owner: root
     group: root
-    mode: '0644'
+    mode: '0600'  # holds crowdsecLapiKey; traefik reads it as root in the container
   # No notify: Traefik file provider watches this directory
   # (traefik_file_provider_watch=true) and applies dynamic config edits
   # without a container restart.

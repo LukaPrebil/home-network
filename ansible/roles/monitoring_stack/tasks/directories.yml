@@ -13,18 +13,21 @@
 # Data dirs live on the local LXC rootfs (see monitoring_stack_base_dir) - no
 # host-delegated NFS dirs: the prior /mnt/pve/truenas-docker path was the source
 # of the silent-empty-stub failure mode and is gone after the relocation.
-# 0777 preserves the existing writability for the non-root container uids
-# (grafana 472, prometheus 65534/nobody, loki 10001), which create their own
-# files under these roots. Tightening to per-uid ownership is a wave-6 task.
-- name: Create monitoring data directories
+# Each dir is owned by its service's container uid at 0750 (not the old 0777),
+# so the non-root container can write its own data without world access.
+- name: Create monitoring data directories (owned per service uid)
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "{{ item.path }}"
     state: directory
-    mode: '0777'
+    owner: "{{ item.uid }}"
+    group: "{{ item.uid }}"
+    mode: '0750'
   loop:
-    - "{{ monitoring_stack_grafana_data_dir }}"
-    - "{{ monitoring_stack_prometheus_data_dir }}"
-    - "{{ monitoring_stack_loki_data_dir }}"
+    - { path: "{{ monitoring_stack_grafana_data_dir }}", uid: "{{ monitoring_stack_grafana_uid }}" }
+    - { path: "{{ monitoring_stack_prometheus_data_dir }}", uid: "{{ monitoring_stack_prometheus_uid }}" }
+    - { path: "{{ monitoring_stack_loki_data_dir }}", uid: "{{ monitoring_stack_loki_uid }}" }
+  loop_control:
+    label: "{{ item.path }}"
   tags:
     - monitoring-stack
     - setup

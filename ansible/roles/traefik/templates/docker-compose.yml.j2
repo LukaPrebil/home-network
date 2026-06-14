@@ -38,13 +38,13 @@ services:
 {% endif %}
       # Docker socket (read-only)
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Secrets (CF_DNS_API_TOKEN) live in the 0600 env_file, not inline here.
+    env_file:
+      - {{ traefik_base_dir }}/traefik.env
     environment:
       - TZ={{ timezone | default('UTC') }}
-{% if traefik_acme_challenge_type | default('http') == 'dns' %}
-      - CF_DNS_API_TOKEN={{ traefik_cloudflare_dns_api_token }}
-{% endif %}
     # Dashboard: LAN-only via http://{{ ansible_host | default('localhost') }}:{{ traefik_dashboard_port }}
-    # Removed from public exposure — no Docker labels for public routing
+    # Removed from public exposure - no Docker labels for public routing
 
 networks:
   {{ traefik_docker_network }}:

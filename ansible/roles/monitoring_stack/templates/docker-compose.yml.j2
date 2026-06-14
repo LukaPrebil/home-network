@@ -49,10 +49,12 @@ services:
     volumes:
       - {{ monitoring_stack_grafana_data_dir }}:/var/lib/grafana
       - {{ monitoring_stack_grafana_data_dir }}/provisioning:/etc/grafana/provisioning
+    # Secret (GF_SECURITY_ADMIN_PASSWORD) lives in the 0600 env_file.
+    env_file:
+      - {{ monitoring_stack_compose_dir }}/monitoring.env
     environment:
       - TZ={{ timezone | default('UTC') }}
       - GF_SECURITY_ADMIN_USER={{ monitoring_stack_grafana_admin_user }}
-      - GF_SECURITY_ADMIN_PASSWORD={{ monitoring_stack_grafana_admin_password | replace('$', '$$') }}
       - GF_INSTALL_PLUGINS=
       - GF_USERS_ALLOW_SIGN_UP=false
 
@@ -84,12 +86,12 @@ services:
       - {{ monitoring_stack_docker_network }}
     ports:
       - "{{ monitoring_stack_proxmox_exporter_port }}:9221"
+    # Secrets (PVE_USER/TOKEN_NAME/TOKEN_VALUE) live in the 0600 env_file.
+    env_file:
+      - {{ monitoring_stack_compose_dir }}/monitoring.env
     environment:
       - TZ={{ timezone | default('UTC') }}
       - PVE_URL={{ monitoring_stack_proxmox_api_url }}
-      - PVE_USER={{ vault_proxmox_api_user }}
-      - PVE_TOKEN_NAME={{ vault_proxmox_api_token_name }}
-      - PVE_TOKEN_VALUE={{ vault_proxmox_api_token_secret | replace('$', '$$') }}
       - PVE_VERIFY_SSL={{ monitoring_stack_proxmox_api_verify_ssl | string | lower }}
 
   omada-exporter:
@@ -100,11 +102,12 @@ services:
       - {{ monitoring_stack_docker_network }}
     ports:
       - "{{ monitoring_stack_omada_exporter_port }}:9202"
+    # Secrets (OMADA_USER/OMADA_PASS) live in the 0600 env_file.
+    env_file:
+      - {{ monitoring_stack_compose_dir }}/monitoring.env
     environment:
       - TZ={{ timezone | default('UTC') }}
       - OMADA_HOST={{ monitoring_stack_omada_controller_url }}
-      - OMADA_USER={{ vault_omada_controller_user }}
-      - OMADA_PASS={{ vault_omada_controller_password | replace('$', '$$') }}
       - OMADA_SITE={{ monitoring_stack_omada_site }}
       - OMADA_INSECURE=true
 

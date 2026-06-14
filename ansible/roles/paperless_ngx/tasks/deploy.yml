@@ -20,6 +20,17 @@
     name: "{{ paperless_ngx_docker_network }}"
     state: present
 
+# No notify: the env_file is read by the compose deploy task (state: present),
+# which recreates on env_file content drift - same apply path as the compose file.
+- name: Deploy Paperless-ngx secrets env file
+  ansible.builtin.template:
+    src: paperless.env.j2
+    dest: "{{ paperless_ngx_base_dir }}/paperless.env"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  no_log: true  # don't print the rendered secret under --check --diff
+
 - name: Deploy Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2

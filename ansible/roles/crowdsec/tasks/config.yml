@@ -1,6 +1,17 @@
 ---
 # Deploy CrowdSec configuration files
 
+# No notify: the env_file is read by the compose deploy task (state: present),
+# which recreates on env_file content drift - same apply path as the compose file.
+- name: Deploy CrowdSec secrets env file
+  ansible.builtin.template:
+    src: crowdsec.env.j2
+    dest: "{{ crowdsec_base_dir }}/crowdsec.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true  # don't print the rendered secret under --check --diff
+
 # No notify: the compose deploy task (state: present) recreates on template
 # changes; `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy CrowdSec Docker Compose file

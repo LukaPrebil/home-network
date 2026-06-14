@@ -51,6 +51,13 @@ monitoring_stack_omada_exporter_port: 9202
 monitoring_stack_omada_controller_url: "https://{{ hostvars['omada']['ansible_host'] }}:8043"
 monitoring_stack_omada_site: "Home"
 
+# Upstream image uids - the containers run as these fixed non-root users and own
+# their data dirs / read their provisioning. Used to scope dir ownership + modes
+# instead of the old world-writable 0777.
+monitoring_stack_grafana_uid: 472
+monitoring_stack_prometheus_uid: 65534  # nobody
+monitoring_stack_loki_uid: 10001
+
 # Docker network
 monitoring_stack_docker_network: "monitoring"
 

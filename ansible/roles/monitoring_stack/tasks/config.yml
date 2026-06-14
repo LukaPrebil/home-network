@@ -70,6 +70,20 @@
     - config
     - grafana
 
+# No notify: the env_file is read by the compose deploy task (state: present),
+# which recreates on env_file content drift - same apply path as the compose file.
+- name: Deploy monitoring stack secrets env file
+  ansible.builtin.template:
+    src: monitoring.env.j2
+    dest: "{{ monitoring_stack_compose_dir }}/monitoring.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true  # don't print the rendered secret under --check --diff
+  tags:
+    - monitoring-stack
+    - config
+
 # No notify: the compose deploy task (state: present) recreates on template
 # changes; `docker compose restart` would double-bounce without re-reading them.
 - name: Deploy Docker Compose file
@@ -93,11 +107,15 @@
     - grafana
     - alerting
 
+# Holds the Telegram bot token - 0600, owned by the grafana uid so the container
+# can read it while it is not world-readable.
 - name: Deploy Grafana alerting contact points
   ansible.builtin.template:
     src: grafana-alerting-contact-points.yml.j2
     dest: "{{ monitoring_stack_grafana_data_dir }}/provisioning/alerting/contact-points.yml"
-    mode: '0644'
+    owner: "{{ monitoring_stack_grafana_uid }}"
+    group: "{{ monitoring_stack_grafana_uid }}"
+    mode: '0600'
   notify: Restart Monitoring Stack
   tags:
     - monitoring-stack

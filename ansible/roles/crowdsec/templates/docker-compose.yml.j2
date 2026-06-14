@@ -13,10 +13,12 @@ services:
     ports:
       - "127.0.0.1:{{ crowdsec_lapi_port }}:8080"
       - "{{ crowdsec_metrics_port }}:6060"
+    # Secret (BOUNCER_KEY_traefik) lives in the 0600 env_file, not inline here.
+    env_file:
+      - {{ crowdsec_base_dir }}/crowdsec.env
     environment:
       - TZ={{ timezone | default('UTC') }}
       - COLLECTIONS={{ crowdsec_collections | join(' ') }}
-      - BOUNCER_KEY_traefik={{ crowdsec_bouncer_key }}
     volumes:
       # CrowdSec persistent config and data
       - {{ crowdsec_config_dir }}:/etc/crowdsec

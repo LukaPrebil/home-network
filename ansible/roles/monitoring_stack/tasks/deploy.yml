@@ -68,7 +68,7 @@
   ansible.builtin.debug:
     msg:
       - "Monitoring stack is now running!"
-      - "Grafana: http://{{ ansible_host }}:{{ monitoring_stack_grafana_port }} (admin/{{ monitoring_stack_grafana_admin_password }})"
+      - "Grafana: http://{{ ansible_host }}:{{ monitoring_stack_grafana_port }} (admin user; password in vault)"
       - "Prometheus: http://{{ ansible_host }}:{{ monitoring_stack_prometheus_port }}"
       - "Loki: http://{{ ansible_host }}:{{ monitoring_stack_loki_port }}"
   tags:
