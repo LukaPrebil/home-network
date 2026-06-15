@@ -1,6 +1,6 @@
 ---
 # Provision Proxmox LXC containers from declarative configuration
-# This playbook creates LXC containers based on definitions in group_vars/lxc.yml
+# This playbook creates LXC containers based on definitions in vars/lxc.yml
 #
 # Usage:
 #   ansible-playbook provision-lxc.yml
@@ -17,7 +17,7 @@
   gather_facts: false
   become: true
   vars_files:
-    - group_vars/lxc.yml
+    - vars/lxc.yml
 
   tasks:
     - name: Check if Ubuntu 25.04 LXC template exists
@@ -36,7 +36,7 @@
   hosts: proxmox_hosts
   gather_facts: true
   vars_files:
-    - group_vars/lxc.yml
+    - vars/lxc.yml
     - group_vars/all.yml
     - secrets.yml
 
@@ -261,7 +261,7 @@
 
 - name: Reconcile memory caps on existing LXC containers
   # The create-step above only applies `memory:` at first provision.
-  # Editing memory in group_vars/lxc.yml does not retroactively change
+  # Editing memory in vars/lxc.yml does not retroactively change
   # the running container's cgroup cap. This play closes that drift
   # idempotently for every container declared in lxc_containers.
   #
@@ -277,7 +277,7 @@
   tags:
     - lxc-memory-reconcile
   vars_files:
-    - group_vars/lxc.yml
+    - vars/lxc.yml
 
   tasks:
     - name: Read current memory cap for each declared LXC
@@ -313,7 +313,7 @@
   hosts: localhost
   gather_facts: false
   vars_files:
-    - group_vars/lxc.yml
+    - vars/lxc.yml
 
   tasks:
     - name: Add newly created containers to inventory

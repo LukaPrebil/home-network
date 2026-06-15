@@ -38,7 +38,7 @@
     - proxmox
   vars_files:
     - secrets.yml
-    - group_vars/lxc.yml  # lxc_loadavg.yml needs lxc_containers
+    - vars/lxc.yml  # lxc_loadavg.yml needs lxc_containers
   roles:
     - proxmox
 

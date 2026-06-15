@@ -1,16 +1,16 @@
 ---
 # Weekly pre-upgrade VM snapshot cron.
 #
-# Snapshots every VM in group_vars/vms.yml that has snapshot_weekly: true.
+# Snapshots every VM in vars/vms.yml that has snapshot_weekly: true.
 # Retains the last 4 snapshots per VM (rolling window). Lives on the Proxmox
 # host so it can call qm directly without SSH.
 #
-# group_vars/vms.yml isn't auto-loaded for proxmox_hosts (it's not a group
+# vars/vms.yml isn't auto-loaded for proxmox_hosts (it's not a group
 # var file that matches any group), so we include it explicitly here.
 
 - name: Load VM declarations for the snapshot script template
   ansible.builtin.include_vars:
-    file: "{{ playbook_dir }}/group_vars/vms.yml"
+    file: "{{ playbook_dir }}/vars/vms.yml"
 
 - name: Deploy weekly snapshot script
   ansible.builtin.template:

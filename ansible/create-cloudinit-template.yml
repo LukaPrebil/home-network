@@ -1,6 +1,6 @@
 ---
 # Playbook to create Ubuntu cloud-init template on Proxmox.
-# Ubuntu version is parameterised via group_vars/cloudinit_template.yml.
+# Ubuntu version is parameterised via vars/cloudinit_template.yml.
 # This creates a reusable template for rapid VM provisioning.
 
 - name: Download Ubuntu cloud image
@@ -8,7 +8,7 @@
   become: true
   vars_files:
     - secrets.yml
-    - group_vars/cloudinit_template.yml
+    - vars/cloudinit_template.yml
   tasks:
     - name: Ensure cloud image directory exists on TrueNAS storage
       ansible.builtin.file:
@@ -39,7 +39,7 @@
   become: true
   vars_files:
     - secrets.yml
-    - group_vars/cloudinit_template.yml
+    - vars/cloudinit_template.yml
   tasks:
     - name: Check if template VM already exists
       ansible.builtin.command:
@@ -112,7 +112,7 @@
   become: true
   vars_files:
     - secrets.yml
-    - group_vars/cloudinit_template.yml
+    - vars/cloudinit_template.yml
   tasks:
     - name: Write SSH key to temporary file
       ansible.builtin.copy:
@@ -156,7 +156,7 @@
   hosts: n5p
   become: true
   vars_files:
-    - group_vars/cloudinit_template.yml
+    - vars/cloudinit_template.yml
   tasks:
     - name: Convert VM to template
       ansible.builtin.command:

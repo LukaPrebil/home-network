@@ -42,7 +42,7 @@ dev_vm_claude_path: "{{ dev_vm_user.home }}/code/domengabrovsek/claude"
 # DNS - override the global all.yml fallback that includes 1.1.1.1 / 1.0.0.1.
 # This list also feeds:
 #   - the common role's dns.yml task that writes /etc/resolv.conf
-#   - cloud-init via group_vars/vms.yml's dns_servers (which inherits this if
+#   - cloud-init via vars/vms.yml's dns_servers (which inherits this if
 #     not separately overridden)
 # AdGuard primary + secondary already gives two-server redundancy; if both are
 # down DNS legitimately fails rather than silently bypassing filtering.

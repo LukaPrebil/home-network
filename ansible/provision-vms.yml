@@ -1,6 +1,6 @@
 ---
 # Playbook to provision VMs from cloud-init template
-# VMs are defined in group_vars/vms.yml
+# VMs are defined in vars/vms.yml
 #
 # Usage:
 #   ansible-playbook provision-vms.yml
@@ -11,12 +11,12 @@
   hosts: localhost
   gather_facts: false
   vars_files:
-    - group_vars/vms.yml
+    - vars/vms.yml
   tasks:
     - name: Check if any VMs are defined
       ansible.builtin.fail:
         msg: |
-          ERROR: No VMs defined in group_vars/vms.yml
+          ERROR: No VMs defined in vars/vms.yml
           Please add VMs to the 'vms_to_create' list before running this playbook.
       when: vms_to_create | length == 0
 
@@ -50,8 +50,8 @@
   become: true
   vars_files:
     - secrets.yml
-    - group_vars/cloudinit_template.yml
-    - group_vars/vms.yml
+    - vars/cloudinit_template.yml
+    - vars/vms.yml
   vars:
     # VLAN network mapping for display purposes
     vlan_networks:
@@ -285,7 +285,7 @@
   hosts: n5p
   become: true
   vars_files:
-    - group_vars/vms.yml
+    - vars/vms.yml
   tasks:
     - name: Check if any VMs were provisioned
       ansible.builtin.set_fact:
@@ -325,7 +325,7 @@
 
 # Reconcile memory caps on every run, not just first-provision.
 # The create-flow above only touches VMs in `vms_to_provision` (new VMs);
-# editing `memory:` in group_vars/vms.yml does not retroactively change the
+# editing `memory:` in vars/vms.yml does not retroactively change the
 # running VM's max. This play closes that drift.
 #
 # qm set --memory N updates the PENDING config — the cap takes effect at
@@ -344,7 +344,7 @@
   tags:
     - vm-memory-reconcile
   vars_files:
-    - group_vars/vms.yml
+    - vars/vms.yml
   tasks:
     - name: Read each managed VM's current memory cap
       ansible.builtin.shell:
@@ -376,13 +376,13 @@
 # Reconcile balloon floors on every run, not just first-provision.
 # The create-flow above only touches VMs in `vms_to_provision` (new VMs).
 # For existing VMs, PVE keeps whatever `balloon:` was set last, so a change
-# in group_vars/vms.yml would silently never apply without this block.
+# in vars/vms.yml would silently never apply without this block.
 - name: Reconcile VM balloon floors
   hosts: n5p
   become: true
   gather_facts: false
   vars_files:
-    - group_vars/vms.yml
+    - vars/vms.yml
   tasks:
     - name: Read each managed VM's current balloon value
       # qm config emits `balloon: N` when set, or omits the line when PVE
