@@ -3,7 +3,6 @@
 # Each container will be provisioned using the community.proxmox.proxmox module
 
 # LXC Template configuration
-lxc_template_storage: "local"  # Storage for LXC templates
 lxc_template_ubuntu: "ubuntu-25.04-standard_25.04-1.1_amd64.tar.zst"  # Ubuntu 25.04 Plucky Proxmox template
 lxc_template_url: "http://download.proxmox.com/images/system/ubuntu-25.04-standard_25.04-1.1_amd64.tar.zst"
 
@@ -34,7 +33,6 @@ lxc_containers:
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough configuration for AMD Radeon 880M/890M iGPU
     gpu_passthrough: true  # Enable GPU passthrough for hardware transcoding
-    gpu_device: /dev/dri  # AMD iGPU device (card0 + renderD128)
     # NFS storage configuration
     nfs_docker_volumes: true  # Bind mount Docker volumes from NFS
 
@@ -123,7 +121,7 @@ lxc_containers:
     netmask: 24
     cores: 4
     memory: 4096  # 4GB cap. Working set ~3.5GB (prom 447MB + loki 85MB + grafana 143MB +
-    # cadvisor + exporters). Tight on the upper bound — if Prometheus TSDB or Loki chunks
+    # cadvisor + exporters). Tight on the upper bound - if Prometheus TSDB or Loki chunks
     # grow past current footprint, bump back to 5-6GB before this OOMs.
     swap: 2048  # 2GB swap
     disk: 32  # 32GB root disk (for metrics and log storage on NFS)
@@ -167,7 +165,6 @@ lxc_containers:
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough for hardware transcoding (AMD 890M)
     gpu_passthrough: true
-    gpu_device: /dev/dri  # AMD iGPU device (card0 + renderD128)
     # Media server uses custom NFS mounts (not standard docker-volumes)
     nfs_docker_volumes: false
     # Custom NFS mounts for media
@@ -200,7 +197,7 @@ lxc_containers:
     onboot: true
     startup: "order=3"  # Boot after TrueNAS + containers VM (needs ha-mcp reachable)
     gpu_passthrough: false
-    nfs_docker_volumes: false  # State stays on local rootfs — SQLite locking on NFS is banned
+    nfs_docker_volumes: false  # State stays on local rootfs - SQLite locking on NFS is banned
 
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:

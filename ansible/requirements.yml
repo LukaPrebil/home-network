@@ -17,6 +17,3 @@ collections:
 
   - name: community.proxmox
     version: ">=1.6.0"
-
-  - name: arensb.truenas
-    version: ">=0.1.0"

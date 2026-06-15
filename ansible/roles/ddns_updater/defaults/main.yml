@@ -11,7 +11,6 @@ ddns_updater_container_name: "ddns-updater"
 
 # Network configuration
 ddns_updater_port: 8000
-ddns_updater_docker_network: "traefik"  # Connect to Traefik network (optional for web UI)
 
 # Service state (can be overridden during migration)
 ddns_updater_service_state: "started"  # Options: started, stopped, present

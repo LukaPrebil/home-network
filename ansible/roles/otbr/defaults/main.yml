@@ -37,7 +37,6 @@ otbr_thread_channel: 15                          # Thread channel (default 15, a
 otbr_thread_network_name: "OpenThreadHA"         # Thread network name
 otbr_thread_panid: "0x1234"                      # PAN ID (16-bit hex)
 otbr_thread_extpanid: "1111111122222222"         # Extended PAN ID (64-bit hex)
-otbr_thread_network_key: "{{ vault_thread_network_key }}"  # 128-bit network key (from vault)
 
 # OTBR Configuration
 otbr_port_web: 8086                         # OTBR Web UI port

@@ -21,7 +21,3 @@ adguard_statistics_interval: "168h"  # 7 days
 # Matter Server Configuration (rpi4 hosts Matter Server)
 matter_server_port: 5580
 matter_server_log_level: "info"
-
-# OTBR Connection (Matter Server connects to OTBR on containers VM)
-otbr_host: "192.168.1.140"  # containers VM
-otbr_rest_api_port: 8081

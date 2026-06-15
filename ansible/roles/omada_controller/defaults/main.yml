@@ -14,7 +14,6 @@ omada_controller_logs_dir: "/opt/tplink/EAPController/logs"
 
 # Service configuration
 omada_controller_service_state: started
-omada_controller_service_enabled: true
 
 # Network configuration
 omada_controller_http_port: 8088

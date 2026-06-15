@@ -69,7 +69,6 @@
     rpi4_services_dir: "/srv/docker"
     rpi4_services:
       - adguard
-      - mosquitto
 
   tasks:
     - name: Create base services directory

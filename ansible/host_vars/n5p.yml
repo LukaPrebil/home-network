@@ -1,13 +1,7 @@
 ---
 # Host-specific variables for n5p (Minisforum N5 Pro)
 
-# Current network configuration (will transition to VLAN 30 later)
-current_ip: 192.168.1.128
-target_ip: 192.168.30.2  # Final IP in VLAN 30
-
-# Hardware details
-cpu_cores: 12  # Ryzen AI 9 HX 370 - 12 cores / 24 threads
-memory_gb: 16
+# Physical uplink the Proxmox bridge attaches to (roles/proxmox/tasks/network.yml).
 primary_interface: enp197s0
 
 # Additional user for management

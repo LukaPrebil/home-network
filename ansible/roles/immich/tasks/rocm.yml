@@ -9,6 +9,8 @@
     state: absent
     purge: true
 
+# Left on disk after install so get_url is a no-op on re-converge. Deleting it
+# (as a cleanup step used to) made every run re-download + re-mark changed.
 - name: Download AMD GPU install package for ROCm 7.2
   ansible.builtin.get_url:
     url: https://repo.radeon.com/amdgpu-install/7.2/ubuntu/noble/amdgpu-install_7.2.70200-1_all.deb
@@ -40,11 +42,6 @@
     state: present
   # Note: Using rocm-hip-runtime instead of full 'rocm' package to save space
   # This includes the HSA runtime and ROCm tools needed for inference
-
-- name: Clean up AMD GPU install package
-  ansible.builtin.file:
-    path: /tmp/amdgpu-install_7.2.70200-1_all.deb
-    state: absent
 
 - name: Test ROCm installation
   ansible.builtin.command:
