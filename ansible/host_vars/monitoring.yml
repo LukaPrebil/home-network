@@ -1,0 +1,9 @@
+---
+# Monitoring LXC (Prometheus / Loki / Grafana) host-specific variables.
+#
+# The TSDB, Loki chunks, and Grafana state moved to local rootfs
+# (/opt/monitoring/data) in wave 5 - SQLite/TSDB on NFS is banned. The box has
+# no docker-volumes NFS bind anymore, so skip the /srv/docker mount + stub
+# creation (otherwise the docker role recreates an empty stub after the
+# vestigial bind is dropped).
+docker_nfs_volumes_enabled: false

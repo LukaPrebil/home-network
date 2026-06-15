@@ -124,7 +124,7 @@ lxc_containers:
     # cadvisor + exporters). Tight on the upper bound - if Prometheus TSDB or Loki chunks
     # grow past current footprint, bump back to 5-6GB before this OOMs.
     swap: 2048  # 2GB swap
-    disk: 32  # 32GB root disk (for metrics and log storage on NFS)
+    disk: 32  # 32GB root disk - holds the TSDB/Loki/Grafana state on local rootfs (wave 5)
     storage: truenas-vms
     description: "Monitoring Stack - Prometheus, Grafana, Loki for observability"
     unprivileged: true  # Use unprivileged container (more secure)
@@ -137,8 +137,11 @@ lxc_containers:
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough not needed for monitoring
     gpu_passthrough: false
-    # NFS storage for metrics and logs data
-    nfs_docker_volumes: true
+    # No NFS docker-volumes bind: Prometheus TSDB / Loki chunks / Grafana state
+    # moved to local rootfs in wave 5 (SQLite/TSDB-on-NFS is banned). The old
+    # /srv/docker bind is vestigial and dropped. host_vars/monitoring.yml also
+    # sets docker_nfs_volumes_enabled=false so the docker role skips the stub.
+    nfs_docker_volumes: false
 
   - name: media
     vmid: 205
@@ -167,9 +170,11 @@ lxc_containers:
     gpu_passthrough: true
     # Media server uses custom NFS mounts (not standard docker-volumes)
     nfs_docker_volumes: false
-    # Custom NFS mounts for media
-    nfs_plex_apps: true   # Mount plex-apps pool for config
-    nfs_plex_bulk: true   # Mount plex-bulk pool for media
+    # Custom NFS mounts for media. plex-apps held the old Jellyfin config; that
+    # moved to local rootfs (/opt/jellyfin/data) in wave 5, so the plex-apps bind
+    # is vestigial and dropped. plex-bulk is the live media library - keep it.
+    nfs_plex_apps: false   # Jellyfin config now on local rootfs (was plex-apps)
+    nfs_plex_bulk: true    # Mount plex-bulk pool for media
 
   - name: hermes
     vmid: 206
