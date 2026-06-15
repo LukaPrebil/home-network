@@ -1,12 +1,12 @@
 ---
-# OS-level package upgrade — opt-in only
+# OS-level package upgrade - opt-in only
 # Run with: ansible-playbook site.yml --tags apt-upgrade --limit '<host>'
 # Tagged `never` so it's skipped on default site.yml runs.
 # Use `-e reboot_allowed=true` per host to allow auto-reboot when a kernel upgrade requires it.
 
-- name: Upgrade apt packages (safe — no removals)
+- name: Upgrade apt packages
   ansible.builtin.apt:
-    upgrade: safe
+    upgrade: "{{ common_upgrade_type }}"
     update_cache: true
     cache_valid_time: 0
   when: ansible_os_family == "Debian"
@@ -26,7 +26,7 @@
 - name: Warn when reboot is required but not allowed
   ansible.builtin.debug:
     msg: >-
-      REBOOT REQUIRED on {{ inventory_hostname }} —
+      REBOOT REQUIRED on {{ inventory_hostname }} -
       re-run with `-e reboot_allowed=true` to auto-reboot, or reboot manually.
   when:
     - ansible_os_family == "Debian"

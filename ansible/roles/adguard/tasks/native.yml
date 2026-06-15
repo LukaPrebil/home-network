@@ -98,14 +98,11 @@
   ansible.builtin.set_fact:
     adguard_needs_install: "{{ not adguard_binary.stat.exists or adguard_version not in (adguard_installed_version.stdout | default('')) }}"
 
-- name: Stop AdGuard Home service before upgrade
-  ansible.builtin.systemd:
-    name: AdGuardHome
-    state: stopped
-  when:
-    - adguard_needs_install
-    - adguard_binary.stat.exists
-
+# Download + extract to /tmp while the current binary keeps answering DNS, then
+# swap it in with an atomic copy (a running binary is replaced by rename, not
+# truncated) and let the restart handler do the cutover. We deliberately do NOT
+# stop the service before downloading: a failed download would otherwise leave
+# this DNS instance down until the next successful run.
 - name: Download AdGuard Home
   ansible.builtin.get_url:
     url: "https://github.com/AdguardTeam/AdGuardHome/releases/download/{{ adguard_version }}/AdGuardHome_linux_{{ adguard_arch }}.tar.gz"

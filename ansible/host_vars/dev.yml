@@ -23,6 +23,10 @@ common_install_oh_my_zsh: false
 # Defense in depth - this box never needs root SSH.
 common_sshd_permit_root_login: "no"
 
+# Dev box keeps Docker state on local rootfs; never mount the production
+# TrueNAS docker-volumes share here (it holds live service data).
+docker_nfs_volumes_enabled: false
+
 # dev_vm role configuration
 dev_vm_user:
   name: luka

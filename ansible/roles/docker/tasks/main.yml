@@ -3,9 +3,17 @@
 
 - name: Include Docker installation tasks
   ansible.builtin.include_tasks: install.yml
+  tags: docker
 
 - name: Include Docker configuration tasks
   ansible.builtin.include_tasks: configure.yml
+  tags: docker
 
+# Only hosts that actually back /srv/docker with the TrueNAS NFS share need the
+# mount + base-dir + wait-for-nfs drop-in. Hosts that keep all service state on
+# local rootfs (dev VM, traefik/media LXCs) set docker_nfs_volumes_enabled=false
+# so the role never mounts the prod share or leaves an empty /srv/docker stub.
 - name: Include NFS mount tasks
   ansible.builtin.include_tasks: nfs.yml
+  when: docker_nfs_volumes_enabled | bool
+  tags: docker

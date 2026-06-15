@@ -269,15 +269,19 @@
     - common
     - hermes
 
+# TrueNAS (truenas_hosts) has no apt - exclude it from the group structurally
+# rather than relying on a --limit at the CLI.
 - name: OS-level package upgrade (opt-in)
-  hosts: linux_servers
+  hosts: linux_servers:!truenas_hosts
   become: true
   tags:
     - apt-upgrade
     - never
   tasks:
-    - name: Import apt-upgrade tasks
-      ansible.builtin.import_tasks: roles/common/tasks/upgrade.yml
+    - name: Run the common role's apt-upgrade task path
+      ansible.builtin.import_role:
+        name: common
+        tasks_from: upgrade.yml
 
 - name: Manual apt upgrade for dev VM (opt-in, never as part of common run)
   hosts: dev_hosts
@@ -286,21 +290,9 @@
     - dev-vm-upgrade
     - never
   tasks:
-    - name: Update apt cache
-      ansible.builtin.apt:
-        update_cache: true
-
-    - name: Run apt dist-upgrade with autoremove
-      ansible.builtin.apt:
-        upgrade: dist
-        autoremove: true
-
-    - name: Check for required reboot
-      ansible.builtin.stat:
-        path: /var/run/reboot-required
-      register: dev_vm_reboot_required
-
-    - name: Notify if reboot required
-      ansible.builtin.debug:
-        msg: "REBOOT REQUIRED - run 'sudo reboot' from the dev VM at your convenience."
-      when: dev_vm_reboot_required.stat.exists
+    - name: Run the common role's apt-upgrade task path (dist mode)
+      ansible.builtin.import_role:
+        name: common
+        tasks_from: upgrade.yml
+      vars:
+        common_upgrade_type: dist  # dev box tolerates dependency-driven removals

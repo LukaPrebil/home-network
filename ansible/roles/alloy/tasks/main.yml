@@ -80,7 +80,33 @@
     - monitoring
     - logging
 
-- name: Stop Alloy service before upgrade
+# Download the new binary into a version-scoped staging dir while the current
+# Alloy keeps running. Only after it is on disk do we stop + swap, so a failed
+# or partial download can never leave the host with no Alloy binary.
+- name: Create Alloy upgrade staging directory
+  ansible.builtin.file:
+    path: "{{ alloy_stage_dir }}"
+    state: directory
+    mode: '0755'
+  when: alloy_needs_upgrade | bool
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Download new Alloy binary to staging
+  ansible.builtin.unarchive:
+    src: "{{ alloy_binary_url }}"
+    dest: "{{ alloy_stage_dir }}"
+    remote_src: true
+    creates: "{{ alloy_stage_dir }}/{{ alloy_binary_name }}"
+  when: alloy_needs_upgrade | bool
+  tags:
+    - alloy
+    - monitoring
+    - logging
+
+- name: Stop Alloy service before swapping the binary
   ansible.builtin.systemd:
     name: alloy
     state: stopped
@@ -91,32 +117,24 @@
     - monitoring
     - logging
 
-- name: Remove old Alloy binary
-  ansible.builtin.file:
-    path: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
-    state: absent
-  when: alloy_needs_upgrade | bool
-  tags:
-    - alloy
-    - monitoring
-    - logging
-
-- name: Download Alloy binary
-  ansible.builtin.unarchive:
-    src: "{{ alloy_binary_url }}"
-    dest: "{{ alloy_install_dir }}"
+- name: Swap the staged Alloy binary into place
+  ansible.builtin.copy:
+    src: "{{ alloy_stage_dir }}/{{ alloy_binary_name }}"
+    dest: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
     remote_src: true
-    creates: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
+    mode: '0755'
+  when: alloy_needs_upgrade | bool
   notify: Restart Alloy
   tags:
     - alloy
     - monitoring
     - logging
 
-- name: Make Alloy binary executable
+- name: Remove the Alloy upgrade staging directory
   ansible.builtin.file:
-    path: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
-    mode: '0755'
+    path: "{{ alloy_stage_dir }}"
+    state: absent
+  when: alloy_needs_upgrade | bool
   tags:
     - alloy
     - monitoring

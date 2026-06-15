@@ -9,10 +9,12 @@
 - name: Include native installation tasks
   ansible.builtin.include_tasks: native.yml
   when: adguard_deployment_method == "native"
+  tags: adguard
 
 - name: Include Docker deployment tasks
   ansible.builtin.include_tasks: docker.yml
   when: adguard_deployment_method == "docker"
+  tags: adguard
 
 - name: Display AdGuard Home access information
   ansible.builtin.debug:

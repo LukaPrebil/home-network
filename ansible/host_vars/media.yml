@@ -1,0 +1,7 @@
+---
+# Media LXC (Jellyfin) host-specific variables.
+#
+# Jellyfin config lives on local rootfs (/opt/jellyfin/data) and the media
+# library is the dedicated /mnt/plex-bulk NFS bind - the box has no
+# docker-volumes NFS bind, so skip the /srv/docker mount + stub creation.
+docker_nfs_volumes_enabled: false

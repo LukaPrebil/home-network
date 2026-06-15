@@ -6,6 +6,10 @@ ansible_host: 192.168.1.142  # Temporary IP (will migrate to 192.168.60.2)
 ansible_user: root
 ansible_ssh_private_key_file: ~/.ssh/homelab_ansible
 
+# Traefik keeps its config/state on local rootfs (/opt/traefik); it has no
+# docker-volumes NFS bind, so skip the /srv/docker mount + stub creation.
+docker_nfs_volumes_enabled: false
+
 # ACME/Let's Encrypt configuration
 traefik_acme_enabled: true
 traefik_acme_email: "luka.prebil.grintal@proton.me"  # Email for Let's Encrypt notifications

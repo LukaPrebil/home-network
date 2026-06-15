@@ -24,3 +24,10 @@ docker_live_restore: true
 
 docker_nfs_mount_point: "{{ docker_base_dir }}"
 docker_nfs_opts: "{{ nfs_common_opts }}"
+
+# Whether this host backs /srv/docker with the TrueNAS docker-volumes NFS share.
+# True for the containers VM, rpi4, and the immich LXC (host-bind), which keep
+# compose/service state there. Set false per-host for boxes whose state lives on
+# local rootfs (dev VM, traefik/media LXCs) so the role neither mounts the prod
+# share nor leaves an empty /srv/docker stub that would mask a missing mount.
+docker_nfs_volumes_enabled: true

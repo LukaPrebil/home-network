@@ -28,14 +28,18 @@
     mode: '0755'
     owner: root
     group: docker
-  when: docker_is_lxc.rc | default(1) != 0
+  when:
+    - docker_nfs_volumes_enabled | bool
+    - docker_is_lxc.rc | default(1) != 0
 
 - name: Ensure Docker base directory exists (without ownership for LXCs)
   ansible.builtin.file:
     path: "{{ docker_base_dir }}"
     state: directory
     mode: '0755'
-  when: docker_is_lxc.rc | default(1) == 0
+  when:
+    - docker_nfs_volumes_enabled | bool
+    - docker_is_lxc.rc | default(1) == 0
 
 - name: Configure Docker daemon
   ansible.builtin.copy:

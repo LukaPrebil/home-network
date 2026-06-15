@@ -66,9 +66,11 @@
   gather_facts: true
 
   vars:
+    # rpi4 stores matter-server state under this base (NFS-backed). AdGuard is
+    # now a native binary with state on the local SD card - no /srv/docker/adguard
+    # entry - and the planned Mosquitto broker was decommissioned, so there are no
+    # per-service subdirectories to pre-create here.
     rpi4_services_dir: "/srv/docker"
-    rpi4_services:
-      - adguard
 
   tasks:
     - name: Create base services directory
@@ -78,15 +80,6 @@
         mode: '0755'
         owner: root
         group: root
-
-    - name: Create individual service directories
-      ansible.builtin.file:
-        path: "{{ rpi4_services_dir }}/{{ item }}"
-        state: directory
-        mode: '0755'
-        owner: root
-        group: root
-      loop: "{{ rpi4_services }}"
 
     - name: Display completion message
       ansible.builtin.debug:
@@ -99,20 +92,12 @@
           - "  ✅ Common configuration applied"
           - "  ✅ Users and SSH configured"
           - "  ✅ Docker installed"
-          - "  ✅ Service directories created"
-          - ""
-          - "Service directories:"
-          - "{% for service in rpi4_services %}  - {{ rpi4_services_dir }}/{{ service }}{% endfor %}"
+          - "  ✅ Base services directory created"
           - ""
           - "Next Steps:"
-          - "1. Deploy services:"
-          - "   ansible-playbook configure-rpi4-services.yml"
+          - "1. Deploy Matter Server:"
+          - "   ansible-playbook site.yml --tags matter-server --limit rpi4"
           - ""
           - "2. Verify Docker:"
           - "   ssh {{ ansible_user }}@{{ ansible_host }} docker ps"
-          - ""
-          - "Planned Services:"
-          - "  - AdGuard Home (Secondary DNS)"
-          - "  - Mosquitto MQTT (Broker)"
-          - "  - (Add more services as needed)"
           - "=============================================="

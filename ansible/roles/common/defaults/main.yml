@@ -11,3 +11,8 @@ common_install_oh_my_zsh: true
 # preserve current behaviour on every existing host. Set to "no" on a host that
 # never needs root SSH (e.g. the dev VM).
 common_sshd_permit_root_login: prohibit-password
+
+# apt upgrade mode for the opt-in upgrade.yml task path. "safe" never removes
+# packages (the fleet default); the dev-vm-upgrade play overrides to "dist" to
+# allow dependency-driven removals on the throwaway dev box.
+common_upgrade_type: safe
