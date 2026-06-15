@@ -106,49 +106,51 @@ adguard_docker_hostname: "adguard"
 # DNS Rewrites - Local hostname to IP mappings
 # These provide convenient hostnames for all devices on the network
 adguard_dns_rewrites:
-  # Infrastructure
+  # Infrastructure. IPs derive from inventory hostvars so a host's address is
+  # declared in exactly one place (the inventory). gateway.lan is the only
+  # literal - the router is not an inventory-managed host.
   - domain: "n5p.lan"
-    answer: "192.168.1.128"
+    answer: "{{ hostvars['n5p']['ansible_host'] }}"
   - domain: "gateway.lan"
     answer: "192.168.1.1"
 
   # Storage & VMs
   - domain: "truenas.lan"
-    answer: "192.168.1.150"
+    answer: "{{ hostvars['tn-storage']['ansible_host'] }}"
   - domain: "tn-storage.lan"
-    answer: "192.168.1.150"
+    answer: "{{ hostvars['tn-storage']['ansible_host'] }}"
   - domain: "containers.lan"
-    answer: "192.168.1.140"
+    answer: "{{ hostvars['containers']['ansible_host'] }}"
 
   # Services
   - domain: "haos.lan"
-    answer: "192.168.1.144"
+    answer: "{{ hostvars['haos']['ansible_host'] }}"
   - domain: "homeassistant.lan"
-    answer: "192.168.1.144"
+    answer: "{{ hostvars['haos']['ansible_host'] }}"
   - domain: "immich.lan"
-    answer: "192.168.1.141"
+    answer: "{{ hostvars['immich']['ansible_host'] }}"
   - domain: "photos.lan"
-    answer: "192.168.1.141"
+    answer: "{{ hostvars['immich']['ansible_host'] }}"
   - domain: "traefik.lan"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "omada.lan"
-    answer: "192.168.1.143"
+    answer: "{{ hostvars['omada']['ansible_host'] }}"
 
   # DNS Servers
   - domain: "adguard.lan"
-    answer: "192.168.1.145"
+    answer: "{{ hostvars['adguard']['ansible_host'] }}"
   - domain: "adguard-primary.lan"
-    answer: "192.168.1.145"
+    answer: "{{ hostvars['adguard']['ansible_host'] }}"
   - domain: "adguard-secondary.lan"
-    answer: "192.168.1.110"
+    answer: "{{ hostvars['rpi4']['ansible_host'] }}"
   - domain: "dns1.lan"
-    answer: "192.168.1.145"
+    answer: "{{ hostvars['adguard']['ansible_host'] }}"
   - domain: "dns2.lan"
-    answer: "192.168.1.110"
+    answer: "{{ hostvars['rpi4']['ansible_host'] }}"
 
   # Raspberry Pis
   - domain: "rpi4.lan"
-    answer: "192.168.1.110"
+    answer: "{{ hostvars['rpi4']['ansible_host'] }}"
 
   # Public domain local overrides (split-DNS for internal access).
   # All *.lukapg.dev names answer with Traefik's LAN IP (192.168.1.142):
@@ -162,31 +164,34 @@ adguard_dns_rewrites:
   #
   # Two flavours coexist here:
   #   - Public *.lukapg.dev (Cloudflare A record exists, WAN-reachable
-  #     via CF proxy):  ha, photos, grafana, jellyfin, kuma, status.
+  #     via CF proxy):  ha, photos, grafana, jellyfin, kuma, status, documents.
   #   - Internal-only *.lukapg.dev (no Cloudflare A record, NXDOMAIN
   #     externally; Traefik enforces a LAN+tailnet ipAllowList on the
   #     route): n5p, tn, omada, adguard.
+  # Every entry answers with Traefik's LAN IP (derived from inventory hostvars).
   - domain: "jellyfin.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "ha.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "photos.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "grafana.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "kuma.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "status.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
+  - domain: "documents.lukapg.dev"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
 
   # Internal-only services (no public Cloudflare DNS, lan-only middleware
   # at Traefik). See ansible/roles/traefik/templates/dynamic.yml.j2 for
   # the matching routers.
   - domain: "n5p.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "tn.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "omada.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "adguard.lukapg.dev"
-    answer: "192.168.1.142"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
