@@ -6,7 +6,7 @@ Detailed reference for role creation, deployment patterns, and infrastructure op
 
 ```bash
 brew install ansible
-ansible-galaxy collection install community.general community.docker ansible.posix
+ansible-galaxy collection install -r ansible/requirements.yml
 ```
 
 SSH access to all managed hosts must be configured with key-based auth. The shared key is `~/.ssh/homelab_ansible` (except rpi4, which uses `~/.ssh/id_ed25519`).
@@ -15,11 +15,11 @@ SSH access to all managed hosts must be configured with key-based auth. The shar
 
 ```
 ansible/
-├── site.yml                  # Main entrypoint — maps roles to hosts with tags
+├── site.yml                  # Main entrypoint - maps roles to hosts with tags
 ├── ansible.cfg               # Config: inventory path, vault_password_file, SSH settings
 ├── secrets.yml               # Ansible Vault encrypted secrets (vault_* variables)
 ├── .vault_pass               # Vault password file (git-ignored, referenced in ansible.cfg)
-├── inventory/hosts.yml       # Static inventory — all hosts and group hierarchy
+├── inventory/hosts.yml       # Static inventory - all hosts and group hierarchy
 ├── group_vars/               # Variables scoped to host groups
 │   ├── all.yml               # Global: DNS servers, NFS paths, timezone, common packages
 │   ├── proxmox_hosts.yml
@@ -91,13 +91,13 @@ ansible-playbook site.yml
 ansible-playbook site.yml --tags traefik
 
 # Multiple related services
-ansible-playbook site.yml --tags media              # Plex + Jellyfin + Arr
+ansible-playbook site.yml --tags media              # Jellyfin + Arr
 ansible-playbook site.yml --tags pds                # ATProto PDS
 
 # Scope to one host
 ansible-playbook site.yml --limit immich
 
-# Skip TrueNAS (no apt — common role fails)
+# Skip TrueNAS (no apt - common role fails)
 ansible-playbook site.yml --limit 'all:!tn-storage'
 
 # Dry run
@@ -111,7 +111,7 @@ Role structure: `tasks/main.yml` includes subtasks (`directories.yml`, `deploy.y
 
 **Native binary installs** (no Docker): AdGuard Home on LXC, node-exporter, Alloy, Omada Controller (.deb).
 
-**iSCSI storage** (instead of NFS): For services that use SQLite or require POSIX file locking, use iSCSI zvols from TrueNAS instead of NFS. The PDS and Uptime Kuma roles demonstrate this pattern — zvol defined in `host_vars/tn-storage.yml`, iSCSI target created via `configure-truenas.yml`, client setup in `roles/<service>/tasks/iscsi.yml`, data mounted at `/mnt/<service>`. Compose files stay on NFS at `/srv/docker/<service>/`.
+**iSCSI storage** (instead of NFS): For services that use SQLite or require POSIX file locking, use iSCSI zvols from TrueNAS instead of NFS. The PDS and Uptime Kuma roles demonstrate this pattern - zvol defined in `host_vars/tn-storage.yml`, iSCSI target created via `configure-truenas.yml`, client setup in `roles/<service>/tasks/iscsi.yml`, data mounted at `/mnt/<service>`. Compose files stay on NFS at `/srv/docker/<service>/`.
 
 ## Secrets
 
@@ -144,32 +144,32 @@ password: "{{ vault_some_password | replace('$', '$$') }}"
 
 ## Version Management
 
-- Pin exact versions in role `defaults/main.yml` — never use `latest`
+- Pin exact versions in role `defaults/main.yml` - never use `latest`
 - **cAdvisor**: image is `ghcr.io/google/cadvisor`, tags have **no `v` prefix** (e.g., `v0.51.0` is wrong, `0.51.0` is correct)
-- **AdGuard Home**: schema auto-migrates on binary upgrade — just update the version variable
+- **AdGuard Home**: schema auto-migrates on binary upgrade - just update the version variable
 - When bumping versions, update the variable in `defaults/main.yml` and re-run with the appropriate tag
 
 ## Provisioning Pattern (Multi-Play)
 
 Provisioning playbooks (`provision-*.yml`) follow a strict multi-play pattern:
 
-1. **Play 1 — Create resource**: target hypervisor (`hosts: n5p`), use `community.general.proxmox_kvm` or `proxmox`, `register` the result
-2. **Play 2 — Add to inventory**: `ansible.builtin.add_host` into a temporary group
-3. **Play 3 — Wait for ready**: `ansible.builtin.wait_for_connection`
-4. **Play 4 — Configure**: apply roles (`common`, `docker`, service roles)
+1. **Play 1 - Create resource**: target hypervisor (`hosts: n5p`), use `community.general.proxmox_kvm` or `proxmox`, `register` the result
+2. **Play 2 - Add to inventory**: `ansible.builtin.add_host` into a temporary group
+3. **Play 3 - Wait for ready**: `ansible.builtin.wait_for_connection`
+4. **Play 4 - Configure**: apply roles (`common`, `docker`, service roles)
 
-These stay as separate playbooks — they are one-time operations, not part of `site.yml`.
+These stay as separate playbooks - they are one-time operations, not part of `site.yml`.
 
 ## PostgreSQL Major Version Upgrades (Docker)
 
-Major PostgreSQL upgrades (e.g., 14→18) require a full dump and restore — the data files are not compatible across major versions.
+Major PostgreSQL upgrades (e.g., 14→18) require a full dump and restore - the data files are not compatible across major versions.
 
 ### Procedure
 
 1. **Dump**: `docker exec -t <container> pg_dumpall --clean --if-exists --username=<user> | gzip > dump.sql.gz`
 2. **Stop the stack**: `docker compose down`
 3. **Preserve old data**: `mv database/ database-old-backup/` and create a fresh empty `database/`
-4. **Update the image tag** and volume mount (PG18 changed PGDATA — see below), then deploy
+4. **Update the image tag** and volume mount (PG18 changed PGDATA - see below), then deploy
 5. **Restore**: pipe the dump into `psql` with the `search_path` fix
 
 ### Restore command
@@ -180,7 +180,7 @@ gunzip < dump.sql.gz \
   | docker exec -i <container> psql --username=<user> --dbname=postgres
 ```
 
-**`--dbname=postgres` is critical.** Without it, psql connects to the database matching the username (e.g., `immich`). The dump contains `DROP DATABASE immich;` which silently fails if psql is connected to that same database — the restore appears to succeed but all tables end up empty.
+**`--dbname=postgres` is critical.** Without it, psql connects to the database matching the username (e.g., `immich`). The dump contains `DROP DATABASE immich;` which silently fails if psql is connected to that same database - the restore appears to succeed but all tables end up empty.
 
 ### PG18 volume mount change
 
@@ -197,5 +197,5 @@ PostgreSQL 18 changed PGDATA from `/var/lib/postgresql/data` to `/var/lib/postgr
 ### Immich-specific notes
 
 - The `sed` fixes `pg_dumpall` resetting `search_path` to empty, which breaks Immich
-- The Immich PG image switched from pgvecto.rs to pgvector — if the dump contains `CREATE EXTENSION vectors` it will error harmlessly on PG18
+- The Immich PG image switched from pgvecto.rs to pgvector - if the dump contains `CREATE EXTENSION vectors` it will error harmlessly on PG18
 - Immich v2.5.5+ is required for reliable backup/restore

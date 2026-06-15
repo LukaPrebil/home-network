@@ -140,8 +140,8 @@ The Traefik role includes several pre-configured middlewares in `dynamic.yml`:
 
 When `traefik_cloudflare_real_ip_enabled` and `traefik_crowdsec_enabled` are true (default for the traefik host), all public routes in `dynamic.yml.j2` automatically get:
 
-1. **cloudflare-real-ip** — traefik-warp plugin, extracts real client IP from Cloudflare proxy headers
-2. **crowdsec** — CrowdSec bouncer plugin (stream mode), blocks IPs flagged by CrowdSec engine or community blocklists
+1. **cloudflare-real-ip** - traefik-warp plugin, extracts real client IP from Cloudflare proxy headers
+2. **crowdsec** - CrowdSec bouncer plugin (stream mode), blocks IPs flagged by CrowdSec engine or community blocklists
 3. Per-route middlewares (proxy-headers, security-headers, rate-limit)
 
 This chain is built via a Jinja2 namespace variable (`_ns.security_mw`) at the top of the template.
@@ -180,7 +180,7 @@ The `.lan` domain is configured as an AdGuard DNS rewrite in `roles/adguard/defa
 
 ### Internal-Only Routes (HTTPS via Traefik, no public DNS)
 
-Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reachable at `*.lukapg.dev` URLs that are **only resolvable on the LAN and tailnet** — public DNS returns NXDOMAIN. Traefik enforces a `lan-only` `ipAllowList` middleware as a defence-in-depth backstop.
+Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reachable at `*.lukapg.dev` URLs that are **only resolvable on the LAN** - public DNS returns NXDOMAIN. Traefik enforces a `lan-only` `ipAllowList` middleware as a defence-in-depth backstop. (Off-LAN access over the tailnet is planned but **not yet deployed** - it needs the Tailscale subnet router + a DNS override; the `lan-only` middleware already pre-allowlists the Tailscale CGNAT ranges below so it will work once that lands.)
 
 Pattern:
 
@@ -232,12 +232,12 @@ For services running on a different host (not co-located with Traefik), use the 
 
 ### Example: ATProto PDS with Wildcard Subdomain Routing
 
-The PDS requires two routers — one for the main hostname and one for user handle subdomains:
+The PDS requires two routers - one for the main hostname and one for user handle subdomains:
 
 ```yaml
 # In dynamic.yml.j2 (routers section)
 routers:
-  # ATProto PDS — single hostname, no wildcard subdomains needed.
+  # ATProto PDS - single hostname, no wildcard subdomains needed.
   # Handles are verified via DNS TXT records (_atproto.<domain>),
   # so only pds.lukapg.dev needs routing. This allows Cloudflare
   # proxy (orange cloud) to hide the origin IP.
@@ -267,9 +267,9 @@ services:
 
 **Key points for static routing:**
 - `passHostHeader: true` is essential when the backend uses the Host header for routing (e.g., multi-tenant services)
-- Handles use DNS TXT verification (`_atproto.<domain>` TXT `did=did:plc:...`) — no wildcard subdomain routing needed
+- Handles use DNS TXT verification (`_atproto.<domain>` TXT `did=did:plc:...`) - no wildcard subdomain routing needed
 - `pds.lukapg.dev` is proxied through Cloudflare (orange cloud) since `*.lukapg.dev` is covered by free Universal SSL
-- WebSocket connections (like ATProto's firehose) are proxied natively — no extra middleware needed
+- WebSocket connections (like ATProto's firehose) are proxied natively - no extra middleware needed
 
 ## Troubleshooting
 
