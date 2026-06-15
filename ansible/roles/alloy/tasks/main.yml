@@ -67,6 +67,10 @@
   register: alloy_installed_version
   changed_when: false
   failed_when: false
+  # Read-only probe: run it under --check too, otherwise alloy_needs_upgrade is
+  # spuriously true (skipped command -> empty rc) and the staging/download tasks
+  # fire against a dir check mode never created, failing the whole --check run.
+  check_mode: false
   tags:
     - alloy
     - monitoring

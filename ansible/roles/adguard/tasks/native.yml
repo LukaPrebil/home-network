@@ -92,6 +92,10 @@
     cmd: "{{ adguard_install_dir }}/AdGuardHome --version"
   register: adguard_installed_version
   changed_when: false
+  # Read-only probe: run under --check too, otherwise adguard_needs_install is
+  # spuriously true (skipped command) and the download/extract tasks fire against
+  # a /tmp tarball check mode never fetched, failing the --check run.
+  check_mode: false
   when: adguard_binary.stat.exists
 
 - name: Determine if install or upgrade is needed
@@ -180,6 +184,10 @@
   changed_when: false
   failed_when: false
   no_log: true
+  # Read-only verify: run under --check too, else adguard_hash_stale defaults true
+  # (skipped shell -> rc default 1) and the config re-renders a fresh bcrypt salt,
+  # showing a spurious "changed" on every --check run.
+  check_mode: false
   when: adguard_existing_hash | length > 0
 
 # bcrypt salts differ per run: regenerating unconditionally would change the
