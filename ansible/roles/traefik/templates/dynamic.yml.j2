@@ -76,7 +76,7 @@ http:
 {% endif %}
 
 {% if traefik_crowdsec_enabled | default(false) %}
-    # CrowdSec bouncer — blocks IPs flagged by CrowdSec engine
+    # CrowdSec bouncer - blocks IPs flagged by CrowdSec engine
     crowdsec:
       plugin:
         crowdsec:
@@ -240,7 +240,7 @@ http:
 
     # ATProto PDS (Personal Data Server)
     # Handles are verified via DNS TXT records (not wildcard subdomains)
-    # so only pds.lukapg.dev needs routing — no *.pds.lukapg.dev needed.
+    # so only pds.lukapg.dev needs routing - no *.pds.lukapg.dev needed.
     # This allows Cloudflare proxy (orange cloud) to hide the origin IP.
     pds-secure:
       rule: "Host(`pds.{{ traefik_domain | default('lukapg.dev') }}`)"
@@ -262,15 +262,15 @@ http:
         - rate-limit
 
     # ─── Internal-only routers (LAN + tailnet only) ───
-    # No Cloudflare proxy, no public DNS — split-DNS only via AdGuard.
+    # No Cloudflare proxy, no public DNS - split-DNS only via AdGuard.
     # Middleware chain: `lan-only` first (drops non-LAN/non-tailnet),
     # `crowdsec` next (brute-force detection on internal admin endpoints
-    # — Proxmox login is the highest-value target in the homelab), then
+    # - Proxmox login is the highest-value target in the homelab), then
     # `proxy-headers` and `security-headers`.
     # Intentionally omitted: `cloudflare-real-ip` (no CF in path) and
     # `rate-limit` (admin SPAs poll fast enough to brush 100 req/min).
 
-    # Proxmox VE (n5p) — HTTPS self-signed backend, noVNC over WebSocket
+    # Proxmox VE (n5p) - HTTPS self-signed backend, noVNC over WebSocket
     proxmox-secure:
       rule: "Host(`n5p.{{ traefik_domain | default('lukapg.dev') }}`)"
       entryPoints:
@@ -290,7 +290,7 @@ http:
         - proxy-headers
         - security-headers
 
-    # TrueNAS Scale — HTTPS self-signed backend, WebSocket Web Shell
+    # TrueNAS Scale - HTTPS self-signed backend, WebSocket Web Shell
     truenas-secure:
       rule: "Host(`tn.{{ traefik_domain | default('lukapg.dev') }}`)"
       entryPoints:
@@ -310,7 +310,7 @@ http:
         - proxy-headers
         - security-headers
 
-    # Omada Controller — HTTPS self-signed backend, WebSocket device map
+    # Omada Controller - HTTPS self-signed backend, WebSocket device map
     omada-secure:
       rule: "Host(`omada.{{ traefik_domain | default('lukapg.dev') }}`)"
       entryPoints:
@@ -330,7 +330,7 @@ http:
         - proxy-headers
         - security-headers
 
-    # AdGuard Home (primary) — plain HTTP backend on adguard LXC
+    # AdGuard Home (primary) - plain HTTP backend on adguard LXC
     adguard-secure:
       rule: "Host(`adguard.{{ traefik_domain | default('lukapg.dev') }}`)"
       entryPoints:
@@ -358,13 +358,13 @@ http:
     homeassistant:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.144:8123"
+          - url: "http://{{ hostvars['haos']['ansible_host'] }}:8123"
         passHostHeader: true
 
     uptimekuma:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.140:3001"
+          - url: "http://{{ hostvars['containers']['ansible_host'] }}:3001"
         passHostHeader: true
 
 
@@ -372,31 +372,31 @@ http:
     immich:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.141:2283"
+          - url: "http://{{ hostvars['immich']['ansible_host'] }}:2283"
         passHostHeader: true
 
     grafana:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.146:3000"
+          - url: "http://{{ hostvars['monitoring']['ansible_host'] }}:3000"
         passHostHeader: true
 
     jellyfin:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.147:8096"
+          - url: "http://{{ hostvars['media']['ansible_host'] }}:8096"
         passHostHeader: true
 
     paperless:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.140:8010"
+          - url: "http://{{ hostvars['containers']['ansible_host'] }}:8010"
         passHostHeader: true
 
     pds:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.140:3000"
+          - url: "http://{{ hostvars['containers']['ansible_host'] }}:3000"
         passHostHeader: true
 
     # ─── Internal-only service backends ───
@@ -406,32 +406,32 @@ http:
     proxmox:
       loadBalancer:
         servers:
-          - url: "https://192.168.1.128:8006"
+          - url: "https://{{ hostvars['n5p']['ansible_host'] }}:8006"
         passHostHeader: true
         serversTransport: proxmox-tls
 
     truenas:
       loadBalancer:
         servers:
-          - url: "https://192.168.1.150:443"
+          - url: "https://{{ hostvars['tn-storage']['ansible_host'] }}:443"
         passHostHeader: true
         serversTransport: truenas-tls
 
     omada:
       loadBalancer:
         servers:
-          - url: "https://192.168.1.143:8043"
+          - url: "https://{{ hostvars['omada']['ansible_host'] }}:8043"
         passHostHeader: true
         serversTransport: omada-tls
 
     adguard:
       loadBalancer:
         servers:
-          - url: "http://192.168.1.145:3000"
+          - url: "http://{{ hostvars['adguard']['ansible_host'] }}:3000"
         passHostHeader: true
 {% endif %}
 
-  # serversTransports — per-router upstream TLS verification policy.
+  # serversTransports - per-router upstream TLS verification policy.
   # Internal HTTPS backends present self-signed certs; insecureSkipVerify
   # is acceptable here because the connection is LAN-only and the backend
   # identity is implicit in the routing rule (Host header → fixed IP).

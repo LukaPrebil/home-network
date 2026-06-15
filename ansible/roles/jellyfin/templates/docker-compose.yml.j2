@@ -17,7 +17,7 @@ services:
 {% endif %}
     environment:
       - TZ={{ jellyfin_timezone }}
-      - JELLYFIN_PublishedServerUrl=http://192.168.1.147  # Set to Plex LXC IP for now
+      - JELLYFIN_PublishedServerUrl=http://{{ ansible_host }}
     volumes:
       - {{ jellyfin_config_dir }}:/config
       - {{ jellyfin_cache_dir }}:/cache

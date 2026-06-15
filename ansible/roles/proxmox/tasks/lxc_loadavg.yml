@@ -105,7 +105,7 @@
   ansible.builtin.command:
     argv:
       - dig
-      - "@192.168.1.110"
+      - "@{{ hostvars['rpi4']['ansible_host'] }}"
       - google.com
       - +short
       - +time=2
