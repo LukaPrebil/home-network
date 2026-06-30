@@ -3,8 +3,11 @@
 # Each container will be provisioned using the community.proxmox.proxmox module
 
 # LXC Template configuration
-lxc_template_ubuntu: "ubuntu-25.04-standard_25.04-1.1_amd64.tar.zst"  # Ubuntu 25.04 Plucky Proxmox template
-lxc_template_url: "http://download.proxmox.com/images/system/ubuntu-25.04-standard_25.04-1.1_amd64.tar.zst"
+# Ubuntu 26.04 LTS (25.04 Plucky is EOL). Confirm the exact build suffix on n5p
+# before provisioning - `pveam available --section system | grep ubuntu-26` -
+# and correct the filename below if it is not -1 (get_url 404s loudly if wrong).
+lxc_template_ubuntu: "ubuntu-26.04-standard_26.04-1_amd64.tar.zst"  # Ubuntu 26.04 LTS Proxmox template
+lxc_template_url: "http://download.proxmox.com/images/system/ubuntu-26.04-standard_26.04-1_amd64.tar.zst"
 
 lxc_containers:
   - name: immich
@@ -203,6 +206,35 @@ lxc_containers:
     startup: "order=3"  # Boot after TrueNAS + containers VM (needs ha-mcp reachable)
     gpu_passthrough: false
     nfs_docker_volumes: false  # State stays on local rootfs - SQLite locking on NFS is banned
+
+  - name: mattermost
+    vmid: 207
+    node: n5p
+    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
+    vlan_id: null  # No VLAN until router is deployed (flat network for now)
+    ip: 192.168.1.151  # Temporary IP (migrates to a Servers-VLAN IP later); .150 is TrueNAS
+    gateway: 192.168.1.1
+    netmask: 24
+    cores: 2
+    memory: 4096  # 4GB. App idles low; Postgres takes ~25-30%. Ample for the
+    # 20-user cap; bump only if it ever OOMs.
+    swap: 1024
+    disk: 24  # 24GB root disk: OS + Docker images + Postgres text data. Uploads
+    # live on the separate encrypted NFS mount, not here.
+    storage: truenas-vms-enc  # Encrypted dataset, so Postgres on the local rootfs
+    # is encrypted at rest without touching the shared proxmox-vms dataset.
+    description: "Mattermost team chat - self-hosted Slack alternative (Team Edition)"
+    unprivileged: true
+    features:
+      - nesting=1  # Required for Docker inside LXC
+      - keyctl=1   # Required for systemd
+      - fuse=1     # Required for FUSE filesystems
+      - mknod=1    # Required for NFS mounts
+    onboot: true
+    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
+    gpu_passthrough: false
+    nfs_docker_volumes: false  # App state on local rootfs; uploads via the
+    # dedicated encrypted NFS mount handled by the role.
 
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:

@@ -68,6 +68,27 @@ zfs_datasets:
     description: "Paperless-ngx document storage"
     compression: zstd  # Documents compress well
 
+  # Mattermost LXC disk image (OS + Docker + Postgres). Dedicated ENCRYPTED
+  # dataset: Postgres stays on the LXC local rootfs per the no-DB-on-NFS rule,
+  # and encrypting this dataset gives at-rest protection without migrating the
+  # shared proxmox-vms dataset (ZFS cannot encrypt in place). Keyfile
+  # auto-unlock (generate_key) so the LXC recovers unattended after a power
+  # event; export the key once and store it offline.
+  - name: "{{ zfs_pool_name }}/mattermost-vm"
+    quota: 64G
+    description: "Mattermost LXC disk image (encrypted at rest)"
+    compression: lz4
+    encryption: true
+
+  # Mattermost file uploads (attachments, avatars), bind-mounted into the
+  # container. Large blobs, not a DB, so NFS is fine - encrypted to match the
+  # message store.
+  - name: "{{ zfs_pool_name }}/mattermost-uploads"
+    quota: 50G
+    description: "Mattermost file uploads (encrypted at rest)"
+    compression: lz4
+    encryption: true
+
 # NFS Share Configuration
 # Fields mirror the TrueNAS Scale sharing.nfs API (ro, maproot_*, mapall_*).
 # Classic exports options (sync/async, no_subtree_check, ...) are NOT
@@ -164,6 +185,29 @@ nfs_shares:
   # Separate pool for Plex media library (movies, TV shows, downloads)
   - path: "/mnt/plex-bulk"
     name: plex-bulk
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    ro: false
+    maproot_user: root
+    maproot_group: root
+
+  # Encrypted Mattermost LXC-disk dataset, added to Proxmox as the
+  # `truenas-vms-enc` storage (content images,rootdir) so the mattermost LXC
+  # rootfs lands on encrypted storage.
+  - path: "/mnt/{{ zfs_pool_name }}/mattermost-vm"
+    name: mattermost-vm
+    allowed_networks:
+      - 192.168.1.0/24
+      - 192.168.30.0/24
+    ro: false
+    maproot_user: root
+    maproot_group: root
+
+  # Encrypted Mattermost uploads dataset, mounted on the mattermost LXC host
+  # and bind-mounted into the container.
+  - path: "/mnt/{{ zfs_pool_name }}/mattermost-uploads"
+    name: mattermost-uploads
     allowed_networks:
       - 192.168.1.0/24
       - 192.168.30.0/24

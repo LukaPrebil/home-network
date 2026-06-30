@@ -164,7 +164,7 @@ adguard_dns_rewrites:
   #
   # Two flavours coexist here:
   #   - Public *.lukapg.dev (Cloudflare A record exists, WAN-reachable
-  #     via CF proxy):  ha, photos, grafana, jellyfin, kuma, status, documents.
+  #     via CF proxy):  ha, photos, grafana, jellyfin, kuma, status, documents, chat.
   #   - Internal-only *.lukapg.dev (no Cloudflare A record, NXDOMAIN
   #     externally; Traefik enforces a LAN+tailnet ipAllowList on the
   #     route): n5p, tn, omada, adguard.
@@ -182,6 +182,8 @@ adguard_dns_rewrites:
   - domain: "status.lukapg.dev"
     answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "documents.lukapg.dev"
+    answer: "{{ hostvars['traefik']['ansible_host'] }}"
+  - domain: "chat.lukapg.dev"
     answer: "{{ hostvars['traefik']['ansible_host'] }}"
 
   # Internal-only services (no public Cloudflare DNS, lan-only middleware

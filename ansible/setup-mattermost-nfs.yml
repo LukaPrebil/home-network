@@ -1,0 +1,81 @@
+---
+# Configure the n5p host NFS mount for the mattermost uploads dataset and bind
+# it into the LXC. Idempotent and safe to re-run: the host-mount reconciles its
+# hardened fstab opts (x-systemd.automount, retry) on every run via
+# state: mounted; the disruptive stop -> pct set -> start block runs only when
+# the bind is not already configured (first provision). Re-running against a
+# live, bound container is a no-op.
+
+- name: Setup NFS uploads mount for the mattermost container
+  hosts: n5p
+  become: true
+  vars_files:
+    - group_vars/all.yml
+    - roles/mattermost/defaults/main.yml
+
+  tasks:
+    - name: Ensure the host NFS mount point for Mattermost uploads exists
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-mattermost-uploads
+        state: directory
+        mode: '0755'
+
+    - name: Mount the TrueNAS Mattermost uploads NFS share on the Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/truenas-mattermost-uploads
+        src: "{{ mattermost_nfs_server }}:{{ mattermost_nfs_share }}"
+        fstype: nfs
+        opts: "{{ mattermost_nfs_opts }}"
+        state: mounted
+
+    - name: Grant the container uid write access to the uploads dataset
+      # The container (uid {{ mattermost_run_uid }}) maps to host uid
+      # {{ mattermost_uploads_host_uid }} in the unprivileged LXC, and that
+      # shifted uid is what reaches TrueNAS over the maproot-root NFS share. The
+      # dataset is created root-owned, so chown it to the shifted uid here (n5p
+      # root can, maproot maps it to TrueNAS root) or the server cannot write.
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-mattermost-uploads
+        state: directory
+        owner: "{{ mattermost_uploads_host_uid }}"
+        group: "{{ mattermost_uploads_host_gid }}"
+        mode: '0750'
+
+    - name: Read current bind-mount config for the mattermost container
+      ansible.builtin.command:
+        cmd: /usr/sbin/pct config 207
+      register: mattermost_pct_config
+      changed_when: false
+
+    - name: Determine whether the uploads bind mount is already configured
+      ansible.builtin.set_fact:
+        mattermost_bind_present: >-
+          {{ (',mp=' + mattermost_uploads_mount) in mattermost_pct_config.stdout }}
+
+    - name: Configure the uploads bind mount (one-time, requires the container stopped)
+      when: not mattermost_bind_present
+      block:
+        - name: Stop the mattermost container to add the bind mount
+          ansible.builtin.command:
+            cmd: /usr/sbin/pct stop 207
+          register: mattermost_pct_stop
+          failed_when: false
+          changed_when: mattermost_pct_stop.rc == 0
+
+        - name: Wait for the container to stop
+          ansible.builtin.pause:
+            seconds: 5
+
+        - name: Configure the uploads bind mount in the mattermost container
+          ansible.builtin.command:
+            cmd: /usr/sbin/pct set 207 -mp0 /mnt/pve/truenas-mattermost-uploads,mp={{ mattermost_uploads_mount }}
+          changed_when: true
+
+        - name: Start the mattermost container
+          ansible.builtin.command:
+            cmd: /usr/sbin/pct start 207
+          changed_when: true
+
+        - name: Wait for the container to start
+          ansible.builtin.pause:
+            seconds: 10

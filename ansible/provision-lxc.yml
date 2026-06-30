@@ -20,12 +20,12 @@
     - vars/lxc.yml
 
   tasks:
-    - name: Check if Ubuntu 25.04 LXC template exists
+    - name: Check if the Ubuntu LXC template exists
       ansible.builtin.stat:
         path: "/var/lib/vz/template/cache/{{ lxc_template_ubuntu }}"
       register: lxc_template_check
 
-    - name: Download Ubuntu 25.04 Proxmox LXC template
+    - name: Download the Ubuntu Proxmox LXC template
       ansible.builtin.get_url:
         url: "{{ lxc_template_url }}"
         dest: "/var/lib/vz/template/cache/{{ lxc_template_ubuntu }}"
@@ -35,6 +35,10 @@
 - name: Check existing LXC containers and provision new ones
   hosts: proxmox_hosts
   gather_facts: true
+  # pct/pvesm probes shell out as the non-root ansible_user, whose PATH
+  # excludes /usr/sbin; without play-level become the read tasks hit
+  # "pct: command not found". The mutating tasks below already escalate.
+  become: true
   vars_files:
     - vars/lxc.yml
     - group_vars/all.yml
@@ -54,9 +58,19 @@
       ansible.builtin.set_fact:
         existing_vmids: "{{ existing_containers.stdout_lines | map('int') | list }}"
 
+    # Optional scoping: pass -e lxc_provision_only=mattermost (comma-separated
+    # for several) to create only those containers. Without it, behavior is
+    # unchanged - every declared-but-absent container is created. This exists so
+    # adding one new container does not also create others that are declared but
+    # intentionally not yet provisioned (e.g. hermes).
     - name: Filter containers that need to be created
       ansible.builtin.set_fact:
-        containers_to_create: "{{ lxc_containers | rejectattr('vmid', 'in', existing_vmids | default([])) | list }}"
+        containers_to_create: >-
+          {{ _absent if _only | length == 0
+             else _absent | selectattr('name', 'in', _only) | list }}
+      vars:
+        _absent: "{{ lxc_containers | rejectattr('vmid', 'in', existing_vmids | default([])) | list }}"
+        _only: "{{ (lxc_provision_only | default('')).split(',') | map('trim') | select | list }}"
 
     - name: Display containers to be created
       ansible.builtin.debug:
