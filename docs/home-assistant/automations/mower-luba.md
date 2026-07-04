@@ -8,7 +8,7 @@ All are managed via the `ha-mcp` tools (never edit HA YAML directly). Household-
 
 - **Channel:** `Mower` (green `#8BC34A`, `mdi:robot-mower`), `group: mower` so all Luba alerts stack together.
 - **Language:** household alerts are Slovenian (like laundry/mold); the offline alert is English (like battery/Proxmox admin alerts).
-- **Deep link:** every notification `clickAction` -> `/home/areas-driveway` (the "Vrt" area view; area_id is `driveway`, display name "Vrt"; the Luba device is assigned to that area).
+- **Deep link:** every notification `clickAction` -> `/dashboard-mower` (the dedicated "Luba" mower dashboard in the sidebar - see [`../dashboards/mower.md`](../dashboards/mower.md)). Previously targeted the auto-generated "Vrt" area subview (`/home/areas-driveway`); repointed to the curated dashboard so a tap lands on the camera + controls surface rather than the 77-entity area pile. A storage-dashboard path also always resolves, avoiding the built-in `/home` panel ambiguity.
 - Every automation: area `house`, label `push_notification`.
 
 ## Automations
