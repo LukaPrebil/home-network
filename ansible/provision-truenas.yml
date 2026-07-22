@@ -3,9 +3,9 @@
 # - First run: creates the VM and prepares it for manual installation
 #   via the web UI.
 # - Subsequent runs: leave the existing VM in place; reconcile the qm
-#   config knobs we manage as IaC (currently: net0 multiqueue and the
-#   per-VM firewall bridge flag). Reboots the VM iff a managed knob
-#   actually drifted.
+#   config knobs we manage as IaC (currently: balloon, net0 multiqueue,
+#   the per-VM firewall bridge flag, and the NFS readiness gate
+#   hookscript). Reboots the VM iff a reboot-class knob actually drifted.
 #
 # Run order with configure-truenas.yml: configure first (stages
 # midclt-side changes like kernel_extra_options), provision second
@@ -46,6 +46,7 @@
   become: true
   vars_files:
     - secrets.yml
+    - group_vars/all.yml  # truenas_nfs_server for the NFS readiness gate
   vars:
     truenas_vmid: 100
     truenas_name: "tn-storage"
@@ -68,6 +69,12 @@
     # window. Default false so unrelated runs of this playbook never
     # trigger an unintended reboot.
     truenas_allow_reboot: false
+    # NFS readiness gate hookscript (templates/truenas-nfs-gate.sh.j2):
+    # poll cadence/cap for the post-start showmount loop, and the PVE
+    # volume id the hookscript is attached under.
+    truenas_nfs_gate_poll_interval: 5
+    truenas_nfs_gate_timeout: 600
+    truenas_hookscript_volid: "local:snippets/truenas-nfs-gate.sh"
   tasks:
     - name: Check if TrueNAS VM already exists
       ansible.builtin.command:
@@ -215,6 +222,75 @@
       ansible.builtin.command:
         cmd: qm set {{ truenas_vmid }} --balloon 0
       when: (truenas_balloon_read.stdout | default('') | trim) != '0'
+      changed_when: true
+
+    # ---- NFS readiness gate (no reboot; hookscript applies at next VM start) ----
+    # After a cold host boot, startall released the order=2 group 120s after
+    # TrueNAS started even when its NFS export was not up yet (2026-07-22
+    # power-loss outage: HAOS timed out opening its qcow2 and startall never
+    # retried). The hookscript polls the export from the host inside VM 100's
+    # post-start phase, delaying the next startup order group until storage
+    # actually answers. Decoupled from the reboot-gated net0 logic below.
+
+    - name: Read content types of the local storage from storage.cfg
+      # Default `local` content (iso,vztmpl,backup) does NOT include snippets,
+      # which qm --hookscript requires. Probe rather than rewrite storage.cfg;
+      # pvesm below is the supported write path.
+      ansible.builtin.command:
+        argv:
+          - awk
+          - '$1 == "dir:" { in_local = ($2 == "local") } in_local && $1 == "content" { print $2; exit }'
+          - /etc/pve/storage.cfg
+      register: truenas_local_content_read
+      changed_when: false
+      check_mode: false
+
+    - name: Assert the local storage stanza was found
+      ansible.builtin.assert:
+        that:
+          - truenas_local_content_read.stdout | trim | length > 0
+        fail_msg: >-
+          Could not read the `content` line of the `local` storage from
+          /etc/pve/storage.cfg; refusing to guess at pvesm set arguments.
+
+    - name: Enable snippets content on local storage (hookscript prerequisite)
+      ansible.builtin.command:
+        cmd: "pvesm set local --content {{ (truenas_local_content_read.stdout | trim) ~ ',snippets' }}"
+      when: "'snippets' not in (truenas_local_content_read.stdout | trim).split(',')"
+      changed_when: true
+
+    - name: Ensure snippets directory exists on local storage
+      ansible.builtin.file:
+        path: /var/lib/vz/snippets
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy TrueNAS NFS readiness gate hookscript
+      ansible.builtin.template:
+        src: truenas-nfs-gate.sh.j2
+        dest: /var/lib/vz/snippets/truenas-nfs-gate.sh
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Read current hookscript from qm config
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ truenas_vmid }} | awk '/^hookscript:/ { print $2; exit }'
+        executable: /bin/bash
+      register: truenas_hookscript_read
+      changed_when: false
+      check_mode: false
+
+    - name: Attach NFS readiness gate hookscript (if drifted)
+      # Operand order matters to ansible-lint: `!= truenas_...` false-positives
+      # the literal-compare rule (matches the leading `true` of the var name).
+      ansible.builtin.command:
+        cmd: qm set {{ truenas_vmid }} --hookscript {{ truenas_hookscript_volid }}
+      when: truenas_hookscript_volid != (truenas_hookscript_read.stdout | default('') | trim)
       changed_when: true
 
     # ---- Reconciliation block: runs every time ----

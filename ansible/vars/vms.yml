@@ -14,9 +14,10 @@ vms_to_create:
     # An earlier attempt at 6GB cap / 2GB balloon FLOOR caused OOMs because pvestatd
     # actively shrunk the live VM to ~2.6GB under host pressure and bursts then
     # exceeded the floor. A flat cap (memory==balloon, no shrinking) is the safe
-    # shape — bursts go up to 6GB without pvestatd intervention.
+    # shape - bursts go up to 6GB without pvestatd intervention.
     disk_size: "+40G"  # Increase disk by 40GB (total 50GB)
     storage: truenas-vms
+    onboot: true  # Start on host boot (enforced by the vm-startup-reconcile play)
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     description: "Docker Host VM - runs containerized services"
 
@@ -31,6 +32,7 @@ vms_to_create:
     # because peak working set spikes well above steady-state).
     disk_size: "+90G"  # Template ships 10GB, final disk 100GB
     storage: truenas-vms
+    onboot: true  # Start on host boot (enforced by the vm-startup-reconcile play)
     startup: "order=3"  # Boot after tn-storage (order=1) and containers (order=2)
     # Per-VM DNS override - AdGuard pair only, no Cloudflare fallback.
     # The global default in group_vars/all.yml falls back to 1.1.1.1/1.0.0.1

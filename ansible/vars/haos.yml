@@ -31,6 +31,10 @@ haos_vm:
   machine: q35
   cpu: host
   onboot: true
+  # Boot after TrueNAS (order=1) provides NFS storage - the HAOS disk lives
+  # on truenas-vms. Adopted from the hand-set live config on 2026-07-22;
+  # enforced by the haos-startup-reconcile play.
+  startup: "order=2"
 
   description: "Home Assistant OS - Smart home automation platform"
 

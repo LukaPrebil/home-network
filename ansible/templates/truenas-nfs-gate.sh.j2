@@ -1,0 +1,44 @@
+#!/bin/bash
+# Managed by Ansible (provision-truenas.yml). Proxmox guest hookscript for the
+# TrueNAS VM ({{ truenas_vmid }}): after the VM starts, poll its NFS export so the next
+# startup order group does not race a cold NFS server. A fixed `up=120` was
+# not enough on 2026-07-22: HAOS timed out opening its qcow2 on
+# /mnt/pve/truenas-vms because TrueNAS was not serving NFS yet, and startall
+# never retries a failed guest.
+#
+# Hidden constraint: the gate only delays guests in LATER startup order
+# groups. startall's end-of-group barrier waits for the vm_start worker, and
+# the post-start hook runs synchronously inside that worker (verified on PVE
+# 9.2.4, Nodes.pm:2283-2289). Any guest sharing order=1 with the TrueNAS VM
+# would start concurrently, ungated - VM {{ truenas_vmid }} must remain ALONE in order=1.
+set -u
+
+vmid="${1:-}"
+phase="${2:-}"
+
+# Gate only the TrueNAS VM's own post-start; every other guest/phase passes
+# through instantly.
+if [ "${phase}" != "post-start" ] || [ "${vmid}" != "{{ truenas_vmid }}" ]; then
+  exit 0
+fi
+
+nfs_server="{{ truenas_nfs_server }}"
+poll_interval="{{ truenas_nfs_gate_poll_interval }}"
+poll_timeout="{{ truenas_nfs_gate_timeout }}"
+deadline=$((SECONDS + poll_timeout))
+
+echo "truenas-nfs-gate: waiting up to ${poll_timeout}s for NFS exports on ${nfs_server}"
+while [ "${SECONDS}" -lt "${deadline}" ]; do
+  # Per-attempt timeout: showmount can hang on an unreachable RPC portmapper
+  # far longer than one poll interval.
+  if timeout 5 showmount -e "${nfs_server}" >/dev/null 2>&1; then
+    echo "truenas-nfs-gate: NFS exports up after ${SECONDS}s"
+    exit 0
+  fi
+  sleep "${poll_interval}"
+done
+
+# Exit 0 even at the cap: PVE only warns on post-start hook failures, and a
+# wedged gate must never block the rest of startall.
+echo "truenas-nfs-gate: WARNING: NFS exports on ${nfs_server} still unreachable after ${poll_timeout}s; continuing startall anyway" >&2
+exit 0

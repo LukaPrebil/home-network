@@ -323,6 +323,85 @@
         - (item.stdout | int) != (item.item.memory | int)
       changed_when: true
 
+- name: Reconcile onboot and startup order on existing LXC containers
+  # The create-step applies onboot/startup only at first provision; this play
+  # converges both knobs for every declared container that actually exists.
+  # hermes (206) is declared but intentionally unprovisioned - the probe
+  # answers MISSING for absent vmids and the apply tasks skip them. Live
+  # state already matches the declarations, so this is an expected no-op.
+  #
+  # Tagged `lxc-startup-reconcile` so it can be run in isolation without
+  # triggering the create-flow: ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile
+  hosts: proxmox_hosts
+  gather_facts: false
+  become: true
+  tags:
+    - lxc-startup-reconcile
+  vars_files:
+    - vars/lxc.yml
+
+  tasks:
+    - name: Read current onboot flag for each declared LXC
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          if pct status {{ item.vmid }} >/dev/null 2>&1; then
+            pct config {{ item.vmid }} | awk '/^onboot:/ { print $2; exit }'
+          else
+            echo "MISSING"
+          fi
+        executable: /bin/bash
+      loop: "{{ lxc_containers }}"
+      loop_control:
+        label: "{{ item.name }} (vmid {{ item.vmid }})"
+      register: lxc_current_onboot
+      changed_when: false
+      check_mode: false
+
+    - name: Apply onboot flag drift correction
+      # pct config omits the onboot line entirely when it was never set (PVE
+      # default 0), so an empty probe result counts as '0'.
+      ansible.builtin.command:
+        cmd: pct set {{ item.item.vmid }} --onboot {{ 1 if (item.item.onboot | default(lxc_defaults.onboot) | bool) else 0 }}
+      loop: "{{ lxc_current_onboot.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout | default('unset') | trim }} -> {{ item.item.onboot | default(lxc_defaults.onboot) }}"
+      when:
+        - item.stdout is defined
+        - item.stdout != 'MISSING'
+        - ((item.stdout | trim) or '0') != ('1' if (item.item.onboot | default(lxc_defaults.onboot) | bool) else '0')
+      changed_when: true
+
+    - name: Read current startup order for each declared LXC
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          if pct status {{ item.vmid }} >/dev/null 2>&1; then
+            pct config {{ item.vmid }} | awk '/^startup:/ { print $2; exit }'
+          else
+            echo "MISSING"
+          fi
+        executable: /bin/bash
+      loop: "{{ lxc_containers }}"
+      loop_control:
+        label: "{{ item.name }} (vmid {{ item.vmid }})"
+      register: lxc_current_startup
+      changed_when: false
+      check_mode: false
+
+    - name: Apply startup order drift correction
+      ansible.builtin.command:
+        cmd: pct set {{ item.item.vmid }} --startup {{ item.item.startup }}
+      loop: "{{ lxc_current_startup.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout | default('unset') | trim }} -> {{ item.item.startup | default('skip') }}"
+      when:
+        - item.item.startup is defined
+        - item.stdout is defined
+        - item.stdout != 'MISSING'
+        - (item.stdout | trim) != item.item.startup
+      changed_when: true
+
 - name: Add new containers to in-memory inventory
   hosts: localhost
   gather_facts: false

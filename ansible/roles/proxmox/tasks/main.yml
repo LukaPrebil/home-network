@@ -35,3 +35,14 @@
   tags:
     - snapshot-cron
     - proxmox
+
+- name: Include Wake-on-LAN arming tasks
+  ansible.builtin.include_tasks:
+    file: wol.yml
+    apply:
+      tags:
+        - wol
+        - proxmox
+  tags:
+    - wol
+    - proxmox

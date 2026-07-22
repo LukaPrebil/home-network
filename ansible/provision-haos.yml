@@ -99,6 +99,7 @@
           --ostype l26
           --scsihw virtio-scsi-single
           --onboot {{ 1 if haos_vm.onboot else 0 }}
+          {% if haos_vm.startup is defined %}--startup {{ haos_vm.startup }}{% endif %}
           --tablet 0
           --agent enabled=1
           --description "{{ haos_vm.description }}"
@@ -212,6 +213,60 @@
       when:
         - haos_vm.balloon is defined
         - (haos_balloon_read.stdout | default('') | trim | int) != (haos_vm.balloon | int)
+      changed_when: true
+
+# Reconcile onboot + startup order on every run. The create play above ends
+# the host when the VM already exists, so create-time flags never reach an
+# existing VM; the live order=2 was hand-set outside the repo until it was
+# adopted into vars/haos.yml on 2026-07-22. HAOS is not SSH-managed - this
+# play only ever talks to qm on the Proxmox host, never the guest.
+- name: Reconcile HAOS onboot and startup order
+  # Tagged `haos-startup-reconcile` so it can be run in isolation:
+  # ansible-playbook provision-haos.yml --tags haos-startup-reconcile
+  hosts: n5p
+  become: true
+  gather_facts: false
+  tags:
+    - haos-startup-reconcile
+  vars_files:
+    - vars/haos.yml
+  tasks:
+    - name: Read current HAOS onboot flag
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ haos_vm.vmid }} | awk '/^onboot:/ { print $2; exit }'
+        executable: /bin/bash
+      register: haos_onboot_read
+      changed_when: false
+      check_mode: false
+
+    - name: Apply onboot flag if drifted
+      # qm config omits the onboot line entirely when it was never set (PVE
+      # default 0), so an empty probe result counts as '0'.
+      ansible.builtin.command:
+        cmd: qm set {{ haos_vm.vmid }} --onboot {{ 1 if (haos_vm.onboot | bool) else 0 }}
+      when:
+        - haos_vm.onboot is defined
+        - ((haos_onboot_read.stdout | default('') | trim) or '0') != ('1' if (haos_vm.onboot | bool) else '0')
+      changed_when: true
+
+    - name: Read current HAOS startup order
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ haos_vm.vmid }} | awk '/^startup:/ { print $2; exit }'
+        executable: /bin/bash
+      register: haos_startup_read
+      changed_when: false
+      check_mode: false
+
+    - name: Apply startup order if drifted
+      ansible.builtin.command:
+        cmd: qm set {{ haos_vm.vmid }} --startup {{ haos_vm.startup }}
+      when:
+        - haos_vm.startup is defined
+        - (haos_startup_read.stdout | default('') | trim) != haos_vm.startup
       changed_when: true
 
 - name: Display network configuration instructions

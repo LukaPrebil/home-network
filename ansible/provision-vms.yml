@@ -239,6 +239,18 @@
         label: "{{ item.name }} - DNS {{ item.dns_servers | default('default') }}"
       changed_when: true
 
+    - name: Enable start-on-boot for VMs
+      # The clone flow historically never set --onboot, leaving new VMs at the
+      # PVE default (0) - which kept the containers and dev VMs down after the
+      # 2026-07-22 power-loss outage.
+      ansible.builtin.command:
+        cmd: qm set {{ vm_vmid_map[item.name] }} --onboot {{ 1 if (item.onboot | bool) else 0 }}
+      when: item.onboot is defined
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        label: "{{ item.name }} - onboot {{ item.onboot | default('unset') }}"
+      changed_when: true
+
     - name: Set startup order for VMs
       ansible.builtin.command:
         cmd: qm set {{ vm_vmid_map[item.name] }} --startup {{ item.startup }}
@@ -328,7 +340,7 @@
 # editing `memory:` in vars/vms.yml does not retroactively change the
 # running VM's max. This play closes that drift.
 #
-# qm set --memory N updates the PENDING config — the cap takes effect at
+# qm set --memory N updates the PENDING config - the cap takes effect at
 # next boot. A running VM keeps its current allocation until it restarts
 # (LXCs are different: pct set --memory is enforced live by cgroups).
 #
@@ -410,4 +422,71 @@
       loop: "{{ vm_balloon_read.results }}"
       loop_control:
         label: "{{ item.item.name }}: {{ item.stdout | default('unset') | trim }} -> {{ item.item.balloon | default('skip') }}"
+      changed_when: true
+
+# Reconcile onboot + startup order on every run, not just first-provision.
+# The create-flow above only touches new VMs, and before 2026-07-22 it never
+# set --onboot at all - which is why the containers and dev VMs stayed
+# powered off after the power-loss outage. This play converges both knobs
+# for every VM declared in vms_to_create (and only those - never the
+# cloud-init template 9001, never undeclared vmids).
+- name: Reconcile VM onboot and startup order
+  # Tagged `vm-startup-reconcile` so it can be run in isolation when the
+  # create-flow is not needed: ansible-playbook provision-vms.yml --tags vm-startup-reconcile
+  hosts: n5p
+  become: true
+  gather_facts: false
+  tags:
+    - vm-startup-reconcile
+  vars_files:
+    - vars/vms.yml
+  tasks:
+    - name: Read each managed VM's current onboot flag
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ item.vmid }} | awk '/^onboot:/ { print $2; exit }'
+        executable: /bin/bash
+      register: vm_onboot_read
+      changed_when: false
+      check_mode: false
+      loop: "{{ vms_to_create }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.vmid }})"
+
+    - name: Apply onboot flag where on-disk drifted from desired
+      # qm config omits the onboot line entirely when it was never set (PVE
+      # default 0), so an empty probe result counts as '0'.
+      ansible.builtin.command:
+        cmd: qm set {{ item.item.vmid }} --onboot {{ 1 if (item.item.onboot | bool) else 0 }}
+      when:
+        - item.item.onboot is defined
+        - ((item.stdout | default('') | trim) or '0') != ('1' if (item.item.onboot | bool) else '0')
+      loop: "{{ vm_onboot_read.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout | default('unset') | trim }} -> {{ item.item.onboot | default('skip') }}"
+      changed_when: true
+
+    - name: Read each managed VM's current startup order
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          qm config {{ item.vmid }} | awk '/^startup:/ { print $2; exit }'
+        executable: /bin/bash
+      register: vm_startup_read
+      changed_when: false
+      check_mode: false
+      loop: "{{ vms_to_create }}"
+      loop_control:
+        label: "{{ item.name }} ({{ item.vmid }})"
+
+    - name: Apply startup order where on-disk drifted from desired
+      ansible.builtin.command:
+        cmd: qm set {{ item.item.vmid }} --startup {{ item.item.startup }}
+      when:
+        - item.item.startup is defined
+        - (item.stdout | default('') | trim) != item.item.startup
+      loop: "{{ vm_startup_read.results }}"
+      loop_control:
+        label: "{{ item.item.name }}: {{ item.stdout | default('unset') | trim }} -> {{ item.item.startup | default('skip') }}"
       changed_when: true

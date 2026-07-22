@@ -1,0 +1,64 @@
+---
+# Arm Wake-on-LAN on the primary NIC so a powered-off n5p can be woken
+# remotely (wakeonlan from rpi4 over the LAN). The NIC's WoL mode is not
+# persistent across reboots on this hardware, so a oneshot unit re-arms it
+# at every boot. WoL only works if the BIOS also has WoL enabled and keeps
+# standby power after AC loss - that part is an operator step, see
+# docs/infrastructure/n5p-power-recovery.md.
+
+- name: Ensure ethtool is installed
+  ansible.builtin.apt:
+    name: ethtool
+    state: present
+
+- name: Deploy wol-arm systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/wol-arm.service
+    content: |
+      # Managed by ansible roles/proxmox/tasks/wol.yml.
+      [Unit]
+      Description=Arm Wake-on-LAN on {{ primary_interface }}
+      After=network.target
+      Wants=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/sbin/ethtool -s {{ primary_interface }} wol g
+
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: '0644'
+  register: proxmox_wol_unit
+
+- name: Enable wol-arm unit for future boots
+  # Not dry-runnable on first provision: check mode simulates the copy above
+  # (the unit file is never written), so systemd cannot find the service.
+  ansible.builtin.systemd:
+    name: wol-arm.service
+    enabled: true
+    daemon_reload: "{{ proxmox_wol_unit.changed | default(false) }}"
+  when: not ansible_check_mode
+
+- name: Probe current Wake-on mode of the primary NIC
+  # ethtool prints "Supports Wake-on:" and "Wake-on:"; anchor on leading
+  # whitespace so only the current-mode line matches.
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      ethtool {{ primary_interface }} | awk -F': ' '/^[[:space:]]*Wake-on:/ { print $2; exit }'
+    executable: /bin/bash
+  register: proxmox_wol_current
+  changed_when: false
+  check_mode: false
+
+- name: Arm Wake-on-LAN now (if not already armed)
+  # Same first-provision constraint as the enable task: the unit only exists
+  # on real runs.
+  ansible.builtin.systemd:
+    name: wol-arm.service
+    state: started
+  when:
+    - not ansible_check_mode
+    - (proxmox_wol_current.stdout | default('') | trim) != 'g'

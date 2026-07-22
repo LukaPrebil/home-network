@@ -160,6 +160,34 @@ Provisioning playbooks (`provision-*.yml`) follow a strict multi-play pattern:
 
 These stay as separate playbooks - they are one-time operations, not part of `site.yml`.
 
+## Guest Startup Ordering (n5p)
+
+Every guest's root disk lives on `truenas-vms` (NFS from the TrueNAS VM)
+except TrueNAS itself, so boot order is storage-driven:
+
+| Order | Guests | Why |
+|---|---|---|
+| 1 | TrueNAS VM 100 (`up=120` + NFS-gate hookscript) | Provides NFS for everything else |
+| 2 | containers VM 101, HAOS VM 102, LXCs 200-205, 207 | Need `truenas-vms` NFS |
+| 3 | dev VM 148, hermes LXC 206 | Need order=2 services (DNS, ha-mcp) |
+
+**Invariant: TrueNAS stays ALONE in startup order=1.** Its post-start
+hookscript (`local:snippets/truenas-nfs-gate.sh`, deployed by
+`provision-truenas.yml`) polls the NFS export and delays the *next* order
+group until storage answers; guests sharing order=1 would start
+concurrently, ungated. See `docs/infrastructure/n5p-power-recovery.md`.
+
+`onboot`/`startup` are declared in `vars/vms.yml`, `vars/haos.yml`,
+`vars/lxc.yml` and are reconciled on every run (create-time-only before
+2026-07-22):
+
+```bash
+ansible-playbook provision-vms.yml --tags vm-startup-reconcile     # VMs 101, 148
+ansible-playbook provision-haos.yml --tags haos-startup-reconcile  # VM 102 (qm only, guest untouched)
+ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile    # declared LXCs; skips unprovisioned (hermes)
+ansible-playbook provision-truenas.yml                             # VM 100 knobs + gate hookscript
+```
+
 ## PostgreSQL Major Version Upgrades (Docker)
 
 Major PostgreSQL upgrades (e.g., 14→18) require a full dump and restore - the data files are not compatible across major versions.

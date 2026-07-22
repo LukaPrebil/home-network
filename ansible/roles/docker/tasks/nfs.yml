@@ -68,12 +68,12 @@
   ansible.builtin.copy:
     dest: /etc/systemd/system/docker.service.d/wait-for-nfs.conf
     content: |
-      # Managed by Ansible — ensure docker.service waits for the NFS mount
+      # Managed by Ansible - ensure docker.service waits for the NFS mount
       # so containers never start against an empty local stub directory.
       #
       # We intentionally do NOT use RequiresMountsFor={{ docker_nfs_mount_point }}. That
-      # forces a synchronous mount and — if the network isn't routable yet
-      # after a power event — turns a transient mount failure into an
+      # forces a synchronous mount and - if the network isn't routable yet
+      # after a power event - turns a transient mount failure into an
       # un-retryable "dependency failed", leaving Docker down until manual
       # intervention. Instead, ExecStartPre polls for the real NFS mount
       # (triggering the x-systemd.automount on each pass), and
@@ -81,6 +81,9 @@
       [Unit]
       After=network-online.target
       Wants=network-online.target
+      # Lift systemd's default 5-starts/10s burst cap so the retry loop can
+      # run indefinitely while TrueNAS is still booting.
+      StartLimitIntervalSec=0
 
       [Service]
       ExecStartPre=/bin/sh -c 'for i in $(seq 1 24); do ls {{ docker_nfs_mount_point }} >/dev/null 2>&1 || true; findmnt -t nfs,nfs4 {{ docker_nfs_mount_point }} >/dev/null 2>&1 && exit 0; sleep 5; done; exit 1'
