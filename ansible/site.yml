@@ -15,7 +15,8 @@
 #   ansible-playbook site.yml --tags crowdsec             # CrowdSec intrusion detection
 #   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
 #   ansible-playbook site.yml --tags dev-vm              # Dev VM (apt, dotfiles, claude code, ufw)
-#   ansible-playbook site.yml --tags tailscale           # Tailscale role only
+#   ansible-playbook site.yml --tags tailscale                    # Tailscale role on dev + rpi4
+#   ansible-playbook site.yml --tags tailscale-subnet-router      # Just the rpi4 subnet router
 #   ansible-playbook site.yml --limit immich             # Everything for Immich host
 #   ansible-playbook site.yml --limit 'all:!tn-storage'  # Skip TrueNAS (no apt)
 #   ansible-playbook site.yml --tags apt-upgrade --limit '<host>'   # Opt-in OS package upgrade
@@ -196,6 +197,17 @@
   roles:
     - docker
     - matter_server
+
+- name: Configure Tailscale subnet router on rpi4
+  hosts: rpi4
+  become: true
+  tags:
+    - tailscale
+    - tailscale-subnet-router
+  vars_files:
+    - secrets.yml
+  roles:
+    - tailscale
 
 - name: Deploy Jellyfin media server
   hosts: media_hosts

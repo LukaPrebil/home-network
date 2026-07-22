@@ -6,61 +6,127 @@
 #   pkgs.tailscale.com flakiness)
 # - `tailscale up` is gated on BackendState != "Running"; once enrolled,
 #   subsequent runs short-circuit and never reference the (revoked) auth key
-# - auth key passed via TS_AUTHKEY env var to keep it out of /var/log/auth.log
-#   and process accounting
+# - auth key staged to a transient root-only file and passed via
+#   --auth-key=file:..., keeping it out of argv, process env, and
+#   /var/log/auth.log; the file is removed right after enrolment
 
-- name: Add Tailscale GPG key
-  ansible.builtin.get_url:
-    url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_distribution_release }}.noarmor.gpg"
-    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
-    mode: '0644'
-  retries: 3
-  delay: 10
-  tags: tailscale
-
-- name: Add Tailscale apt repo
-  ansible.builtin.get_url:
-    url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ansible_distribution_release }}.tailscale-keyring.list"
-    dest: /etc/apt/sources.list.d/tailscale.list
-    mode: '0644'
-  retries: 3
-  delay: 10
-  tags: tailscale
-
-- name: Install tailscale
-  ansible.builtin.apt:
-    name: tailscale
+# IP forwarding is required when this host is a subnet router. Gated on
+# the advertise_routes var so non-router hosts (dev) are unaffected.
+- name: Enable IPv4 forwarding for Tailscale subnet routing
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_file: /etc/sysctl.d/99-tailscale-subnet-router.conf
     state: present
-    update_cache: true
+    reload: true
+  when: tailscale_advertise_routes | length > 0
   tags: tailscale
 
-- name: Enable and start tailscaled
-  ansible.builtin.systemd:
-    name: tailscaled
-    enabled: true
-    state: started
+- name: Enable IPv6 forwarding for Tailscale subnet routing
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: '1'
+    sysctl_file: /etc/sysctl.d/99-tailscale-subnet-router.conf
+    state: present
+    reload: true
+  when: tailscale_advertise_routes | length > 0
   tags: tailscale
 
+- name: Install and start tailscale (real-run only)
+  # Not dry-runnable: check mode never writes the GPG key or apt list, so
+  # apt has no install candidate for tailscale on a host that lacks it, and
+  # the tailscaled unit does not exist until the package is installed. Skip
+  # the whole chain under --check; real runs stay idempotent.
+  when: not ansible_check_mode
+  tags: tailscale
+  block:
+    - name: Add Tailscale GPG key
+      ansible.builtin.get_url:
+        url: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}/{{ ansible_distribution_release }}.noarmor.gpg"
+        dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+        mode: '0644'
+      retries: 3
+      delay: 10
+
+    - name: Add Tailscale apt repo
+      ansible.builtin.get_url:
+        url: "https://pkgs.tailscale.com/stable/{{ ansible_distribution | lower }}/{{ ansible_distribution_release }}.tailscale-keyring.list"
+        dest: /etc/apt/sources.list.d/tailscale.list
+        mode: '0644'
+      retries: 3
+      delay: 10
+
+    - name: Install tailscale
+      ansible.builtin.apt:
+        name: tailscale
+        state: present
+        update_cache: true
+
+    - name: Enable and start tailscaled
+      ansible.builtin.systemd:
+        name: tailscaled
+        enabled: true
+        state: started
+
+# Read-only probe; runs even under --check (check_mode false) so the
+# enrolment gate below always has a real rc to evaluate. On a host where
+# the binary is absent the command fails, failed_when false absorbs it,
+# and the up/set commands auto-skip in check mode anyway.
 - name: Check tailscale backend state
   ansible.builtin.command: tailscale status --json
   register: tailscale_status_check
   changed_when: false
   failed_when: false
+  check_mode: false
   tags: tailscale
 
-- name: Bring tailscale up (first auth)
-  ansible.builtin.command: >-
-    tailscale up
-    --hostname={{ tailscale_hostname }}
-    {% if tailscale_advertise_tags | length > 0 %}--advertise-tags={{ tailscale_advertise_tags }}{% endif %}
-    --accept-dns={{ 'true' if tailscale_accept_dns else 'false' }}
-    --accept-routes={{ 'true' if tailscale_accept_routes else 'false' }}
-    {% for arg in tailscale_extra_args %}{{ arg }} {% endfor %}
-  environment:
-    TS_AUTHKEY: "{{ tailscale_authkey }}"
+- name: Enrol tailscale on first run
+  # The tailscale CLI does NOT read the TS_AUTHKEY env var (that is a
+  # containerboot/Docker convention) - with only the env set, `tailscale up`
+  # falls back to interactive auth and hangs on a printed URL. Stage the key
+  # to a root-only file and pass --auth-key=file:..., which keeps it out of
+  # argv (ps) and process env; the file is removed again in `always`.
   when:
     - tailscale_authkey | length > 0
     - tailscale_status_check.rc != 0 or (tailscale_status_check.stdout | from_json).BackendState != "Running"
-  no_log: true
-  changed_when: true
+  tags: tailscale
+  block:
+    - name: Stage tailscale auth key in a root-only file
+      ansible.builtin.copy:
+        content: "{{ tailscale_authkey }}"
+        dest: /run/tailscale-authkey
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Bring tailscale up (first auth)
+      ansible.builtin.command: >-
+        tailscale up
+        --hostname={{ tailscale_hostname }}
+        --auth-key=file:/run/tailscale-authkey
+        {% if tailscale_advertise_tags | length > 0 %}--advertise-tags={{ tailscale_advertise_tags }}{% endif %}
+        {% if tailscale_advertise_routes | length > 0 %}--advertise-routes={{ tailscale_advertise_routes | join(',') }}{% endif %}
+        --accept-dns={{ 'true' if tailscale_accept_dns else 'false' }}
+        --accept-routes={{ 'true' if tailscale_accept_routes else 'false' }}
+        {% for arg in tailscale_extra_args %}{{ arg }} {% endfor %}
+      no_log: true
+      changed_when: true
+  always:
+    - name: Remove tailscale auth key file
+      ansible.builtin.file:
+        path: /run/tailscale-authkey
+        state: absent
+      no_log: true
+
+# tailscale up is gated on BackendState != Running, so once a host is
+# enrolled, route changes via the up command are never reapplied. Use
+# tailscale set to apply --advertise-routes idempotently on every run.
+# `tailscale set` is itself idempotent (no-op when routes already match);
+# `changed_when: false` keeps Ansible noise low.
+- name: Apply advertised subnet routes (idempotent re-runs)
+  ansible.builtin.command:
+    cmd: tailscale set --advertise-routes={{ tailscale_advertise_routes | join(',') }}
+  when: tailscale_advertise_routes | length > 0
+  changed_when: false
   tags: tailscale

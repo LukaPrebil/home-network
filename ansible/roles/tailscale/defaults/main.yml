@@ -11,3 +11,8 @@ tailscale_accept_dns: false         # keep host DNS authoritative (AdGuard etc.)
 tailscale_accept_routes: false      # don't accept advertised subnet routes
 tailscale_authkey: ""               # vault'd one-shot key; empty = skip up
 tailscale_extra_args: []
+# Subnet routes this host advertises to the tailnet. Empty = not a subnet
+# router (the default for non-router hosts like dev). Setting this triggers
+# IP-forwarding sysctl management and adds --advertise-routes to tailscale up
+# / tailscale set.
+tailscale_advertise_routes: []
