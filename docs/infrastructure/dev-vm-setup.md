@@ -1,4 +1,4 @@
-# Dev VM (`dev`) — Setup, Operations, and Recovery
+# Dev VM (`dev`) - Setup, Operations, and Recovery
 
 Headless Ubuntu 26.04 development VM on Proxmox `n5p`, mirroring the macOS
 workstation environment. Remote access via LAN (allowlisted MacBook IP) and
@@ -47,6 +47,8 @@ Proxmox n5p (192.168.1.128)
   `sudo docker` (passwordless, see "Docker access" below).
 - **Editor target**: Claude Code (official native installer, pinned via
   `dev_vm_claude_code_version`).
+- **Session multiplexer**: herdr (manual install, see "Known gotchas");
+  attach from the Mac with `herdr --remote dev`.
 - **Remote access**: Tailscale (`tag:dev`).
 
 ## Access
@@ -158,7 +160,7 @@ snapshots.
 If the VM is ever destroyed or compromised: visit
 <https://github.com/settings/keys>, find the key titled
 `luka@dev (homelab)`, delete it. The VM identity is contained to that one
-key — no impact on macOS workflows.
+key - no impact on macOS workflows.
 
 ## Sudo and Docker access
 
@@ -167,7 +169,7 @@ key — no impact on macOS workflows.
 the `docker` group: group membership lets any process running as `luka`
 silently use the docker socket, while `sudo docker` at least leaves an
 audit trail in the system log. The passwordless choice is honest about
-the threat model — `sudo docker run -v /:/host` is itself a root escape,
+the threat model - `sudo docker run -v /:/host` is itself a root escape,
 so any sudo carve-out that includes docker effectively grants full root.
 With SSH restricted to keys + LAN/Tailscale, the password gate would only
 add per-command friction without changing what an attacker who reaches
@@ -202,7 +204,7 @@ user.
 - **chezmoi laying down macOS-only files**: `dot_Brewfile` and
   `dot_wezterm.lua` are tracked in the dotfiles repo for the macOS box.
   On Linux they're inert files; nothing reads them. A `.chezmoiignore`
-  with OS guards in the dotfiles repo would clean this up — tracked as a
+  with OS guards in the dotfiles repo would clean this up - tracked as a
   follow-up.
 - **Brewfile -> apt drift**: as new tools are added to the macOS Brewfile,
   the dev VM apt list in `host_vars/dev.yml` does not auto-track. Manual
@@ -227,3 +229,17 @@ user.
   `docker_hosts`. `docker_hosts` is the deployment-target group for
   monitoring stack / reverse proxy / etc.; the dev VM is a workstation,
   not a service host. Keep them separate.
+- **herdr is not Ansible-managed**: installed 2026-07-23 via the official
+  install script (`curl -fsSL https://herdr.dev/install.sh | sh`) as `luka`,
+  binary at `~/.local/bin/herdr` plus a manual `sudo ln -sf` shim into
+  `/usr/local/bin` (same pattern as bat/fd, since `~/.local/bin` is not on
+  the VM's PATH). Deliberately not added to the `dev_vm` role: the local
+  client's `herdr --remote dev` auto-installs/updates the server binary on
+  attach and keeps client/server versions in sync, so an Ansible pin would
+  fight the self-updater. After a VM rebuild the first `herdr --remote dev`
+  restores the binary; only the `/usr/local/bin` symlink needs re-creating
+  by hand. The VM's `~/.config/herdr/config.toml` (also manual, not
+  chezmoi-tracked) sets `shell_mode = "login"`: herdr's `auto` mode only
+  uses login shells on macOS, and on Linux non-login panes skip
+  `~/.zprofile`, losing `~/.local/bin` from PATH - claude and cargo appear
+  missing inside herdr panes without it.
