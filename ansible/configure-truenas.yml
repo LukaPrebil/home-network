@@ -115,6 +115,50 @@
       ansible.builtin.debug:
         msg: "{{ zfs_list.stdout_lines }}"
 
+- name: Configure periodic ZFS snapshot tasks
+  # docker-volumes backs matter-server's fabric state on rpi4; losing that
+  # data means re-commissioning every Matter device. The other user-data
+  # datasets got UI-made snapshot tasks, this one is managed here so a
+  # rebuild cannot silently drop the only backup of the fabric.
+  hosts: tn-storage
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: Get datasets that already have a snapshot task
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call pool.snapshottask.query | jq -r '.[].dataset'
+        executable: /bin/bash
+      register: existing_snapshot_tasks
+      changed_when: false
+      check_mode: false  # read-only probe; always run, even in --check
+
+    - name: Create daily snapshot task for docker-volumes
+      # Schedule, retention and naming mirror the UI-made tasks on the
+      # other datasets (daily at 00:00, keep 1 week, auto-* names).
+      ansible.builtin.shell:
+        cmd: |
+          midclt call pool.snapshottask.create '{
+            "dataset": "{{ zfs_pool_name }}/docker-volumes",
+            "recursive": false,
+            "lifetime_value": 1,
+            "lifetime_unit": "WEEK",
+            "naming_schema": "auto-%Y-%m-%d_%H-%M",
+            "enabled": true,
+            "allow_empty": true,
+            "schedule": {"minute": "0", "hour": "0", "dom": "*", "month": "*", "dow": "*", "begin": "00:00", "end": "23:59"}
+          }'
+      register: snapshot_task_created
+      when:
+        - (zfs_pool_name ~ '/docker-volumes') not in existing_snapshot_tasks.stdout_lines
+        - not ansible_check_mode
+      changed_when: snapshot_task_created.rc == 0
+
+    - name: Display snapshot task status
+      ansible.builtin.debug:
+        msg: "Snapshot task for {{ zfs_pool_name }}/docker-volumes {{ 'created' if snapshot_task_created is changed else 'already exists' }}"
+
 - name: Configure NFS Shares
   hosts: tn-storage
   vars_files:
