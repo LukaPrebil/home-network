@@ -24,6 +24,9 @@ services:
       - "{{ matter_server_port }}"
       - --log-level
       - "{{ matter_server_log_level }}"
+{% if matter_server_time_sync %}
+      - --enable-time-sync
+{% endif %}
     # No compose healthcheck: the image ships its own; the old python3-based check can never pass in this Node image, and autoheal would restart-loop the permanently-unhealthy container
     labels:
       - "autoheal=true"

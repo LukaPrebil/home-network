@@ -243,8 +243,11 @@ Reference values for the live fabric:
     - Add an Uptime Kuma TCP monitor for `192.168.1.110:5580` (manual UI
       step, see Monitoring below).
 
-11. **Soak for about a week** before enabling controller time sync (that
-    is a separate, later change).
+11. **Controller time sync is enabled** via `matter_server_time_sync`
+    (default `true`): the server pushes host UTC plus timezone/DST to
+    time-capable devices on connect, on TimeFailure events, and every
+    24h. The step-1 precondition stands: the host clock must be
+    NTP-synced before this runs.
 
 ### Known failure modes
 

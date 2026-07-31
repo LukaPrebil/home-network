@@ -18,6 +18,8 @@ matter_server_data_dir: "{{ matter_server_base_dir }}/data"
 # Matter Server Configuration
 matter_server_port: 5580  # WebSocket API port for Home Assistant
 matter_server_log_level: "info"  # Log level: debug, info, warning, error
+# Only safe while the host clock is NTP-synced; timesyncd is managed by the common role on docker_hosts
+matter_server_time_sync: true
 
 # Timezone (inherit from global or default to UTC)
 matter_server_timezone: "{{ timezone | default('UTC') }}"
