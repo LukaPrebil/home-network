@@ -1,0 +1,54 @@
+---
+# Managed NTP via systemd-timesyncd.
+#
+# Applied only to docker_hosts (rpi4, containers): matter-server's upcoming
+# time-push feature propagates the host clock to Matter devices unguarded,
+# so clock discipline on these hosts must be asserted IaC, not left to the
+# unmanaged distro default. Other hosts keep their existing time setup.
+#
+# Guarded by group membership only: docker_hosts are Debian-family by
+# construction, and narrow --tags runs gather no facts, so an
+# ansible_os_family condition would hit an undefined variable.
+
+- name: Ensure systemd-timesyncd is installed
+  ansible.builtin.apt:
+    name: systemd-timesyncd
+    state: present
+  when:
+    - "'docker_hosts' in group_names"
+
+- name: Create timesyncd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/timesyncd.conf.d
+    state: directory
+    mode: '0755'
+  when:
+    - "'docker_hosts' in group_names"
+
+- name: Configure NTP servers for timesyncd
+  ansible.builtin.template:
+    src: timesyncd.conf.j2
+    dest: /etc/systemd/timesyncd.conf.d/10-ansible.conf
+    mode: '0644'
+  notify: Restart systemd-timesyncd
+  when:
+    - "'docker_hosts' in group_names"
+
+- name: Enable and start systemd-timesyncd
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    enabled: true
+    state: started
+  when:
+    - "'docker_hosts' in group_names"
+
+- name: Verify NTP synchronization is active
+  ansible.builtin.command: timedatectl show -p NTPSynchronized --value
+  register: common_ntp_sync_check
+  until: common_ntp_sync_check.stdout == "yes"
+  retries: 12
+  delay: 5
+  changed_when: false
+  check_mode: false
+  when:
+    - "'docker_hosts' in group_names"

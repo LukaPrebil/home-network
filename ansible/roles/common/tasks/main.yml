@@ -21,3 +21,7 @@
 - name: Import DNS configuration tasks
   ansible.builtin.import_tasks: dns.yml
   tags: dns
+
+- name: Import time synchronization tasks
+  ansible.builtin.import_tasks: timesync.yml
+  tags: timesync

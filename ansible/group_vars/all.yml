@@ -37,6 +37,14 @@ docker_socket_proxy_endpoint: "tcp://{{ docker_socket_proxy_container_name }}:{{
 # Timezone
 timezone: Europe/Ljubljana
 
+# NTP servers for managed systemd-timesyncd on docker hosts. This list is the
+# single seam for a future local stratum-1 time server (rpi2+GPS) - repoint here.
+ntp_servers:
+  - 0.debian.pool.ntp.org
+  - 1.debian.pool.ntp.org
+  - 2.debian.pool.ntp.org
+  - 3.debian.pool.ntp.org
+
 # Common packages
 common_packages:
   - curl

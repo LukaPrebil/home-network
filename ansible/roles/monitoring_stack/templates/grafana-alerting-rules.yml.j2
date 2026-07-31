@@ -19,7 +19,7 @@ groups:
     interval: 1m
     rules:
 
-      # 1. High CPU usage — > 85% for 5 min
+      # 1. High CPU usage - > 85% for 5 min
       - uid: alert-high-cpu
         title: High CPU Usage
         condition: C
@@ -72,7 +72,7 @@ groups:
         labels:
           severity: warning
 
-      # 2. High memory usage — available < 10% for 5 min
+      # 2. High memory usage - available < 10% for 5 min
       - uid: alert-high-memory
         title: High Memory Usage
         condition: C
@@ -125,7 +125,7 @@ groups:
         labels:
           severity: warning
 
-      # 3a. Disk space low — warning >85%
+      # 3a. Disk space low - warning >85%
       - uid: alert-disk-warning
         title: Disk Space Low (Warning)
         condition: C
@@ -178,7 +178,7 @@ groups:
         labels:
           severity: warning
 
-      # 3b. Disk space low — critical >95%
+      # 3b. Disk space low - critical >95%
       - uid: alert-disk-critical
         title: Disk Space Low (Critical)
         condition: C
@@ -231,7 +231,7 @@ groups:
         labels:
           severity: critical
 
-      # 4. System load high — load5 > CPU count for 10 min
+      # 4. System load high - load5 > CPU count for 10 min
       - uid: alert-high-load
         title: High System Load
         condition: C
@@ -281,6 +281,59 @@ groups:
         annotations:
           summary: "System load high on {{ '{{' }} $labels.instance {{ '}}' }}"
           description: "Load average (5m) exceeds CPU count on {{ '{{' }} $labels.instance {{ '}}' }} for over 10 minutes."
+        labels:
+          severity: warning
+
+      # 22. Docker host clock not NTP-synchronized - sustained 30 min
+      - uid: alert-clock-unsync
+        title: Docker Host Clock Not Synchronized
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: node_timex_sync_status{job="node-exporter",type="docker-host"}
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: NoData
+        execErrState: Error
+        for: 30m
+        annotations:
+          summary: "Clock not NTP-synchronized on {{ '{{' }} $labels.instance {{ '}}' }}"
+          description: "node_timex_sync_status has been 0 for 30 minutes on {{ '{{' }} $labels.instance {{ '}}' }}. The host clock is free-running and may drift."
         labels:
           severity: warning
 
@@ -355,7 +408,7 @@ groups:
     interval: 1m
     rules:
 
-      # 6. Container restart loop — > 3 restarts in 15 min
+      # 6. Container restart loop - > 3 restarts in 15 min
       - uid: alert-container-restart
         title: Container Restart Loop
         condition: C
@@ -408,7 +461,7 @@ groups:
         labels:
           severity: critical
 
-      # 7. Container high memory — > 90% of its limit
+      # 7. Container high memory - > 90% of its limit
       - uid: alert-container-memory
         title: Container High Memory
         condition: C
@@ -576,7 +629,7 @@ groups:
         labels:
           severity: warning
 
-      # 10. TLS certificate expiring — < 14 days
+      # 10. TLS certificate expiring - < 14 days
       - uid: alert-tls-expiry
         title: TLS Certificate Expiring Soon
         condition: C
@@ -629,7 +682,7 @@ groups:
         labels:
           severity: critical
 
-      # 12. Internet download speed degraded — < 800 Mbps
+      # 12. Internet download speed degraded - < 800 Mbps
       - uid: alert-speed-download
         title: Internet Download Speed Degraded
         condition: C
@@ -682,7 +735,7 @@ groups:
         labels:
           severity: warning
 
-      # 13. Internet upload speed degraded — < 200 Mbps
+      # 13. Internet upload speed degraded - < 200 Mbps
       - uid: alert-speed-upload
         title: Internet Upload Speed Degraded
         condition: C
@@ -735,7 +788,7 @@ groups:
         labels:
           severity: warning
 
-      # 14. High latency — ping > 80ms sustained
+      # 14. High latency - ping > 80ms sustained
       # speedtest_latency_seconds is already in ms despite the name
       - uid: alert-speed-latency
         title: Internet High Latency
@@ -798,7 +851,7 @@ groups:
     interval: 2m
     rules:
 
-      # 15. Spike in blocked IPs — large net increase in active decisions
+      # 15. Spike in blocked IPs - large net increase in active decisions
       # cs_active_decisions is a gauge; normal churn is +-50/hr, spike would be +2000
       - uid: alert-crowdsec-decisions
         title: CrowdSec Decision Spike
@@ -852,7 +905,7 @@ groups:
         labels:
           severity: warning
 
-      # 16. Bucket overflow surge — unusual scenario triggers
+      # 16. Bucket overflow surge - unusual scenario triggers
       - uid: alert-crowdsec-overflow
         title: CrowdSec Scenario Overflow Surge
         condition: C
@@ -914,7 +967,7 @@ groups:
     interval: 2m
     rules:
 
-      # 17. Error log spike — high rate of error-level logs
+      # 17. Error log spike - high rate of error-level logs
       - uid: alert-log-errors
         title: Error Log Spike
         condition: C
@@ -968,7 +1021,7 @@ groups:
         labels:
           severity: warning
 
-      # 18. Service crash patterns — OOM, segfault, panic
+      # 18. Service crash patterns - OOM, segfault, panic
       - uid: alert-log-crash
         title: Service Crash Detected
         condition: C
@@ -1022,7 +1075,7 @@ groups:
         labels:
           severity: critical
 
-      # 19. Auth failure spike — brute force indicator
+      # 19. Auth failure spike - brute force indicator
       - uid: alert-log-auth
         title: Authentication Failure Spike
         condition: C
@@ -1085,7 +1138,7 @@ groups:
     interval: 5m
     rules:
 
-      # 20. Prometheus storage filling — > 80% of monitoring disk used
+      # 20. Prometheus storage filling - > 80% of monitoring disk used
       - uid: alert-prometheus-storage
         title: Prometheus Storage Filling
         condition: C
