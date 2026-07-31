@@ -1,6 +1,6 @@
 ---
 # Main tasks file for Matter Server role
-# Deploys Python Matter Server for Home Assistant
+# Deploys matterjs-server, the Matter fabric controller for Home Assistant
 
 - name: Include prerequisite tasks
   ansible.builtin.include_tasks: prerequisites.yml

@@ -46,7 +46,7 @@ ansible/
 │   ├── omada-controller/     # TP-Link Omada SDN (native .deb install)
 │   ├── autoheal/             # Auto-restart unhealthy containers (Compose)
 │   ├── otbr/                 # OpenThread Border Router (Compose)
-│   ├── matter-server/        # Python Matter Server (Compose)
+│   ├── matter-server/        # matterjs-server Matter controller (Compose)
 │   ├── uptime-kuma/          # Uptime monitoring (Compose, iSCSI storage from TrueNAS)
 │   ├── ddns-updater/         # Dynamic DNS (Compose)
 │   ├── pds/                  # ATProto PDS (Compose, iSCSI storage from TrueNAS)

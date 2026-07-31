@@ -121,6 +121,142 @@ Docker service, not just matter-server.
 If devices stay unavailable, check the Thread side first
 (`otbr-thread-recovery.md`) before touching the fabric state again.
 
+## Migration runbook: python-matter-server to matterjs-server
+
+One-time, operator-driven migration of the fabric controller from the
+archived python-matter-server (8.1.2 was its final release) to its
+successor `ghcr.io/matter-js/matterjs-server`. The new server reads the
+old storage on first start and converts it in place. A known
+standalone-Docker failure mode exists (home-assistant/core issue #168531):
+the server silently creates a NEW fabric instead of converting the old
+one, which would mean re-commissioning all 20 devices by hand. The
+tripwire in step 8 exists to catch exactly that before anything else
+touches the fabric.
+
+Reference values for the live fabric:
+
+- compressed_fabric_id: `4941327263744875345`
+- Node count: 20
+
+1. **Preconditions** - all of these must hold before starting:
+
+   - Managed time sync is active on `rpi4`:
+     `timedatectl show -p NTPSynchronized` reports `yes`.
+   - The TrueNAS daily snapshot task for `tank/docker-volumes` is live
+     (see "Daily snapshot schedule" above).
+   - Home Assistant is healthy.
+   - `scripts/matter_probe.py` shows 20/20 nodes available and prints
+     `compressed_fabric_id` `4941327263744875345`. Note the value it
+     prints - step 7 compares against it.
+
+2. **Manual pre-migration snapshot** on TrueNAS (192.168.1.150):
+
+   ```bash
+   midclt call zfs.snapshot.create '{"dataset":"tank/docker-volumes","name":"pre-matterjs-migration"}'
+   ```
+
+3. **Stop the server** on `rpi4`. HA Matter entities go unavailable -
+   expected:
+
+   ```bash
+   sudo docker stop matter-server
+   ```
+
+4. **Gold-copy tar with the server stopped**, then copy it to the
+   operator machine:
+
+   ```bash
+   # on rpi4
+   sudo tar czf /tmp/matter-fabric-pre-matterjs-$(date +%F).tgz -C /srv/docker/matter-server data
+
+   # from the operator machine
+   scp rpi4:/tmp/matter-fabric-pre-matterjs-<date>.tgz ~/backups/
+   ```
+
+5. **Chown the storage files to the container user** before first start:
+
+   ```bash
+   sudo chown -R 1000:1000 /srv/docker/matter-server/data
+   ```
+
+   The matterjs image runs as user 1000:1000; the python server ran as
+   root with the node store at mode 0600. The loader gates legacy
+   detection on `chip.json` but treats an unreadable node store as
+   optional: the server then starts SILENTLY with migrated fabric
+   credentials and 0 nodes, logging only a debug-level line.
+
+6. **Converge** the role onto the new image:
+
+   ```bash
+   ansible-playbook site.yml --tags matter-server --limit rpi4
+   ```
+
+7. **Wait for container health** to reach `healthy`. The first start may
+   take up to ~15 min (storage conversion plus re-interviewing 20 nodes);
+   the converge itself polls for this, or watch manually on `rpi4`:
+
+   ```bash
+   sudo docker inspect --format '{{.State.Health.Status}}' matter-server
+   ```
+
+   Then confirm the node store was actually read - healthy alone does
+   not prove it:
+
+   ```bash
+   sudo docker logs matter-server | grep -E "Loaded legacy server data|Injecting node"
+   ```
+
+   Expect `Loaded legacy server data from 4941327263744875345.json: 20 node(s)`
+   plus one `Injecting node <n>` line per node. If these lines are
+   absent, the node store was not read even though the server reports
+   healthy.
+
+8. **TRIPWIRE** - verify the fabric survived before anything else:
+
+   ```bash
+   /tmp/mp-venv/bin/python scripts/matter_probe.py
+   ls /srv/docker/matter-server/data
+   ```
+
+   All of these must hold:
+
+   - `compressed_fabric_id` equals the noted value
+     (`4941327263744875345`).
+   - All 20 nodes are listed.
+   - No fresh `server-*` directory has appeared in the data dir alongside
+     otherwise-untouched old files - that combination is the known
+     new-fabric failure signature.
+
+9. **On tripwire failure: ABORT.** Never debug the new server against
+   live fabric data.
+
+   - `sudo docker stop matter-server`
+   - Restore the step-4 tar over `data/` (see "Restore" above).
+   - Redeploy the previous role state (check out the pre-migration
+     commit, converge with the same tags).
+   - Verify with `scripts/matter_probe.py`, then investigate offline on a
+     copy of the data.
+
+10. **On success:**
+
+    - Spot-check Matter devices in Home Assistant.
+    - Add an Uptime Kuma TCP monitor for `192.168.1.110:5580` (manual UI
+      step, see Monitoring below).
+
+11. **Soak for about a week** before enabling controller time sync (that
+    is a separate, later change).
+
+### Known failure modes
+
+- **Silent nodeless start** (this migration's attempt 1): the probe shows
+  0 nodes, a fresh `server-1-fff1/` directory appears, and the legacy
+  json files are byte-identical to the backup. The node store was
+  unreadable to uid 1000. Restore the tar, fix ownership (step 5), retry.
+- **An interrupted injection poisons retries**: the injector writes
+  per-node `__version__` markers as it goes; a re-run skips marked nodes
+  and never writes `commissionedNodes`. Never re-run over a half-migrated
+  data dir - always restore the tar first.
+
 ## Monitoring
 
 matter-server's WebSocket port (tcp/5580 on `rpi4`) should be watched by an

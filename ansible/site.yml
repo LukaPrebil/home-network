@@ -186,7 +186,7 @@
     - docker
     - otbr
 
-- name: Deploy Python Matter Server
+- name: Deploy Matter Server (matterjs-server)
   hosts: rpi4
   become: true
   tags:

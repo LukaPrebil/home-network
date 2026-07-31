@@ -28,28 +28,21 @@
     state: present
   register: matter_server_deploy
 
-- name: Wait for Matter Server to be ready
-  ansible.builtin.wait_for:
-    host: localhost
-    port: "{{ matter_server_port }}"
-    timeout: 120
-    delay: 10
-
-- name: Verify Matter Server WebSocket is responding
-  ansible.builtin.uri:
-    url: "http://localhost:{{ matter_server_port }}"
-    method: GET
-    status_code: [200, 400, 404, 426]  # 426 = Upgrade Required (WebSocket endpoint)
-    timeout: 10
-  register: matter_server_api_check
-  retries: 5
-  delay: 5
-  until: matter_server_api_check.status in [200, 400, 404, 426]
+# 60 x 15s matches the image's built-in healthcheck start_period of 15 min:
+# a first start may convert python-matter-server storage and re-interview every node
+- name: Wait for Matter Server container to report healthy
+  community.docker.docker_container_info:
+    name: "{{ matter_server_container_name }}"
+  register: matter_server_container_info
+  retries: 60
+  delay: 15
+  until: >-
+    matter_server_container_info.container.State.Health.Status | default('') == 'healthy'
 
 - name: Display Matter Server deployment status
   ansible.builtin.debug:
     msg: |
-      Python Matter Server deployed successfully!
+      matterjs-server deployed successfully!
 
       WebSocket API: ws://{{ ansible_host }}:{{ matter_server_port }}/ws
 

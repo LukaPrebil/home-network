@@ -1,5 +1,5 @@
 ---
-# Docker Compose for Python Matter Server
+# Docker Compose for matterjs-server
 # Managed by Ansible - DO NOT EDIT MANUALLY
 #
 # Note: Matter Server must use host networking for mDNS discovery
@@ -24,11 +24,6 @@ services:
       - "{{ matter_server_port }}"
       - --log-level
       - "{{ matter_server_log_level }}"
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('localhost', {{ matter_server_port }})); s.close()"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+    # No compose healthcheck: the image ships its own; the old python3-based check can never pass in this Node image, and autoheal would restart-loop the permanently-unhealthy container
     labels:
       - "autoheal=true"
