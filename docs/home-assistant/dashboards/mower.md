@@ -18,7 +18,7 @@ This is the deep-link target for every Luba notification tap (`clickAction: /das
 
 ## Header badges
 
-`sensor.vrt_luba_battery`, `binary_sensor.vrt_luba_charging`, `sensor.vrt_luba_task_area_path` (battery / charging / task state at a glance).
+`sensor.vrt_luba_battery`, `binary_sensor.vrt_luba_charging`, `sensor.vrt_luba_activity_mode` (battery / charging / working-mode at a glance). The original third badge (`sensor.vrt_luba_task_area_path`) was removed when that map-derived sensor was deleted by the integration on 2026-07-30; `activity_mode` is its device-level replacement - see `docs/adr/0003-luba-device-level-entities-only.md`.
 
 ## Section 1 - main (camera + controls + core status)
 
@@ -40,7 +40,6 @@ Undock is a separate `button` entity, not a `lawn_mower` capability - HA core ha
 | Entity | Display name |
 |--------|-------------|
 | `lawn_mower.vrt_luba` | Stanje |
-| `sensor.vrt_luba_task_area_path` | Naloga |
 | `sensor.vrt_luba_battery` | Baterija (trend-graph) |
 | `sensor.vrt_luba_progress` | Napredek |
 | `sensor.vrt_luba_time_left` | Preostali čas |
