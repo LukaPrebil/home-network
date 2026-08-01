@@ -222,9 +222,13 @@ user.
   (March 2023). When they rotate again, the `git clone` and SSH-T tasks
   fail closed. Update `dev_vm_github_host_key` in `host_vars/dev.yml`
   from <https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints>.
-- **IPv4-only by design**: no ULA / IPv6 work. The home network is v4 today;
-  Tailscale handles cross-network reachability, so v6 dual-stack adds
-  surface without payoff.
+- **No IPv6 work on the VM by design**: the LAN itself does carry
+  unmanaged ISP IPv6 (Telekom GUA + ULA via Innbox RA, with the Innbox
+  advertising itself as the v6 nameserver - v6 DNS therefore bypasses
+  AdGuard, which binds IPv4-only), but none of it is IaC-managed and the
+  dev VM does no ULA / IPv6 configuration; Tailscale handles
+  cross-network reachability, so v6 dual-stack adds surface without
+  payoff.
 - **`docker_hosts` vs `dev_hosts`**: the dev VM runs Docker but isn't in
   `docker_hosts`. `docker_hosts` is the deployment-target group for
   monitoring stack / reverse proxy / etc.; the dev VM is a workstation,

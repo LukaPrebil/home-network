@@ -175,19 +175,20 @@
         executable: /bin/bash
       register: nfs_service_state
       changed_when: false
+      check_mode: false  # read-only probe; always run, even in --check
 
     - name: Enable NFS service
       ansible.builtin.shell:
         cmd: 'midclt call service.update nfs ''{"enable": true}'''
       register: nfs_enabled
-      when: nfs_service_state.stdout.split() | first != 'true'
+      when: (nfs_service_state.stdout | default('')).split() | first | default('') != 'true'
       changed_when: nfs_enabled.rc == 0
 
     - name: Start NFS service
       ansible.builtin.command:
         cmd: midclt call service.start nfs
       register: nfs_started
-      when: nfs_service_state.stdout.split() | last != 'RUNNING'
+      when: (nfs_service_state.stdout | default('')).split() | last | default('') != 'RUNNING'
       changed_when: nfs_started.rc == 0
 
     - name: Get existing NFS shares
@@ -241,19 +242,20 @@
         executable: /bin/bash
       register: iscsi_service_state
       changed_when: false
+      check_mode: false  # read-only probe; always run, even in --check
 
     - name: Enable iSCSI service
       ansible.builtin.shell:
         cmd: 'midclt call service.update iscsitarget ''{"enable": true}'''
       register: iscsi_enabled
-      when: iscsi_service_state.stdout.split() | first != 'true'
+      when: (iscsi_service_state.stdout | default('')).split() | first | default('') != 'true'
       changed_when: iscsi_enabled.rc == 0
 
     - name: Start iSCSI service
       ansible.builtin.command:
         cmd: midclt call service.start iscsitarget
       register: iscsi_started
-      when: iscsi_service_state.stdout.split() | last != 'RUNNING'
+      when: (iscsi_service_state.stdout | default('')).split() | last | default('') != 'RUNNING'
       changed_when: iscsi_started.rc == 0
 
     - name: Get existing datasets and zvols
@@ -445,6 +447,32 @@
           - "iSCSI service enabled"
           - "Configured targets: {{ iscsi_zvols | map(attribute='target_name') | list }}"
           - "Portal ID: {{ portal_id.stdout }}"
+
+- name: Configure TrueNAS system settings
+  # TrueNAS ships with a US-Pacific factory timezone and is excluded from
+  # the apt-based common role, so the fleet-wide timezone var is applied
+  # here via midclt instead of community.general.timezone.
+  hosts: tn-storage
+  vars_files:
+    - secrets.yml
+  tasks:
+    - name: Query current system timezone
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call system.general.config | jq -r '.timezone'
+        executable: /bin/bash
+      register: truenas_timezone_current
+      changed_when: false
+      check_mode: false  # read-only probe; always run, even in --check
+
+    - name: Set system timezone
+      ansible.builtin.shell:
+        cmd: |
+          midclt call system.general.update '{"timezone": "{{ timezone }}"}'
+      register: truenas_timezone_update
+      when: truenas_timezone_current.stdout | trim != timezone
+      changed_when: truenas_timezone_update.rc == 0
 
 - name: Ensure TrueNAS guest kernel cmdline tunables (virtio-net mitigations)
   # Why: TrueNAS Scale 25.04 + single-queue virtio_net + napi_tx=Y is
