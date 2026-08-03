@@ -1,11 +1,40 @@
-.env
+# Rendered env files at any depth. The .j2 sources under ansible/roles/*/templates
+# are deliberately tracked and must stay tracked; they hold variable references, not values.
+**/.env*
+!**/*.env.j2
+!**/env.j2
+
+# Key material and certificates
 **/*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+known_hosts
 **/acme.json
+
+# Decryption material. Only encrypted payloads belong in the repo.
+# ansible.cfg reads the vault password from .vault_pass; ansible/.gitignore already
+# covers that path, this repeats it unanchored so a copy at any depth is caught too.
+.vault_pass
+# Defensive: this repo uses ansible-vault today, but age keys are a common
+# companion and keys.txt is the default output filename of age-keygen.
+*.agekey
+keys.txt
+
+# Python
 **/__pycache__/
+
+# Editors and OS
 .vscode/
 .DS_Store
+
+# Local tooling state
 .mcp.json
-backups/
+.playwright-mcp/
 .claude/scheduled_tasks.lock
 .claude/state/
-.playwright-mcp/
+
+# Local artifacts
+backups/

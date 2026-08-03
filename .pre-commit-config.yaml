@@ -1,0 +1,15 @@
+# Local guard: scans staged changes so a secret never reaches a commit object.
+# CI re-scans full history, because a secret rewritten out of the working tree
+# still lives in the objects a public clone hands out.
+#
+# Install once with: pre-commit install
+repos:
+  # Pinned to a release tag rather than a branch so an upstream change cannot
+  # silently alter what blocks a commit here.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      # Upstream entry is: gitleaks git --pre-commit --redact --staged --verbose
+      # --redact matters locally: it keeps a detected secret out of terminal
+      # scrollback and shell history when the hook reports the finding.
+      - id: gitleaks
