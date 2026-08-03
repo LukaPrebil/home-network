@@ -15,7 +15,7 @@ Loops through a defined list of users, checks if they are home, and sends a noti
 | Person | Notify Service |
 |--------|---------------|
 | `person.luka` | `notify.mobile_app_sm_s926b` |
-| `person.<resident>` | `notify.mobile_app_sm_s711b` |
+| `person.<second-resident>` | `notify.mobile_app_<their-device>` |
 
 ## Parameters
 
@@ -61,7 +61,7 @@ Loops through a defined list of users, checks if they are home, and sends a noti
 
 ## Notification Channels
 
-All notifications use Android notification channels for organized alert behavior. Channels are created on first use and their importance is **locked by the OS** — only per-notification lowering is possible.
+All notifications use Android notification channels for organized alert behavior. Channels are created on first use and their importance is **locked by the OS** - only per-notification lowering is possible.
 
 | Channel | Importance | Color | Used By |
 |---------|-----------|-------|---------|
@@ -106,7 +106,7 @@ data:
   tag: unique_tag           # Required: identifies the notification for updates/clearing
   live_update: true         # Android 16+: pins notification, allows in-place updates
   persistent: true          # Prevents swipe dismiss (Android 13 and below)
-  sticky: "true"            # String, not boolean — prevents dismiss on tap
+  sticky: "true"            # String, not boolean - prevents dismiss on tap
   alert_once: true          # Only buzz on first send, silent on updates
   clickAction: /climate     # Deep link when tapped (see conventions below)
   actions:                  # Action buttons
@@ -116,7 +116,7 @@ data:
 
 ## Notification Deep Link Conventions
 
-Every notification should include a `clickAction` field in `data` that links to the most relevant page when tapped. Note: `url` does NOT work on Android — use `clickAction` instead.
+Every notification should include a `clickAction` field in `data` that links to the most relevant page when tapped. Note: `url` does NOT work on Android - use `clickAction` instead.
 
 | Notification category | `clickAction` value | Target |
 |---|---|---|

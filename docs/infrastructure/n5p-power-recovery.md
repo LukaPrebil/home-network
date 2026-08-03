@@ -39,7 +39,7 @@ re-armed at every boot by the `wol-arm.service` unit, managed by
 
 ```bash
 ssh rpi4                      # the only always-on LAN device
-wakeonlan <n5p-nic-mac>   # n5p primary NIC MAC
+wakeonlan <n5p-nic-mac>       # n5p primary NIC MAC
 ```
 
 Verify the NIC is armed (on n5p): `ethtool enp197s0 | grep Wake-on` should

@@ -1,0 +1,20 @@
+# SOPS + age replaces Ansible Vault once the repository is public
+
+Status: proposed (2026-08-03)
+
+`ansible/secrets.yml` is Ansible Vault encrypted and tracked in git. That is a sound arrangement for a private repository, where the ciphertext is a second line of defence behind GitHub's access control, and an unsound one for a public repository, where the ciphertext becomes the only line of defence and is exposed to unhurried offline attack forever. Ansible Vault derives its key with PBKDF2-HMAC-SHA256 at 10,000 iterations, a figure unchanged for roughly a decade and about sixty times below current OWASP guidance; `ansible2john` extracts the blob and hashcat mode 16900 attacks it at 912 kH/s on an RTX 4090 and 1.165 MH/s on an RTX 5090. Security then rests entirely and permanently on passphrase entropy, and rotating the passphrase does nothing for blobs already published under the old one. We therefore migrate to SOPS with an age recipient. age uses X25519 keypairs, so there is no passphrase in the scheme to grind: an attacker must break the curve or steal the private key file, which never enters git. Secrets stay in the repository, which preserves git as the backup path for `vault_thread_active_dataset`, the sole disaster-recovery artifact for the Matter network.
+
+## Considered options
+
+- **Keep Ansible Vault and publish the ciphertext, relying on a strong passphrase** - rejected: defensible only above roughly 70 bits of genuinely random entropy (six-word diceware or twenty-plus random alphanumerics), and even then every historical revision remains crackable at whatever passphrase protected it at the time, which we cannot retroactively strengthen. A survey of well-regarded public homelab repositories found none still doing this; the last prominent holdout migrated to SOPS and age in December 2025 after repeated credential leaks.
+- **Untrack secrets entirely and ship only `secrets.example.yml`** - rejected: simplest option and used by several respected repositories, but it removes git as a backup for the vaulted Thread Active Operational Dataset. The June 2026 review already flagged the single-copy `.vault_pass` as a recovery single point of failure; this would compound that rather than relieve it.
+- **git-crypt** - rejected: it cannot revoke access previously granted, it leaks filenames and file sizes, and its author documents it as not mature.
+
+## Consequences
+
+- SOPS encrypts values and leaves YAML keys in plaintext, so the published file discloses the secret schema: a reader learns that a Proxmox API password, a Thread dataset and so on exist. Ansible Vault hid this by encrypting the whole file. We accept schema disclosure in exchange for eliminating the brute-force surface.
+- The historical `ansible/secrets.yml` revisions are stripped from the published history rather than carried forward, because each was encrypted under whatever passphrase was current at the time and that cannot be improved after the fact.
+- The control node gains two dependencies: the `sops` binary and the `community.sops` collection. The age private key lives at `~/.config/sops/age/keys.txt` and never enters git; `.sops.yaml` at the repository root holds only the public recipient and is safe to commit.
+- The file moves to `ansible/group_vars/all/secrets.sops.yml` so the `community.sops` vars plugin decrypts it transparently for every host. This deletes the twelve-plus explicit `vars_files: - secrets.yml` entries across `site.yml` and the three provision playbooks, and `vault_password_file` comes out of `ansible.cfg`.
+- All 40 `vault_*` variable names are preserved verbatim, so none of the 28 files referencing them change. The name prefix becomes a historical artifact rather than a description of the mechanism, which is mildly misleading but far cheaper than a fleet-wide rename.
+- The recovery story shifts from "one passphrase in `.vault_pass`" to "one private key in `keys.txt`". The single point of failure is not removed, only relocated, and the age key needs the same offline backup discipline the vault passphrase always needed.

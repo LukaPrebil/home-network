@@ -14,9 +14,9 @@ Integration: [`damacus/robovac`](https://github.com/damacus/robovac), installed 
 | Integration | `damacus/robovac` `v2.4.3-beta.1` (HACS custom repo) |
 | Transport | Tuya local protocol - AES over TCP `6668` (control), UDP `6666/6667` (discovery) |
 | Entities | `vacuum.robi`, `sensor.hisa_robi_battery` |
-| Device id (Tuya gwId) | `bfe1014aca701802b7osep` |
+| Device id (Tuya gwId) | `<tuya-gwid>` |
 | MAC | `<vacuum-mac>` |
-| Eufy account | owner account (`luka.prebil.grintal@proton.me`) |
+| Eufy account | owner account (`<eufy-account-email>`) |
 
 The HA device is named **Robi** (a name carried over from an earlier, now-removed integration attempt for the same vacuum); the device registry confirms `model: L60 Hybrid SES`.
 
