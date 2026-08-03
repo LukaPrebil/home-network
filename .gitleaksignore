@@ -1,0 +1,21 @@
+# Fingerprints of confirmed false positives in historical revisions of
+# ansible/secrets.example.yml, which is a template of placeholder values.
+#
+# Each entry is pinned to an exact commit, file, rule and line, so it cannot
+# mask a future finding. The current revision of that file carries inline
+# `gitleaks:allow` comments instead; these two entries exist only because CI
+# scans full history and the inline comments do not apply retroactively.
+#
+# Verified before suppressing:
+#
+#   vault_thread_network_key is byte-identical to 00112233445566778899aabbccddeeff,
+#   the OpenThread default test key published in the upstream project. It is not a
+#   credential for this network; the real Thread dataset has always been encrypted.
+#
+#   vault_pds_plc_rotation_key is a human-readable placeholder phrase. The comment
+#   directly above it documents `openssl rand --hex 16` as the generator, whose real
+#   output is 32 lowercase hex characters with no separators. The placeholder is
+#   lowercase letters with underscores, so it cannot be the value it stands in for.
+
+1db5e84a8b032764a1d5e3000d8509ed93114b4c:ansible/secrets.example.yml:generic-api-key:60
+3ac11b4712c07c5f2df9e020729261d140bc73a9:ansible/secrets.example.yml:generic-api-key:29
