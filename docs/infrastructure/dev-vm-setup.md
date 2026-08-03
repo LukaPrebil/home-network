@@ -33,7 +33,7 @@ Proxmox n5p (192.168.1.128)
 | Inventory | `ansible/inventory/hosts.yml` (`dev_hosts`) | this repo |
 | User vars | `ansible/host_vars/dev.yml` | this repo |
 | Dotfiles | `git@github.com:LukaPrebil/dotfiles.git` (chezmoi) | external |
-| Claude config | `git@github.com:domengabrovsek/claude.git` + symlinks under `~/.claude/` | external |
+| Claude config | `git@github.com:<dev_vm_claude_remote>/claude.git` + symlinks under `~/.claude/` | external |
 
 ## Software stack on the VM
 

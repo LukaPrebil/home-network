@@ -18,9 +18,12 @@ Layered on top of `common`, `docker`, and `tailscale`:
    propagation.
 5. **chezmoi** - official installer + `chezmoi init --apply` against the
    user's dotfiles repo. Diff-then-apply on re-runs.
-6. **Claude config tree** - clones `domengabrovsek/claude` and creates the
-   symlink set under `~/.claude/` that mirrors the macOS layout. Validates
-   every symlink source exists pre-link.
+6. **Claude config tree** - clones the Claude config repo owned by
+   `dev_vm_claude_remote` and creates the symlink set under `~/.claude/` that
+   mirrors the macOS layout. Validates every symlink source exists pre-link.
+   `dev_vm_claude_remote` has no working default: the clone is symlinked into
+   `~/.claude/` as executable hooks and commands, so the operator must name an
+   owner they control.
 7. **nvm + Node LTS** - for web-dev work; Claude Code uses its own native
    installer (#8).
 8. **Claude Code** - official native installer pinned to

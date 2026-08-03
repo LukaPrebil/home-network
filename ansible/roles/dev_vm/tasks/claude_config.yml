@@ -1,16 +1,34 @@
 ---
-# Clone domengabrovsek/claude into ~/code/domengabrovsek/claude and recreate
-# the symlink set under ~/.claude/ that mirrors the macOS workstation layout.
+# Clone the operator's Claude config repo into ~/code/<owner>/claude and
+# recreate the symlink set under ~/.claude/ that mirrors the macOS workstation
+# layout. The owner segment comes from dev_vm_claude_remote so that no
+# particular GitHub account is baked into the role.
 
-- name: Ensure ~/code/domengabrovsek directory exists
+- name: Assert the Claude config repo owner is set
+  ansible.builtin.assert:
+    that:
+      - dev_vm_claude_remote is defined
+      - dev_vm_claude_remote | trim | length > 0
+      - dev_vm_claude_remote != 'your-github-user'
+      - "'/' not in dev_vm_claude_remote"
+    fail_msg: >-
+      dev_vm_claude_remote must name a single GitHub owner you control, and has
+      no working default on purpose. The role symlinks hooks/, commands/ and
+      settings.json out of that repo into ~/.claude, so whoever owns it can
+      execute code on this box. Set it in host_vars/dev.yml.
+    quiet: true
+
+# dirname keeps the parent in lockstep with the clone destination; deriving it
+# from dev_vm_user.home a second time lets the two drift apart silently.
+- name: Ensure the Claude config repo parent directory exists
   ansible.builtin.file:
-    path: "{{ dev_vm_user.home }}/code/domengabrovsek"
+    path: "{{ dev_vm_claude_path | dirname }}"
     state: directory
     owner: "{{ dev_vm_user.name }}"
     group: "{{ dev_vm_user.name }}"
     mode: '0755'
 
-- name: Clone domengabrovsek/claude repo
+- name: Clone the Claude config repo
   ansible.builtin.git:
     repo: "{{ dev_vm_claude_repo }}"
     dest: "{{ dev_vm_claude_path }}"
