@@ -11,13 +11,24 @@ review anything you adopt before pointing it at your own infrastructure.
 ## Secrets
 
 Tracked files hold no plaintext secrets by design. Sensitive values live in
-`ansible/secrets.yml`, encrypted with ansible-vault (AES256). The vault password
-itself is read from a `.vault_pass` file that is gitignored and never committed,
-so a clone of this repository cannot decrypt anything.
+`ansible/group_vars/all/secrets.sops.yml`, encrypted with SOPS to an age
+recipient. The matching age private key lives outside the repository and is
+never committed, so a clone of this repository cannot decrypt anything.
+
+SOPS encrypts values rather than whole files, so the key names in that file are
+readable while the values are not. That is deliberate: it keeps diffs
+reviewable. Treat the visible key names as a list of what exists, not as a
+disclosure of any value.
+
+The age recipient in `.sops.yaml` is a public key and is safe to read. It is a
+post-quantum hybrid ML-KEM-768 and X25519 key, chosen because a public
+repository is archivable forever and the ciphertext should stay closed against
+an attacker who stores it now to attack later. Unlike a passphrase-derived
+scheme, there is nothing in the published file that can be attacked by guessing.
 
 Everything else that looks like a credential in the tracked files is a
 placeholder in a `*.example` file, or a Jinja template variable that gets filled
-in from the vault at deploy time.
+in at deploy time.
 
 Commits are scanned for secrets two ways: a gitleaks pre-commit hook on staged
 changes, and a full-history gitleaks and TruffleHog scan in CI. History is
