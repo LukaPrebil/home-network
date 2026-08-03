@@ -11,8 +11,8 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
-    ssid: "AC_Fallback"
-    password: "fallback123"
+    ssid: !secret ap_ssid
+    password: !secret ap_password
 
 web_server:
   port: 80
@@ -21,7 +21,7 @@ captive_portal:
 
 logger:
   level: INFO
-  baud_rate: 0  # Disable hardware UART logger — GPIO1/GPIO3 used for CN105
+  baud_rate: 0  # Disable hardware UART logger - GPIO1/GPIO3 used for CN105
 
 api:
   encryption:
@@ -58,7 +58,7 @@ climate:
       dual_setpoint: true
 
     # Sensors
-    # Note: compressor_frequency_sensor intentionally omitted — the MSZ-AY42
+    # Note: compressor_frequency_sensor intentionally omitted - the MSZ-AY42
     # always reports byte 3 as 0 over CN105. Use ac_input_power / ac_stage /
     # climate.air_conditioner_air_conditioner.hvac_action as proxies.
     input_power_sensor:
@@ -102,7 +102,7 @@ climate:
       id: ac_air_purifier
 
 
-# Remote temperature — uses average of conditioned rooms instead of AC's internal sensor
+# Remote temperature - uses average of conditioned rooms instead of AC's internal sensor
 sensor:
   - platform: homeassistant
     name: AC Remote Temperature

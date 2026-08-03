@@ -165,9 +165,10 @@ adguard_dns_rewrites:
   # Two flavours coexist here:
   #   - Public *.lukapg.dev (Cloudflare A record exists, WAN-reachable
   #     via CF proxy):  ha, photos, grafana, jellyfin, kuma, status, documents, chat.
-  #   - Internal-only *.lukapg.dev (no Cloudflare A record, NXDOMAIN
-  #     externally; Traefik enforces a LAN+tailnet ipAllowList on the
-  #     route): n5p, tn, omada, adguard.
+  #   - Internal-only *.lukapg.dev (n5p, tn, omada, adguard): these are NOT
+  #     NXDOMAIN externally. The zone's CF wildcard answers every name,
+  #     including ones with no record, with the same proxy IPs. Traefik's
+  #     lan-only ipAllowList middleware is the entire boundary, not DNS.
   # Every entry answers with Traefik's LAN IP (derived from inventory hostvars).
   - domain: "jellyfin.lukapg.dev"
     answer: "{{ hostvars['traefik']['ansible_host'] }}"
@@ -186,9 +187,9 @@ adguard_dns_rewrites:
   - domain: "chat.lukapg.dev"
     answer: "{{ hostvars['traefik']['ansible_host'] }}"
 
-  # Internal-only services (no public Cloudflare DNS, lan-only middleware
-  # at Traefik). See ansible/roles/traefik/templates/dynamic.yml.j2 for
-  # the matching routers.
+  # Internal-only services. These resolve publicly via the CF wildcard;
+  # the lan-only middleware at Traefik is what keeps them internal. See
+  # ansible/roles/traefik/templates/dynamic.yml.j2 for the matching routers.
   - domain: "n5p.lukapg.dev"
     answer: "{{ hostvars['traefik']['ansible_host'] }}"
   - domain: "tn.lukapg.dev"

@@ -35,9 +35,14 @@ dev_vm_user:
 
 dev_vm_dotfiles_remote: LukaPrebil
 dev_vm_dotfiles_ref: HEAD  # pin to a SHA when something is in flight upstream
-dev_vm_claude_repo: "git@github.com:domengabrovsek/claude.git"
+# Set this to your own GitHub owner before converging the dev VM; there is
+# deliberately no working default. The role symlinks hooks/, commands/ and
+# settings.json out of this repo into ~/.claude, so whoever owns it can
+# execute code on this box - it is a trust decision, not a preference.
+dev_vm_claude_remote: your-github-user
+dev_vm_claude_repo: "git@github.com:{{ dev_vm_claude_remote }}/claude.git"
 dev_vm_claude_ref: HEAD
-dev_vm_claude_path: "{{ dev_vm_user.home }}/code/domengabrovsek/claude"
+dev_vm_claude_path: "{{ dev_vm_user.home }}/code/{{ dev_vm_claude_remote }}/claude"
 
 # DNS - override the global all.yml fallback that includes 1.1.1.1 / 1.0.0.1.
 # This list also feeds:

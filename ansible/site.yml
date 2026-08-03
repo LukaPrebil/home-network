@@ -279,7 +279,6 @@
     # (--tags containers-services) so uptime_kuma can join the external network.
     - docker_socket_proxy
     - uptime_kuma
-    - ddns_updater
     - octoeverywhere
 
 - name: Deploy Hermes Agent
