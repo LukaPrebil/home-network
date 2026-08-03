@@ -35,7 +35,7 @@ vms_to_create:
     onboot: true  # Start on host boot (enforced by the vm-startup-reconcile play)
     startup: "order=3"  # Boot after tn-storage (order=1) and containers (order=2)
     # Per-VM DNS override - AdGuard pair only, no Cloudflare fallback.
-    # The global default in group_vars/all.yml falls back to 1.1.1.1/1.0.0.1
+    # The global default in group_vars/all/main.yml falls back to 1.1.1.1/1.0.0.1
     # if AdGuard hiccups, which would bypass filtering. AdGuard primary +
     # secondary already gives two-server redundancy; if both are down DNS
     # legitimately fails.

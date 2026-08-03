@@ -15,8 +15,6 @@
 - name: Download TrueNAS Scale ISO
   hosts: n5p
   become: true
-  vars_files:
-    - secrets.yml
   vars:
     truenas_version: "25.04.2.4"
     truenas_iso_filename: "TrueNAS-SCALE-{{ truenas_version }}.iso"
@@ -45,8 +43,7 @@
   hosts: n5p
   become: true
   vars_files:
-    - secrets.yml
-    - group_vars/all.yml  # truenas_nfs_server for the NFS readiness gate
+    - group_vars/all/main.yml  # truenas_nfs_server for the NFS readiness gate
   vars:
     truenas_vmid: 100
     truenas_name: "tn-storage"

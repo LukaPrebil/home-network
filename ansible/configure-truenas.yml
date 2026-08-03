@@ -4,8 +4,6 @@
 
 - name: Configure ZFS Storage Pool using midclt
   hosts: tn-storage
-  vars_files:
-    - secrets.yml
   tasks:
     - name: Get disk device names for NVMe drives
       ansible.builtin.shell:
@@ -62,8 +60,6 @@
 
 - name: Configure ZFS Datasets
   hosts: tn-storage
-  vars_files:
-    - secrets.yml
   tasks:
     - name: Get existing datasets
       ansible.builtin.shell:
@@ -121,8 +117,6 @@
   # datasets got UI-made snapshot tasks, this one is managed here so a
   # rebuild cannot silently drop the only backup of the fabric.
   hosts: tn-storage
-  vars_files:
-    - secrets.yml
   tasks:
     - name: Get datasets that already have a snapshot task
       ansible.builtin.shell:
@@ -161,8 +155,6 @@
 
 - name: Configure NFS Shares
   hosts: tn-storage
-  vars_files:
-    - secrets.yml
   tasks:
     - name: Query NFS service enable/running state
       # jq emits exactly two tokens (enable, state) even if the service is
@@ -224,8 +216,6 @@
 
 - name: Configure iSCSI targets for block storage
   hosts: tn-storage
-  vars_files:
-    - secrets.yml
   tasks:
     - name: Skip iSCSI configuration if no zvols defined
       ansible.builtin.meta: end_play
@@ -453,8 +443,6 @@
   # the apt-based common role, so the fleet-wide timezone var is applied
   # here via midclt instead of community.general.timezone.
   hosts: tn-storage
-  vars_files:
-    - secrets.yml
   tasks:
     - name: Query current system timezone
       ansible.builtin.shell:
@@ -486,8 +474,6 @@
   # detects drift; on a normally-converged stack a manual reboot is
   # also fine.
   hosts: tn-storage
-  vars_files:
-    - secrets.yml
   vars:
     truenas_kernel_extra_required:
       - virtio_net.napi_tx=0
@@ -541,8 +527,6 @@
 - name: Add TrueNAS storage to Proxmox
   hosts: n5p
   become: true
-  vars_files:
-    - secrets.yml
   tasks:
     - name: Check existing Proxmox storage
       ansible.builtin.shell:

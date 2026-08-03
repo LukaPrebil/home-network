@@ -13,7 +13,7 @@
 # that entirely.
 #
 # The cross-role contract (network, container name, port, endpoint) lives in
-# group_vars/all.yml so this role and its consumers cannot drift.
+# group_vars/all/main.yml so this role and its consumers cannot drift.
 
 # Pinned to a multi-arch manifest digest (amd64 LXCs + rpi4 arm64). Upgrade =
 # re-capture the running digest and bump deliberately.

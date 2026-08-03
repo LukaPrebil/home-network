@@ -17,3 +17,10 @@ collections:
 
   - name: community.proxmox
     version: ">=1.6.0"
+
+  # Provides the community.sops.sops vars plugin that transparently decrypts
+  # group_vars/host_vars *.sops.yml. Pinned exactly rather than floating like
+  # the entries above: a surprise upgrade here breaks secret loading on every
+  # host at once, so the bump should be a deliberate, reviewed change.
+  - name: community.sops
+    version: "2.4.0"

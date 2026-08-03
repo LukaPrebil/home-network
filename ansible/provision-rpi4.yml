@@ -48,8 +48,6 @@
   hosts: rpi4
   become: true
   gather_facts: true
-  vars_files:
-    - secrets.yml
   roles:
     - common
 

@@ -1,10 +1,13 @@
-# Ansible vault password file
+# Ansible vault password file. Retained only so a leftover copy from the
+# pre-SOPS era can never be committed; nothing reads it any more.
 .vault_pass
 
-# Encrypted secrets (keep encrypted version in git)
-# secrets.yml is encrypted and should be committed
-# But exclude any unencrypted versions
+# Secrets are SOPS-encrypted in group_vars/all/secrets.sops.yml, which IS
+# committed. The age private key lives outside the repo and never enters it.
+# These patterns catch decrypted spills.
+secrets.yml
 secrets.yml.decrypted
+secrets.sops.yml.decrypted
 
 # Retry files
 *.retry

@@ -41,8 +41,7 @@
   become: true
   vars_files:
     - vars/lxc.yml
-    - group_vars/all.yml
-    - secrets.yml
+    - group_vars/all/main.yml
 
   tasks:
     - name: Get list of existing containers

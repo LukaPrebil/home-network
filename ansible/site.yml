@@ -13,7 +13,7 @@
 #   ansible-playbook site.yml --tags pds                  # ATProto PDS
 #   ansible-playbook site.yml --tags ha-mcp              # Home Assistant MCP server
 #   ansible-playbook site.yml --tags crowdsec             # CrowdSec intrusion detection
-#   ansible-playbook site.yml --tags containers-services # Uptime Kuma + DDNS + OctoEverywhere
+#   ansible-playbook site.yml --tags containers-services # Uptime Kuma + OctoEverywhere
 #   ansible-playbook site.yml --tags dev-vm              # Dev VM (apt, dotfiles, claude code, ufw)
 #   ansible-playbook site.yml --tags tailscale                    # Tailscale role on dev + rpi4
 #   ansible-playbook site.yml --tags tailscale-subnet-router      # Just the rpi4 subnet router
@@ -27,8 +27,6 @@
   become: true
   tags:
     - common
-  vars_files:
-    - secrets.yml
   roles:
     - common
 
@@ -38,7 +36,6 @@
   tags:
     - proxmox
   vars_files:
-    - secrets.yml
     - vars/lxc.yml  # lxc_loadavg.yml needs lxc_containers
   roles:
     - proxmox
@@ -48,8 +45,6 @@
   become: true
   tags:
     - dev-vm
-  vars_files:
-    - secrets.yml
   pre_tasks:
     - name: Wait for SSH to come up
       ansible.builtin.wait_for_connection:
@@ -67,8 +62,6 @@
     - node-exporter
     - monitoring
     - monitoring-agents
-  vars_files:
-    - secrets.yml
   roles:
     - node_exporter
 
@@ -79,8 +72,6 @@
     - alloy
     - monitoring
     - monitoring-agents
-  vars_files:
-    - secrets.yml
   roles:
     - alloy
 
@@ -99,8 +90,6 @@
   become: true
   tags:
     - monitoring
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - monitoring_stack
@@ -110,8 +99,6 @@
   become: true
   tags:
     - crowdsec
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - crowdsec
@@ -121,8 +108,6 @@
   become: true
   tags:
     - traefik
-  vars_files:
-    - secrets.yml
   roles:
     - common
     - docker
@@ -133,8 +118,6 @@
   become: true
   tags:
     - immich
-  vars_files:
-    - secrets.yml
   roles:
     - common
     - docker
@@ -145,8 +128,6 @@
   become: true
   tags:
     - mattermost
-  vars_files:
-    - secrets.yml
   roles:
     - common
     - docker
@@ -157,8 +138,6 @@
   become: true
   tags:
     - omada
-  vars_files:
-    - secrets.yml
   roles:
     - common
     - omada_controller
@@ -169,8 +148,6 @@
   serial: 1  # primary + secondary stagger so one DNS server always answers
   tags:
     - adguard
-  vars_files:
-    - secrets.yml
   roles:
     - adguard
 
@@ -180,8 +157,6 @@
   tags:
     - otbr
     - thread-matter
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - otbr
@@ -192,8 +167,6 @@
   tags:
     - matter-server
     - thread-matter
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - matter_server
@@ -204,8 +177,6 @@
   tags:
     - tailscale
     - tailscale-subnet-router
-  vars_files:
-    - secrets.yml
   roles:
     - tailscale
 
@@ -215,8 +186,6 @@
   tags:
     - jellyfin
     - media
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - jellyfin
@@ -227,8 +196,6 @@
   tags:
     - arr-stack
     - media
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - arr_stack
@@ -238,8 +205,6 @@
   become: true
   tags:
     - paperless-ngx
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - paperless_ngx
@@ -249,8 +214,6 @@
   become: true
   tags:
     - pds
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - pds
@@ -260,19 +223,15 @@
   become: true
   tags:
     - ha-mcp
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     - ha_mcp
 
-- name: Deploy container services (Uptime Kuma, DDNS, OctoEverywhere)
+- name: Deploy container services (Uptime Kuma, OctoEverywhere)
   hosts: containers
   become: true
   tags:
     - containers-services
-  vars_files:
-    - secrets.yml
   roles:
     - docker
     # Ensures the socket-proxy + network exist when this play runs standalone
@@ -286,8 +245,6 @@
   become: true
   tags:
     - hermes
-  vars_files:
-    - secrets.yml
   roles:
     - common
     - hermes

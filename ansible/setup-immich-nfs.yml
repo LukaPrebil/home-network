@@ -12,7 +12,7 @@
   hosts: n5p
   become: true
   vars_files:
-    - group_vars/all.yml
+    - group_vars/all/main.yml
     - roles/docker/defaults/main.yml
     - roles/immich/defaults/main.yml
 

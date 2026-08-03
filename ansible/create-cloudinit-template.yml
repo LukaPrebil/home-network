@@ -7,7 +7,6 @@
   hosts: n5p
   become: true
   vars_files:
-    - secrets.yml
     - vars/cloudinit_template.yml
   tasks:
     - name: Ensure cloud image directory exists on TrueNAS storage
@@ -38,7 +37,6 @@
   hosts: n5p
   become: true
   vars_files:
-    - secrets.yml
     - vars/cloudinit_template.yml
   tasks:
     - name: Check if template VM already exists
@@ -111,7 +109,6 @@
   hosts: n5p
   become: true
   vars_files:
-    - secrets.yml
     - vars/cloudinit_template.yml
   tasks:
     - name: Write SSH key to temporary file

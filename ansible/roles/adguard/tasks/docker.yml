@@ -10,8 +10,9 @@
       - vault_adguard_password | length > 0
     fail_msg: >-
       vault_adguard_username and vault_adguard_password must be defined and
-      non-empty in secrets.yml. Refusing to deploy: without them the AdGuard
-      config would render with no admin users (unauthenticated admin UI).
+      non-empty in group_vars/all/secrets.sops.yml. Refusing to deploy: without
+      them the AdGuard config would render with no admin users
+      (unauthenticated admin UI).
     quiet: true
 
 - name: Assert AdGuard Docker path is an NFS mount

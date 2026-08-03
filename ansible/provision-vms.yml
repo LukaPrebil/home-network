@@ -49,7 +49,6 @@
   hosts: n5p
   become: true
   vars_files:
-    - secrets.yml
     - vars/cloudinit_template.yml
     - vars/vms.yml
   vars:
