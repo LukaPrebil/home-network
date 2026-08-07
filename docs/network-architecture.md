@@ -164,9 +164,10 @@ The network currently runs on a flat `192.168.1.0/24` subnet. The VLAN architect
 
 The SOFAR logger stick sits outside the `.140`-`.150` service block because it is a
 static lease in the Innbox DHCP table rather than a host-configured static address.
-Ports 8899 (Modbus) and 80 (config UI) are open on it. The TIGO CCA gateway in the
-same enclosure has no recorded address yet, and a wired Elfin EE11 bridge for inverter
-control is planned but unallocated. See
+Ports 8899 and 80 are open on it, but it answers no local protocol and is a cloud
+uplink only. Two Elfin EE11A wired RS485 bridges are on order, one for the inverter COM
+port and one for the TIGO CCA optimizer tap; both need addresses when they land, as
+does the CCA itself. See
 [`hardware/pv-battery-plant.md`](hardware/pv-battery-plant.md).
 
 ### Automation Configuration

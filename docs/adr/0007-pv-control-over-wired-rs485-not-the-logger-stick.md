@@ -1,6 +1,8 @@
 # PV battery control runs over wired RS485, not the logger stick
 
-Status: accepted (2026-08-07)
+Status: accepted (2026-08-07). Monitoring half superseded by ADR 0008 (2026-08-07):
+the stick turned out to serve no local protocol at all, so monitoring moved to the
+wired bridge as well. The control decision below stands.
 
 The SOFAR ESI 12K-T1 is reachable today on the LSW-3 Wi-Fi logger stick at
 `192.168.1.6`, with port 8899 confirmed open even on the newer MQTT-based firmware

@@ -74,11 +74,11 @@ credited at a much lower rate than manki are charged, which is why self-consumpt
 beats export.
 
 **Logger stick**:
-The SOFAR LSW-3 Wi-Fi dongle that talks to SofarCloud and exposes a local port. Carries
-monitoring only.
-_Avoid_: conflating it with the **wired bridge**, the Elfin EE11 on the inverter COM
-port that will carry control. Both speak to the same inverter; only one of them may be
-written through.
+The SOFAR LSW-3 Wi-Fi dongle that talks to SofarCloud. Port 8899 is open but answers no
+protocol, so it carries nothing locally and is not a data source.
+_Avoid_: conflating it with the **wired bridge**, the Elfin EE11A on the inverter COM
+port that will carry both monitoring and control. Both reach the same inverter; only
+the bridge can be read or written.
 
 ## Relationships
 
@@ -87,7 +87,7 @@ written through.
 - A **Fresh fault** at a low-progress **Job end** means aborted; without it, the same job end is a deliberate cancel
 - A **Time push** lands only on a **Time-capable device**; the other 19 Matter nodes have nowhere to store time
 - **Fabric state** loss is re-commission-class, like Thread dataset loss; the two stores back different halves of the same Matter estate
-- A **Passive Mode** write is only trustworthy over the **wired bridge**; the same write over the **logger stick** succeeds or fails indistinguishably
+- **Passive Mode** is reachable only over the **wired bridge**; the **logger stick** answers no local protocol at all, so it can be neither read nor written
 - **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
 
 ## Example dialogue
