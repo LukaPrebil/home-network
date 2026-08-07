@@ -109,6 +109,7 @@ Read these files **only when working on the relevant topic** - do not load them 
 | HA dashboards (Luba mower) | `docs/home-assistant/dashboards/mower.md` |
 | Heat pump Modbus integration | `docs/hardware/orca-heatpump-modbus.md`, `docs/hardware/orca-modbus-findings.md` |
 | Heat pump HACS integration plan | `docs/hardware/orca-hacs-integration-plan.md` |
+| PV and battery plant (as-built, array, enclosure, constraints) | `docs/hardware/pv-battery-plant.md` |
 | Sofar inverter HA integration | `docs/hardware/sofar-inverter-ha-integration.md` |
 | Eufy L60 vacuum local (Tuya) control | `docs/hardware/eufy-l60-local-control.md` |
 | Network architecture, VLANs, hardware, IP map | `docs/network-architecture.md` |

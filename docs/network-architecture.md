@@ -158,7 +158,15 @@ The network currently runs on a flat `192.168.1.0/24` subnet. The VLAN architect
 | **Dev VM** | `dev` | `192.168.1.148` |
 | **Hermes LXC** | `hermes` | `192.168.1.149` |
 | **TrueNAS VM** | `tn-storage` | `192.168.1.150` |
+| **SOFAR LSW-3 logger stick** | `sofar-logger` | `192.168.1.6` |
 | **Desktop PC** | `desktop-pc` | DHCP |
+
+The SOFAR logger stick sits outside the `.140`-`.150` service block because it is a
+static lease in the Innbox DHCP table rather than a host-configured static address.
+Ports 8899 (Modbus) and 80 (config UI) are open on it. The TIGO CCA gateway in the
+same enclosure has no recorded address yet, and a wired Elfin EE11 bridge for inverter
+control is planned but unallocated. See
+[`hardware/pv-battery-plant.md`](hardware/pv-battery-plant.md).
 
 ### Automation Configuration
 
