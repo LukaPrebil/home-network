@@ -91,20 +91,26 @@ coil whine away from sleeping space under heavy load.
 
 | Device | Address | Notes |
 |---|---|---|
-| SOFAR LSW-3 Wi-Fi logger stick | `192.168.1.6` | Static lease in the Innbox DHCP table. Ports 8899 and 80 open |
+| SOFAR LSW-3 Wi-Fi logger stick | `192.168.1.6` | Static lease in the Innbox DHCP table. Cloud uplink only, serves nothing locally |
 | TIGO CCA gateway | unknown | To be recorded when the RS485 tap is built |
-| Elfin EE11 (planned) | unallocated | Wired bridge for inverter control |
+| Elfin EE11A (inverter bridge) | unallocated | Ordered 2026-08-07 |
+| Elfin EE11A (TIGO CCA tap) | unallocated | Ordered 2026-08-07 |
 
 Firmware as commissioned:
 
 - Logger stick: `LSW3_15_MQTT_270A_1.22`
 - Inverter: `V000001_V000003`
 
-The cloud portal is **SofarCloud**, not SolarMan. The stick firmware is MQTT-based,
-which is consistent with that move. Port 8899 is open regardless, so local polling is
-available. Published guidance about SolarMan stick firmware 1.09 against 1.11, and
-about inverter firmware thresholds like V110051, is written for a different
-versioning scheme and does not map cleanly onto these strings.
+The cloud portal is **SofarCloud**, not SolarMan, and the stick firmware is MQTT-based,
+consistent with that move. Published guidance about SolarMan stick firmware 1.09 against
+1.11, and about inverter firmware thresholds like V110051, is written for a different
+versioning scheme and does not map onto these strings.
+
+**The stick is not a local data source.** Port 8899 is open but answers no protocol
+that can be spoken to it, so all Home Assistant telemetry will come from the wired
+bridges instead. See [`sofar-modbus-findings.md`](sofar-modbus-findings.md) for the
+evidence and ADR 0008 for the decision. Until those bridges are installed, production
+history exists only in SofarCloud.
 
 For how the plant is integrated into Home Assistant, see
 [`sofar-inverter-ha-integration.md`](sofar-inverter-ha-integration.md).

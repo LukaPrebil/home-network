@@ -3,14 +3,14 @@
 Local Modbus control of the inverter, with no cloud in the automation path.
 
 For the plant itself (array, battery, enclosure, network addresses) see
-[`pv-battery-plant.md`](pv-battery-plant.md). For the transport decision and why
-control is not allowed over the logger stick, see ADR 0007.
+[`pv-battery-plant.md`](pv-battery-plant.md). For what was probed and ruled out, see
+[`sofar-modbus-findings.md`](sofar-modbus-findings.md). For the decisions, see ADR 0007
+(control never over the stick) and ADR 0008 (nothing at all over the stick).
 
-> **Status of the register map below**: inherited research, not yet verified against
-> this hardware. Nothing here has been read off the actual inverter. When the first
-> poll disagrees with the map, create `sofar-modbus-findings.md` alongside this file,
-> following the `orca-modbus-findings.md` precedent, and record what the hardware
-> actually says.
+> **Nothing here has been read off the actual inverter yet.** The register map is
+> inherited research and the plant has never been polled locally, because the logger
+> stick serves no local protocol on its current firmware. Local telemetry begins when
+> the wired bridge is installed. Correct this map against the hardware at that point.
 
 ## Protocol lineage
 
@@ -32,53 +32,61 @@ shared.
 
 ## Transport
 
-Two paths, deliberately used for different things.
+One path. A wired Elfin EE11A on the inverter's COM port.
 
 | Path | Use | Status |
 |---|---|---|
-| LSW-3 Wi-Fi logger stick, `192.168.1.6:8899` | Monitoring only | Available now |
-| Elfin EE11 on the inverter COM port | Control | Planned, hardware pending |
+| Elfin EE11A on the inverter COM port | Everything | Ordered 2026-08-07, roughly a month out |
+| LSW-3 Wi-Fi logger stick, `192.168.1.6:8899` | Nothing. SofarCloud only | Ruled out, see findings |
 
-**Reads over the stick are fine.** A dropped poll costs one sample.
+The stick was originally intended to carry monitoring while the wired bridge carried
+control, on the reasoning in ADR 0007: reads degrade honestly over a lossy link, writes
+degrade silently, and a Passive Mode write that fails invisibly makes the battery do
+the wrong thing at the wrong hour of a winter evening.
 
-**Writes over the stick are not.** In the stick's default Data Collection mode, write
-requests return non-standard response codes, so a write appears to fail even when it
-succeeded. The documented workaround is `continue_on_error: true`, which does not fix
-the problem, it hides it. For a battery control loop this means a failed Passive Mode
-write is indistinguishable from a successful one, and the battery does the wrong thing
-at the wrong hour with nothing to signal it. That is the reason control moves to a
-wired path, not link reliability.
+That reasoning still holds and still governs. What changed is that the stick turned out
+to serve nothing locally at all. Port 8899 is open and accepts connections, but answers
+neither Modbus in two framings nor Solarman V5 addressed with the correct logger
+serial. Its working mode is Data collection, in which the cloud-polling process owns
+the RS485 port, and its internal TCP server is bound to the access-point-side address
+rather than the LAN one. See
+[`sofar-modbus-findings.md`](sofar-modbus-findings.md) for the probes and evidence.
 
-Transparency mode would give honest write semantics, but it disables the cloud portal
-and allows a single TCP client. With the handover signed, SofarCloud is the channel
-through which the installer would remote-diagnose a warranty claim, so it stays up.
-The EE11 keeps both: clean Modbus on a wired path, cloud untouched.
+Transparency mode on the stick would work, at the cost of disabling SofarCloud and
+limiting it to one client. Rejected in ADR 0007 and again in ADR 0008: the cloud portal
+is how the installer would remote-diagnose a warranty claim, and the handover is signed,
+so warranty is the only recourse left.
 
-### Wiring the EE11
+### Wiring the bridge
 
 Inverter COM port, RS485: pin 1/2 is A+, pin 3/4 is B-, 120 ohm termination,
-9600/8-N-1. The EE11 mounts on the DIN rail already in the PV enclosure.
+9600/8-N-1. An RJ45 to screw-terminal breakout avoids crimping a custom plug into the
+inverter and is reversible if the pinout is wrong first time.
 
-**Check the EE11 input voltage rating against the enclosure's 24V Delta supply before
-connecting it.** The Elfin serial servers are commonly specified for a lower DC range.
-A step-down may be needed.
+**Use the EE11A, not the plain EE11.** The EE11 accepts 5-18 VDC; the enclosure's Delta
+supply is 24 V. Only the EE11A spans 5-36 VDC and can be fed directly from the existing
+rail. The heat pump's EW11A is the same variant for the same reason.
+
+**Do not add termination to the TIGO CCA tap.** That bridge is a passive parallel tap
+onto a bus already terminated at both ends. A third resistor loads the bus and degrades
+the CCA's own traffic. Termination applies to the inverter link only.
 
 ## Integration choice
 
-`homeassistant-solax-modbus` (wills106, via HACS), used from day one over the stick,
-with writes unused until the wired path exists.
+`homeassistant-solax-modbus` (wills106, via HACS), configured against the wired bridge
+from its first connection.
 
-The alternative, `ha-solarman`, works out of the box with `sofar_g3hyd.yaml` and would
-be quicker tonight. It was rejected as the starting point because it produces different
-entity IDs. Starting there and switching later means either losing accumulated history
-or doing entity ID surgery across every dashboard and automation built on top of it.
-Starting on `solax-modbus` makes the EE11 arriving a host and port change instead of a
-migration.
+Its only interfaces are `tcp` and `serial`, both plain Modbus. The source contains no
+reference to Solarman or V5 anywhere, so it was never able to talk to the stick in its
+current mode, and the transferred research claiming otherwise was wrong.
 
-`ha-solarman` remains the fallback if `solax-modbus` fails to enumerate against this
-hardware. Accepting the future migration is better than accumulating no local history
-at all. The original reason for holding it in reserve, a serial-prefix patch that might
-have proved intractable, no longer applies: see below.
+`ha-solarman` is **not** a fallback. It speaks Solarman V5, which is exactly the
+protocol the stick refuses to answer, so it fails for the same reason everything else
+on 8899 does. It would only become relevant if the stick were put into Transparency
+mode, which both ADRs reject.
+
+Because there is now only ever one transport, the entity-churn concern that shaped the
+original integration choice no longer applies. There is nothing to migrate from.
 
 ### Serial prefix: already supported, no patch needed
 
@@ -193,30 +201,37 @@ those registers.
 
 ## Plan
 
-**Phase 1, monitoring.** Install `homeassistant-solax-modbus` via HACS. Point it at
-`192.168.1.6` port 8899. No code editing: the `SH1` serial prefix is already handled
-upstream. Confirm entities enumerate and the energy dashboard populates. Do not write
-anything.
+There is no cheap interim step. Nothing happens in Home Assistant until the bridge is
+wired, so the plan is two stages, not three.
 
-**Phase 2, control.** When the EE11 arrives, verify its input voltage against the 24V
-rail, wire it to the inverter COM port with termination, give it an address, and change
-the integration's host and port. Entity IDs and history carry over. Writes become
-trustworthy at that point, and Passive Mode automation can start.
+**Stage 1, monitoring and control together.** When the EE11A arrives: wire it to the
+inverter COM port with 120 ohm termination and an RJ45 breakout, power it from the 24V
+rail, give it a LAN address and record it here and in the network doc. Install
+`homeassistant-solax-modbus` via HACS and point it at the bridge. No code editing, the
+`SH1` prefix is handled upstream. Confirm entities enumerate and the energy dashboard
+populates before writing anything. Once reads are stable, Passive Mode control can
+start, because writes over this transport report honestly.
 
-**Phase 3, optimizer telemetry.** Passive parallel RS485 tap on the TIGO CCA's GW/TAP
-port, with the CCA left powered but blocked from the internet, feeding the
-`taptap-mqtt` add-on. This is a separate bus from the inverter and needs its own
-bridge. Per-panel visualisation via the Solar Panel Visualizer Lovelace card.
+**Stage 2, optimizer telemetry.** Passive parallel RS485 tap on the TIGO CCA's GW/TAP
+port, using the second EE11A, with the CCA left powered but blocked from the internet.
+No termination on this one. Per-panel visualisation via the Solar Panel Visualizer
+Lovelace card.
+
+> **Blocker on stage 2**: the intended `taptap-mqtt` add-on needs an MQTT broker, and
+> this estate has had none since the orphaned integration was removed in June 2026.
+> Either stand a broker up or find a path into Home Assistant that does not need one.
+> Resolve this before wiring the tap, not after.
 
 ## Gotchas
 
-- Writes over the logger stick report false failures. This is the whole reason for the
-  wired path. Do not paper over it with `continue_on_error: true` and call it working.
+- The logger stick answers nothing on 8899 despite the port being open. Do not spend an
+  evening on it; read the findings document first.
 - The EEPROM has a finite write-cycle budget. Only the Passive Mode registers and the
   two power-control registers marked volatile are safe for frequent writes.
 - Passive Mode needs block writes via `0x10`. Single-register writes will not take.
 - Transparency mode on the stick kills SofarCloud and allows one client. Not worth it
   while warranty diagnostics matter.
+- Use the EE11A. The plain EE11 tops out at 18 VDC and the enclosure rail is 24 V.
 - The device entry may show a HYD model name rather than ESI 12K-T1, because upstream
   maps the `SH1` prefix to the HYD three-phase family. Cosmetic only.
 - Published firmware guidance for these sticks and inverters uses a different
