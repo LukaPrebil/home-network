@@ -75,18 +75,30 @@ or doing entity ID surgery across every dashboard and automation built on top of
 Starting on `solax-modbus` makes the EE11 arriving a host and port change instead of a
 migration.
 
-`ha-solarman` remains the fallback if the serial-prefix patch below turns into a fight.
-Accepting the future migration is better than accumulating no local history at all.
+`ha-solarman` remains the fallback if `solax-modbus` fails to enumerate against this
+hardware. Accepting the future migration is better than accumulating no local history
+at all. The original reason for holding it in reserve, a serial-prefix patch that might
+have proved intractable, no longer applies: see below.
 
-### Serial prefix patch
+### Serial prefix: already supported, no patch needed
 
-The inverter's serial number prefix must be added to `plugin_sofar.py` with
-`HYBRID | X3 | GEN` flags. The single-phase ESI maps its prefix to
-`HYBRID | X1 | GEN`; the three-phase model needs `X3`.
+This unit's serial begins `SH1`, which `plugin_sofar.py` already recognises:
 
-This is a one-line edit that HACS will overwrite on every integration update. Report
-the prefix upstream in the project's serial-number discussion so it ships in a release
-and the patch stops being re-applied.
+```python
+elif seriesnumber.startswith("SH1"):
+    invertertype = HYBRID | X3 | GEN | BAT_BTS  # HYD5...8KTL-3P
+```
+
+The flags are correct for this hardware. `HYBRID` because there is a battery, `X3` for
+three-phase, `GEN` for the G3 protocol generation, and `BAT_BTS` which matches the
+SOFAR BTS pack actually installed. The plugin reads the serial from register `0x445`.
+
+Earlier planning assumed a one-line patch would be needed and that HACS would clobber
+it on every update. Neither applies. The install is stock.
+
+The upstream comment guesses the model as a HYD 5-8KTL-3P, so the device entry may
+display a model name that is not ESI 12K-T1. That is a label, not behaviour: the ESI
+and HYD three-phase models share the register map.
 
 ## Register map
 
@@ -182,8 +194,9 @@ those registers.
 ## Plan
 
 **Phase 1, monitoring.** Install `homeassistant-solax-modbus` via HACS. Point it at
-`192.168.1.6` port 8899. Patch the serial prefix into `plugin_sofar.py`. Confirm
-entities enumerate and the energy dashboard populates. Do not write anything.
+`192.168.1.6` port 8899. No code editing: the `SH1` serial prefix is already handled
+upstream. Confirm entities enumerate and the energy dashboard populates. Do not write
+anything.
 
 **Phase 2, control.** When the EE11 arrives, verify its input voltage against the 24V
 rail, wire it to the inverter COM port with termination, give it an address, and change
@@ -204,7 +217,8 @@ bridge. Per-panel visualisation via the Solar Panel Visualizer Lovelace card.
 - Passive Mode needs block writes via `0x10`. Single-register writes will not take.
 - Transparency mode on the stick kills SofarCloud and allows one client. Not worth it
   while warranty diagnostics matter.
-- The serial-prefix patch is overwritten by HACS updates until it is upstreamed.
+- The device entry may show a HYD model name rather than ESI 12K-T1, because upstream
+  maps the `SH1` prefix to the HYD three-phase family. Cosmetic only.
 - Published firmware guidance for these sticks and inverters uses a different
   versioning scheme than the strings this unit reports. Do not assume thresholds like
   V110051 apply.
