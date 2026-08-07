@@ -159,6 +159,7 @@ The network currently runs on a flat `192.168.1.0/24` subnet. The VLAN architect
 | **Hermes LXC** | `hermes` | `192.168.1.149` |
 | **TrueNAS VM** | `tn-storage` | `192.168.1.150` |
 | **SOFAR LSW-3 logger stick** | `sofar-logger` | `192.168.1.6` |
+| **Elfin EW11** (heat pump RS485 bridge) | `elfin-heatpump` | `192.168.1.160` |
 | **Desktop PC** | `desktop-pc` | DHCP |
 
 The SOFAR logger stick sits outside the `.140`-`.150` service block because it is a
@@ -174,7 +175,7 @@ control is planned but unallocated. See
 * **Authentication:** SSH key-based authentication.
 * **Privilege Escalation:** Granular `sudo` rules to provide least-privilege access for required commands.
 * **Filesystem Layout:** Persistent application data will be stored in `/srv/docker/[service_name]`. TrueNAS will manage two primary volumes: one for SSD storage and one for bulk HDD storage.
-* **Secrets Management:** All sensitive variables (API keys, passwords) will be encrypted and stored locally using **Ansible Vault**.
+* **Secrets Management:** All sensitive variables (API keys, passwords) are encrypted with **SOPS** using an **age** recipient, in `ansible/group_vars/all/secrets.sops.yml`. The `community.sops` vars plugin decrypts them transparently for every host. `.sops.yaml` at the repository root holds only the public recipient and is safe to commit; the age private key lives at `~/.config/sops/age/keys.txt` and never enters git. See ADR 0006 for why Ansible Vault was retired.
 
 ---
 
