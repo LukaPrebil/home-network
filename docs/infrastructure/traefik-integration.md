@@ -97,6 +97,24 @@ networks:
     external: true
 ```
 
+### Trusted proxies live in the HA UI, not in YAML
+
+The block above is the generic Docker pattern. The real deployment runs Home Assistant OS on VM 102
+and is routed by the static file provider (the `ha-secure` router in `dynamic.yml.j2`), so HA sees
+Traefik as the request source and needs Traefik's IP in its trusted-proxy list.
+
+Since HA 2026.8 that list is no longer in `configuration.yaml`. The `http:` block was migrated into a
+UI-backed store and deleted from the file on 2026-08-07, so the values now exist only under
+Settings > System > Network, in the HTTP server section. They are invisible to grep, and re-adding
+the YAML block does nothing because HA ignores it after migration.
+
+Current entries: `192.168.1.142` (Traefik LXC), `127.0.0.1`, `172.18.0.0/16`.
+
+**When Traefik moves to `192.168.60.2`, this list has to be updated by hand in the HA UI.** No
+Ansible role covers it. The symptom of missing the step is `ha.<domain>` returning 400 ("Received
+X-Forwarded-For header from an untrusted proxy") while direct `http://<haos>:8123` still works, which
+is also the quickest way to tell this apart from a Traefik or certificate fault.
+
 ## Advanced: HTTPS with Let's Encrypt
 
 Once Let's Encrypt is enabled in Traefik:
