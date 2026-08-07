@@ -33,6 +33,22 @@ ICMP round trip about 9 ms, consistent with Wi-Fi rather than a wired path.
 Port 8899 being open is what made the local path look viable. It is not sufficient:
 the port accepts connections and serves nothing.
 
+## Reproducing this
+
+`scripts/sofar_transport_probe.py` runs every framing below against any endpoint. It is
+read-only, function code 3 only, and safe against a live plant.
+
+```sh
+# the logger stick, including the Solarman V5 attempt
+python3 scripts/sofar_transport_probe.py 192.168.1.6 --serial <logger serial>
+
+# a wired Elfin bridge, which serves plain Modbus TCP on 502
+python3 scripts/sofar_transport_probe.py <bridge ip> --port 502
+```
+
+Use it to confirm a new bridge answers before configuring anything in Home Assistant,
+and to re-test the stick after a firmware change.
+
 ## Protocol probes on 8899
 
 Every attempt below completed the TCP handshake and was never reset by the peer. All
