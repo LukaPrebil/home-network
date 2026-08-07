@@ -68,9 +68,11 @@ wired path.
 - SofarCloud stays connected. Nothing automated may depend on it, but it remains the
   remote-diagnosis channel for warranty work, which is now the only channel left since
   the payment leverage is spent.
-- `plugin_sofar.py` carries a local patch adding the inverter's serial prefix with
-  `HYBRID | X3 | GEN` flags. HACS overwrites it on every integration update until the
-  prefix is upstreamed, so upstreaming it is maintenance work, not politeness.
+- `plugin_sofar.py` already handles this inverter's `SH1` serial prefix as
+  `HYBRID | X3 | GEN | BAT_BTS`, which matches the hardware down to the BTS battery
+  pack. The install is stock: no local patch to maintain, nothing to upstream. This
+  consequence originally predicted a one-line patch that HACS would clobber on every
+  update; corrected 2026-08-07 after reading the plugin source.
 - The EE11's DC input rating needs checking against the enclosure's 24V Delta supply
   before it is connected, since these serial servers are commonly specified for a
   lower range. This is the one open hardware question the decision leaves behind.
