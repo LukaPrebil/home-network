@@ -47,6 +47,39 @@ A Matter node exposing the Time Synchronization cluster (0x0038); currently only
 matter-server's on-disk store (`/srv/docker/matter-server/data` on rpi4) holding the fabric credentials and node table; losing it means re-commissioning every Matter device.
 _Avoid_: "matter data dir"
 
+### Solar and tariff
+
+**Passive Mode**:
+The inverter storage mode in which Home Assistant sets the grid power target and the
+battery charge and discharge limits directly, rather than the inverter deciding. Its
+three control register pairs are volatile RAM, so they are safe to write continuously;
+every other control register is EEPROM-backed and is not.
+_Avoid_: "manual mode"
+
+**Blok**:
+A Slovenian network-fee (omrežnina) time band. Blok 1 is the most expensive winter
+peak band, and carrying the house through it without importing is what the 20.48 kWh
+battery is sized against.
+_Avoid_: "peak tariff" (the energy price and the network fee are billed separately, and
+it is the network fee that drives the battery schedule)
+
+**Samooskrba**:
+The Slovenian self-supply arrangement the metering point is enrolled in. Surplus is
+credited and carries forward indefinitely; there is no lock-in and no exit penalty.
+Individual samooskrba today, with community samooskrba possible later.
+
+**Viški / manki**:
+Surplus and deficit against the metering point over a settlement period. Viški are
+credited at a much lower rate than manki are charged, which is why self-consumption
+beats export.
+
+**Logger stick**:
+The SOFAR LSW-3 Wi-Fi dongle that talks to SofarCloud and exposes a local port. Carries
+monitoring only.
+_Avoid_: conflating it with the **wired bridge**, the Elfin EE11 on the inverter COM
+port that will carry control. Both speak to the same inverter; only one of them may be
+written through.
+
 ## Relationships
 
 - A **Job** produces exactly one **Job end**, which is either **Finished** or **Cancelled/aborted**
@@ -54,6 +87,8 @@ _Avoid_: "matter data dir"
 - A **Fresh fault** at a low-progress **Job end** means aborted; without it, the same job end is a deliberate cancel
 - A **Time push** lands only on a **Time-capable device**; the other 19 Matter nodes have nowhere to store time
 - **Fabric state** loss is re-commission-class, like Thread dataset loss; the two stores back different halves of the same Matter estate
+- A **Passive Mode** write is only trustworthy over the **wired bridge**; the same write over the **logger stick** succeeds or fails indistinguishably
+- **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
 
 ## Example dialogue
 
