@@ -46,3 +46,14 @@
   tags:
     - wol
     - proxmox
+
+- name: Include guest autostart reconciler tasks
+  ansible.builtin.include_tasks:
+    file: autostart_reconcile.yml
+    apply:
+      tags:
+        - autostart-reconcile
+        - proxmox
+  tags:
+    - autostart-reconcile
+    - proxmox

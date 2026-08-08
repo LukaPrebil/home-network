@@ -1,10 +1,19 @@
 #!/bin/bash
 # Managed by Ansible (provision-truenas.yml). Proxmox guest hookscript for the
-# TrueNAS VM ({{ truenas_vmid }}): after the VM starts, poll its NFS export so the next
-# startup order group does not race a cold NFS server. A fixed `up=120` was
-# not enough on 2026-07-22: HAOS timed out opening its qcow2 on
-# /mnt/pve/truenas-vms because TrueNAS was not serving NFS yet, and startall
-# never retries a failed guest.
+# TrueNAS VM ({{ truenas_vmid }}): after the VM starts, hold startall until the NFS server
+# can actually serve guest disks, so the next startup order group does not race
+# it.
+#
+# Readiness here means a completed open-and-write on a real NFS mount, not a
+# liveness reply. On 2026-08-08 the previous `showmount -e` probe reported ready
+# at 12:02:07 - one second before nfsd had even started, and 91s before it would
+# serve an open. nfsd enters a 90s NFSv4 grace period on start during which it
+# refuses every non-reclaim OPEN with NFS4ERR_GRACE; HAOS exhausted its 35s PVE
+# start budget at 12:03:37, one second before grace lifted at 12:03:38, and
+# startall never retries a failed guest.
+#
+# The grace period is per-server, not per-export, but each path is probed anyway
+# so a single missing mount cannot pass unnoticed.
 #
 # Hidden constraint: the gate only delays guests in LATER startup order
 # groups. startall's end-of-group barrier waits for the vm_start worker, and
@@ -22,23 +31,67 @@ if [ "${phase}" != "post-start" ] || [ "${vmid}" != "{{ truenas_vmid }}" ]; then
   exit 0
 fi
 
-nfs_server="{{ truenas_nfs_server }}"
 poll_interval="{{ truenas_nfs_gate_poll_interval }}"
 poll_timeout="{{ truenas_nfs_gate_timeout }}"
+attempt_timeout="{{ truenas_nfs_gate_attempt_timeout }}"
+
+probe_paths=(
+{% for probe_path in truenas_nfs_gate_probe_paths %}
+  "{{ probe_path }}"
+{% endfor %}
+)
+{# Everything below is raw: bash ${#array[@]} would otherwise open a Jinja comment. #}
+{% raw %}
 deadline=$((SECONDS + poll_timeout))
 
-echo "truenas-nfs-gate: waiting up to ${poll_timeout}s for NFS exports on ${nfs_server}"
+# True only when the path sits on a real NFS mount and a file can be created,
+# written and removed on it.
+probe_ready() {
+  local path="$1"
+  local mount probe
+
+  # Resolve the containing mount rather than assuming the path IS one, matching
+  # the Ansible-side guard in roles/common/tasks/assert_nfs_mount.yml.
+  mount=$(timeout -k 2 "${attempt_timeout}" stat -c %m "${path}" 2>/dev/null) || return 1
+
+  # Without this, an absent mount leaves a local stub directory that accepts the
+  # write and turns the gate green instantly - the exact silent-stub failure the
+  # Ansible guard exists to prevent.
+  awk -v m="${mount}" '$2 == m && $3 ~ /^nfs/ { found = 1; exit } END { exit !found }' \
+    /proc/mounts || return 1
+
+  probe="${path}/.nfs-gate-probe.$$"
+
+  # During grace the NFS client blocks and retries internally rather than
+  # returning an error, so this call hangs until the timeout rather than failing
+  # fast. -k escalates to SIGKILL because the mounts are `hard`.
+  if timeout -k 2 "${attempt_timeout}" \
+    bash -c "echo probe > '${probe}' && sync '${probe}' && rm -f '${probe}'" 2>/dev/null; then
+    return 0
+  fi
+
+  rm -f "${probe}" 2>/dev/null
+  return 1
+}
+
+echo "truenas-nfs-gate: waiting up to ${poll_timeout}s for writable NFS storage on ${probe_paths[*]}"
+
 while [ "${SECONDS}" -lt "${deadline}" ]; do
-  # Per-attempt timeout: showmount can hang on an unreachable RPC portmapper
-  # far longer than one poll interval.
-  if timeout 5 showmount -e "${nfs_server}" >/dev/null 2>&1; then
-    echo "truenas-nfs-gate: NFS exports up after ${SECONDS}s"
+  not_ready=()
+  for path in "${probe_paths[@]}"; do
+    probe_ready "${path}" || not_ready+=("${path}")
+  done
+
+  if [ "${#not_ready[@]}" -eq 0 ]; then
+    echo "truenas-nfs-gate: storage ready after ${SECONDS}s"
     exit 0
   fi
+
   sleep "${poll_interval}"
 done
 
 # Exit 0 even at the cap: PVE only warns on post-start hook failures, and a
 # wedged gate must never block the rest of startall.
-echo "truenas-nfs-gate: WARNING: NFS exports on ${nfs_server} still unreachable after ${poll_timeout}s; continuing startall anyway" >&2
+echo "truenas-nfs-gate: WARNING: still not writable after ${poll_timeout}s: ${not_ready[*]}; continuing startall anyway" >&2
 exit 0
+{% endraw %}
