@@ -123,16 +123,6 @@
     - docker
     - immich
 
-- name: Deploy Mattermost team chat
-  hosts: mattermost
-  become: true
-  tags:
-    - mattermost
-  roles:
-    - common
-    - docker
-    - mattermost
-
 - name: Deploy Omada Controller
   hosts: omada
   become: true

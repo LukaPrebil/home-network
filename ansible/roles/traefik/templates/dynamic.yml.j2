@@ -262,27 +262,6 @@ http:
         - security-headers
         - rate-limit
 
-    # Mattermost team chat - public via Cloudflare (orange cloud), like PDS.
-    # Traefik passes the WebSocket upgrade through by default (Mattermost needs it).
-    mattermost-secure:
-      rule: "Host(`chat.{{ traefik_domain | default('lukapg.dev') }}`)"
-      entryPoints:
-        - websecure
-      service: mattermost
-      tls:
-        certResolver: letsencrypt
-        domains:
-          - main: "{{ traefik_domain }}"
-            sans:
-              - "*.{{ traefik_domain }}"
-      middlewares:
-{% for mw in _ns.security_mw %}
-        - {{ mw }}
-{% endfor %}
-        - proxy-headers
-        - security-headers
-        - rate-limit
-
     # ─── Internal-only routers (LAN + tailnet only) ───
     # No Cloudflare proxy, no public DNS - split-DNS only via AdGuard.
     # Middleware chain: `lan-only` first (drops non-LAN/non-tailnet),
@@ -419,12 +398,6 @@ http:
       loadBalancer:
         servers:
           - url: "http://{{ hostvars['containers']['ansible_host'] }}:3000"
-        passHostHeader: true
-
-    mattermost:
-      loadBalancer:
-        servers:
-          - url: "http://{{ hostvars['mattermost']['ansible_host'] }}:8065"
         passHostHeader: true
 
     # ─── Internal-only service backends ───

@@ -17,7 +17,7 @@ where HAOS failed again for a reason the first fix did not model.
    other guest's root disk lives on `truenas-vms` (NFS). "Writable" and not
    "answering": see the grace period below.
 4. **order=2 group** (containers 101, HAOS 102, LXCs 200-205), then **order=3**
-   (dev 148, hermes 206 when provisioned). CT 207 is `onboot: 0` and stays down.
+   (dev 148, hermes 206 when provisioned).
 5. **`pve-autostart-reconcile.service` sweeps up** - after `startall` finishes,
    it starts any `onboot=1` guest still down, because `startall` never retries.
 
@@ -121,14 +121,13 @@ check the guests, not the task.
 
    ```bash
    for id in 100 101 102 148; do echo "== $id"; qm config $id | grep -E 'onboot|startup|hookscript'; done
-   for id in 200 201 202 203 204 205 207; do echo "== $id"; pct config $id | grep -E 'onboot|startup'; done
+   for id in 200 201 202 203 204 205; do echo "== $id"; pct config $id | grep -E 'onboot|startup'; done
    ```
 
    Expected: VM 100 `onboot: 1`, `startup: order=1,up=120` plus
    `hookscript: local:snippets/truenas-nfs-gate.sh`; VMs 101/102 and LXCs
    200-205 `onboot: 1`, `order=2` (hermes 206: `order=3`); dev 148
-   `onboot: 1`, `order=3`. **CT 207 (mattermost) is `onboot: 0` on purpose** -
-   deliberately stopped since 2026-07-22, pending removal.
+   `onboot: 1`, `order=3`.
 
 5. **Gate log**: the hookscript's output (`truenas-nfs-gate: ...`) appears in
    the `qmstart:100` task log, not the startall log. `storage ready after Ns`
@@ -157,10 +156,6 @@ wedge `startall`.
 
 Only one path is probed on purpose. The grace period is per-server, so proving
 one export is writable proves the server is out of grace for all of them.
-`truenas-vms-enc` is excluded because its only guest (CT 207) is `onboot: false`
-and it is an encrypted dataset: gating on it would stall the whole boot for the
-full 600 s cap if its `load-key` ever failed, over storage nothing autostarting
-needs.
 
 **It probes a write, not `showmount`, and that distinction is the whole point.**
 `showmount` talks to `rpc.mountd`, which answers long before `nfsd` can serve an
@@ -228,9 +223,8 @@ separately without a reboot:
   export, where the old `showmount` probe went green after 1 s and the new
   write probe after 96 s. It was also shown to refuse a writable non-NFS stub,
   refuse a missing path, and exit 0 on every failure path.
-- The reconciler was tested on n5p: a no-op run exits on pass 1, stopping plex
-  (CT 205) is detected and started on pass 1, and CT 207 is correctly left
-  alone.
+- The reconciler was tested on n5p: a no-op run exits on pass 1, and stopping
+  plex (CT 205) is detected and started on pass 1.
 
 What remains unproven is the two halves working together through a real
 `startall`, and the gate's behaviour against TrueNAS specifically rather than a

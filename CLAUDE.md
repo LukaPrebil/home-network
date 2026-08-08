@@ -95,7 +95,6 @@ Read these files **only when working on the relevant topic** - do not load them 
 | n5p power-loss recovery (BIOS, WoL, autostart, NFS gate) | `docs/infrastructure/n5p-power-recovery.md` |
 | OTBR Thread dataset capture / restore / migration | `docs/infrastructure/otbr-thread-recovery.md` |
 | ATProto PDS (accounts, migration, goat CLI) | `docs/services/atproto-pds-migration.md` |
-| Mattermost team chat (deploy, onboarding, ops) | `docs/services/mattermost.md` |
 | HA automations (humidity/air quality ventilation) | `docs/home-assistant/automations/ventilation-humidity.md`, `ventilation-air-quality.md` |
 | HA automations (motion lights, pantry, office) | `docs/home-assistant/automations/motion-lights.md` |
 | HA automations (blinds, window ventilation) | `docs/home-assistant/automations/blinds.md` |
