@@ -76,12 +76,17 @@
     # poll loop never gets to iterate.
     truenas_nfs_gate_attempt_timeout: 5
     # Host mountpoints backing guests that autostart. The gate holds startall
-    # until every one of these is writable. Grace is per-server so probing one
-    # would technically do, but a per-path probe also catches a single mount
-    # that failed to come back.
+    # until every one of these is writable.
+    #
+    # Deliberately only one path. The NFSv4 grace period is per-server, so
+    # proving this export is writable proves the server is out of grace for
+    # every export on it. truenas-vms-enc is excluded on purpose: its only
+    # guest (CT 207) is onboot: false, and it is an encrypted dataset whose
+    # load-key runs at TrueNAS boot - gating on it would stall the whole boot
+    # for the full cap if that unlock ever failed, over storage nothing
+    # autostarting needs.
     truenas_nfs_gate_probe_paths:
-      - /mnt/pve/truenas-vms      # VMs 101/102/148, CTs 200-205
-      - /mnt/pve/truenas-vms-enc  # CT 207
+      - /mnt/pve/truenas-vms  # VMs 101/102/148, CTs 200-205
     truenas_hookscript_volid: "local:snippets/truenas-nfs-gate.sh"
   tasks:
     - name: Check if TrueNAS VM already exists

@@ -151,9 +151,16 @@ check the guests, not the task.
 `ansible/provision-truenas.yml` from `ansible/templates/truenas-nfs-gate.sh.j2`)
 runs in VM 100's post-start phase. Every 5 s, for up to 600 s, it tries to
 create, write and remove a temp file on each mount backing an autostarting
-guest (`/mnt/pve/truenas-vms`, `/mnt/pve/truenas-vms-enc`). It exits 0
-regardless at the cap, because PVE only warns on post-start hook errors and the
-gate must never wedge `startall`.
+guest - in practice just `/mnt/pve/truenas-vms`. It exits 0 regardless at the
+cap, because PVE only warns on post-start hook errors and the gate must never
+wedge `startall`.
+
+Only one path is probed on purpose. The grace period is per-server, so proving
+one export is writable proves the server is out of grace for all of them.
+`truenas-vms-enc` is excluded because its only guest (CT 207) is `onboot: false`
+and it is an encrypted dataset: gating on it would stall the whole boot for the
+full 600 s cap if its `load-key` ever failed, over storage nothing autostarting
+needs.
 
 **It probes a write, not `showmount`, and that distinction is the whole point.**
 `showmount` talks to `rpc.mountd`, which answers long before `nfsd` can serve an
