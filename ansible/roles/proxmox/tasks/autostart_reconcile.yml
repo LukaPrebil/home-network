@@ -1,0 +1,48 @@
+---
+# Backstop for guest autostart. startall never retries a guest whose start
+# failed, and returns TASK OK regardless, so a single failed guest stays down
+# and unreported until someone notices. This oneshot re-checks after startall
+# has finished and starts whatever is still down.
+#
+# Boot-only on purpose: a periodic sweep would fight every deliberate `qm stop`
+# during normal operation.
+
+- name: Deploy PVE autostart reconciler script
+  ansible.builtin.template:
+    src: pve-autostart-reconcile.sh.j2
+    dest: /usr/local/sbin/pve-autostart-reconcile.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy pve-autostart-reconcile systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/pve-autostart-reconcile.service
+    content: |
+      # Managed by ansible roles/proxmox/tasks/autostart_reconcile.yml.
+      [Unit]
+      Description=Start onboot guests that startall left down
+      # Wants, not Requires: if pve-guests itself failed, that is exactly when
+      # the backstop must still run.
+      After=pve-guests.service
+      Wants=pve-guests.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/pve-autostart-reconcile.sh
+
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: '0644'
+  register: proxmox_autostart_unit
+
+- name: Enable pve-autostart-reconcile for future boots
+  # Same first-provision constraint as wol.yml: in check mode the unit file is
+  # never written, so systemd cannot find the service to enable.
+  ansible.builtin.systemd:
+    name: pve-autostart-reconcile.service
+    enabled: true
+    daemon_reload: "{{ proxmox_autostart_unit.changed | default(false) }}"
+  when: not ansible_check_mode

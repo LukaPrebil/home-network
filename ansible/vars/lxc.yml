@@ -230,7 +230,9 @@ lxc_containers:
       - keyctl=1   # Required for systemd
       - fuse=1     # Required for FUSE filesystems
       - mknod=1    # Required for NFS mounts
-    onboot: true
+    onboot: false  # Deliberately stopped since 2026-07-22, pending removal. Left
+    # at true it would be resurrected by any power event, and the autostart
+    # reconciler treats onboot=1 as "this guest must be running".
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     gpu_passthrough: false
     nfs_docker_volumes: false  # App state on local rootfs; uploads via the

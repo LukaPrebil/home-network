@@ -1,0 +1,7 @@
+---
+# Autostart reconciler (tasks/autostart_reconcile.yml). Six passes 30s apart
+# gives a ~150s window, deliberately longer than the NFS server's 90s NFSv4
+# grace period so the backstop still succeeds if the readiness gate ever hits
+# its cap and startall is released into a server that refuses opens.
+proxmox_autostart_reconcile_passes: 6
+proxmox_autostart_reconcile_delay: 30

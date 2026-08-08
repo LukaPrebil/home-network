@@ -1,0 +1,84 @@
+#!/bin/bash
+# Managed by Ansible (roles/proxmox/tasks/autostart_reconcile.yml). Runs once
+# after pve-guests.service and starts any onboot guest that startall left down.
+#
+# startall warns and moves on when a guest fails to start, and the task still
+# reports OK, so a failed guest is both unretried and invisible. On 2026-08-08
+# that left HAOS down until an operator noticed nine minutes later.
+#
+# Retries rather than probing storage first: a failed start is itself the
+# readiness signal, and the retry window is sized to outlast the NFS server's
+# 90s NFSv4 grace period in case the readiness gate ever hits its cap.
+set -u
+
+max_passes={{ proxmox_autostart_reconcile_passes }}
+pass_delay={{ proxmox_autostart_reconcile_delay }}
+{# Everything below is raw: bash ${#array[@]} would otherwise open a Jinja comment. #}
+{% raw %}
+log() { echo "pve-autostart-reconcile: $*"; }
+
+# Emits "<order> <vmid> <type>" per onboot guest that is not running, so the
+# caller can start them in startup order and never bring a guest up before the
+# storage VM it depends on.
+pending_guests() {
+  local vmid conf order
+
+  for vmid in $(qm list 2>/dev/null | awk 'NR > 1 { print $1 }'); do
+    conf=$(qm config "${vmid}" 2>/dev/null) || continue
+    grep -q '^template: 1' <<<"${conf}" && continue
+    [ "$(awk '/^onboot:/ { print $2; exit }' <<<"${conf}")" = "1" ] || continue
+    qm status "${vmid}" 2>/dev/null | grep -q 'status: running' && continue
+    order=$(sed -n 's/^startup:.*order=\([0-9][0-9]*\).*/\1/p' <<<"${conf}" | head -1)
+    echo "${order:-99} ${vmid} qemu"
+  done
+
+  for vmid in $(pct list 2>/dev/null | awk 'NR > 1 { print $1 }'); do
+    conf=$(pct config "${vmid}" 2>/dev/null) || continue
+    [ "$(awk '/^onboot:/ { print $2; exit }' <<<"${conf}")" = "1" ] || continue
+    pct status "${vmid}" 2>/dev/null | grep -q 'status: running' && continue
+    order=$(sed -n 's/^startup:.*order=\([0-9][0-9]*\).*/\1/p' <<<"${conf}" | head -1)
+    echo "${order:-99} ${vmid} lxc"
+  done
+}
+
+for pass in $(seq 1 "${max_passes}"); do
+  mapfile -t todo < <(pending_guests | sort -n -k1,1 -k2,2)
+
+  if [ "${#todo[@]}" -eq 0 ]; then
+    log "all onboot guests running (pass ${pass}/${max_passes})"
+    exit 0
+  fi
+
+  log "pass ${pass}/${max_passes}: ${#todo[@]} guest(s) down"
+
+  for entry in "${todo[@]}"; do
+    read -r _ vmid type <<<"${entry}"
+    if [ "${type}" = "qemu" ]; then
+      if qm start "${vmid}" >/dev/null 2>&1; then
+        log "started VM ${vmid}"
+      else
+        log "VM ${vmid} did not start"
+      fi
+    else
+      if pct start "${vmid}" >/dev/null 2>&1; then
+        log "started CT ${vmid}"
+      else
+        log "CT ${vmid} did not start"
+      fi
+    fi
+  done
+
+  [ "${pass}" -lt "${max_passes}" ] && sleep "${pass_delay}"
+done
+
+remaining=$(pending_guests | wc -l)
+if [ "${remaining}" -gt 0 ]; then
+  # Non-zero so the unit lands in `systemctl --failed` instead of failing silently
+  # the way startall does.
+  log "WARNING: ${remaining} guest(s) still down after ${max_passes} passes"
+  exit 1
+fi
+
+log "all onboot guests running"
+exit 0
+{% endraw %}
