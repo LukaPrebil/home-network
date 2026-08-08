@@ -168,14 +168,24 @@ except TrueNAS itself, so boot order is storage-driven:
 | Order | Guests | Why |
 |---|---|---|
 | 1 | TrueNAS VM 100 (`up=120` + NFS-gate hookscript) | Provides NFS for everything else |
-| 2 | containers VM 101, HAOS VM 102, LXCs 200-205, 207 | Need `truenas-vms` NFS |
+| 2 | containers VM 101, HAOS VM 102, LXCs 200-205 | Need `truenas-vms` NFS |
 | 3 | dev VM 148, hermes LXC 206 | Need order=2 services (DNS, ha-mcp) |
+
+LXC 207 (mattermost) is `onboot: false` - deliberately stopped, pending removal.
 
 **Invariant: TrueNAS stays ALONE in startup order=1.** Its post-start
 hookscript (`local:snippets/truenas-nfs-gate.sh`, deployed by
-`provision-truenas.yml`) polls the NFS export and delays the *next* order
-group until storage answers; guests sharing order=1 would start
-concurrently, ungated. See `docs/infrastructure/n5p-power-recovery.md`.
+`provision-truenas.yml`) delays the *next* order group until storage is
+genuinely **writable**, not merely answering: it probes a create/write/remove
+cycle on each guest-backing mount, because `showmount` replies during the NFS
+server's 90 s NFSv4 grace period while every guest disk open is still being
+refused. Guests sharing order=1 would start concurrently, ungated. See ADR 0009
+and `docs/infrastructure/n5p-power-recovery.md`.
+
+`startall` never retries a guest whose start failed, and reports `TASK OK`
+anyway, so `pve-autostart-reconcile.service` sweeps afterwards and starts
+anything left down. It is boot-only, so `onboot: 1` must mean "should be
+running".
 
 `onboot`/`startup` are declared in `vars/vms.yml`, `vars/haos.yml`,
 `vars/lxc.yml` and are reconciled on every run (create-time-only before
@@ -186,6 +196,7 @@ ansible-playbook provision-vms.yml --tags vm-startup-reconcile     # VMs 101, 14
 ansible-playbook provision-haos.yml --tags haos-startup-reconcile  # VM 102 (qm only, guest untouched)
 ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile    # declared LXCs; skips unprovisioned (hermes)
 ansible-playbook provision-truenas.yml                             # VM 100 knobs + gate hookscript
+ansible-playbook site.yml --tags autostart-reconcile --limit n5p   # reconciler unit
 ```
 
 ## PostgreSQL Major Version Upgrades (Docker)
