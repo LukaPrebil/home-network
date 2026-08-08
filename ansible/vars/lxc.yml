@@ -207,37 +207,6 @@ lxc_containers:
     gpu_passthrough: false
     nfs_docker_volumes: false  # State stays on local rootfs - SQLite locking on NFS is banned
 
-  - name: mattermost
-    vmid: 207
-    node: n5p
-    ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.151  # Temporary IP (migrates to a Servers-VLAN IP later); .150 is TrueNAS
-    gateway: 192.168.1.1
-    netmask: 24
-    cores: 2
-    memory: 4096  # 4GB. App idles low; Postgres takes ~25-30%. Ample for the
-    # 20-user cap; bump only if it ever OOMs.
-    swap: 1024
-    disk: 24  # 24GB root disk: OS + Docker images + Postgres text data. Uploads
-    # live on the separate encrypted NFS mount, not here.
-    storage: truenas-vms-enc  # Encrypted dataset, so Postgres on the local rootfs
-    # is encrypted at rest without touching the shared proxmox-vms dataset.
-    description: "Mattermost team chat - self-hosted Slack alternative (Team Edition)"
-    unprivileged: true
-    features:
-      - nesting=1  # Required for Docker inside LXC
-      - keyctl=1   # Required for systemd
-      - fuse=1     # Required for FUSE filesystems
-      - mknod=1    # Required for NFS mounts
-    onboot: false  # Deliberately stopped since 2026-07-22, pending removal. Left
-    # at true it would be resurrected by any power event, and the autostart
-    # reconciler treats onboot=1 as "this guest must be running".
-    startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
-    gpu_passthrough: false
-    nfs_docker_volumes: false  # App state on local rootfs; uploads via the
-    # dedicated encrypted NFS mount handled by the role.
-
 # LXC defaults (applied if not specified per-container)
 lxc_defaults:
   cores: 2

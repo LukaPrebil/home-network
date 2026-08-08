@@ -171,8 +171,6 @@ except TrueNAS itself, so boot order is storage-driven:
 | 2 | containers VM 101, HAOS VM 102, LXCs 200-205 | Need `truenas-vms` NFS |
 | 3 | dev VM 148, hermes LXC 206 | Need order=2 services (DNS, ha-mcp) |
 
-LXC 207 (mattermost) is `onboot: false` - deliberately stopped, pending removal.
-
 **Invariant: TrueNAS stays ALONE in startup order=1.** Its post-start
 hookscript (`local:snippets/truenas-nfs-gate.sh`, deployed by
 `provision-truenas.yml`) delays the *next* order group until storage is

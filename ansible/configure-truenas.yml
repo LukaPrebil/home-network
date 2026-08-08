@@ -83,6 +83,9 @@
             {% if item.recordsize is defined %}
             "recordsize": "{{ item.recordsize }}",
             {% endif %}
+            {# No dataset declares encryption today. Kept because re-deriving the
+               midclt encryption_options shape is the expensive part of adding an
+               encrypted dataset, not the decision to have one. #}
             {% if item.encryption | default(false) %}
             "encryption": true,
             "inherit_encryption": false,
@@ -558,20 +561,6 @@
       when: "'truenas-templates' not in existing_storage.stdout"
       register: storage_templates_added
       changed_when: storage_templates_added.rc | default(0) == 0
-
-    # Encrypted dataset backing the mattermost LXC rootfs (Postgres + uploads
-    # protected at rest). Separate storage so only this LXC lands on encrypted
-    # ZFS, not the shared truenas-vms.
-    - name: Add encrypted NFS storage for the Mattermost LXC disk
-      ansible.builtin.shell:
-        cmd: >
-          pvesm add nfs truenas-vms-enc
-          --server {{ hostvars['tn-storage'].ansible_host }}
-          --export /mnt/tank/mattermost-vm
-          --content images,rootdir
-      when: "'truenas-vms-enc' not in existing_storage.stdout"
-      register: storage_vms_enc_added
-      changed_when: storage_vms_enc_added.rc | default(0) == 0
 
     - name: Verify Proxmox storage configuration
       ansible.builtin.command:

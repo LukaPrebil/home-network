@@ -1,6 +1,6 @@
 # Internet-expose Mattermost via Cloudflare with scoped at-rest encryption
 
-Status: accepted (2026-06-30)
+Status: accepted (2026-06-30). Superseded by ADR 0010 (2026-08-08): the service was removed entirely.
 
 We are self-hosting Mattermost (free Team Edition, local auth, capped at 20 users) as the team chat - a Slack replacement for a fully-remote 7-person dev/product team plus a GitHub bot. Mattermost stores message content as plaintext in Postgres and offers no end-to-end encryption (the server, and anyone with DB access, sees everything); search and compliance export depend on that plaintext. The only operator ever on the LAN is the homelab owner, so every human user reaches the service from off-LAN.
 

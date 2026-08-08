@@ -57,7 +57,7 @@
       ansible.builtin.set_fact:
         existing_vmids: "{{ existing_containers.stdout_lines | map('int') | list }}"
 
-    # Optional scoping: pass -e lxc_provision_only=mattermost (comma-separated
+    # Optional scoping: pass -e lxc_provision_only=<name> (comma-separated
     # for several) to create only those containers. Without it, behavior is
     # unchanged - every declared-but-absent container is created. This exists so
     # adding one new container does not also create others that are declared but
