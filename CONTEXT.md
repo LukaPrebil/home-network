@@ -80,6 +80,35 @@ _Avoid_: conflating it with the **wired bridge**, the Elfin EE11A on the inverte
 port that will carry both monitoring and control. Both reach the same inverter; only
 the bridge can be read or written.
 
+### Guest autostart (n5p)
+
+**Startup order group**:
+The set of Proxmox guests sharing one `startup: order=N` value. `startall` releases groups
+in ascending order and waits for every guest in a group to finish starting before releasing
+the next. Guests within a group start near-simultaneously (3 s apart for VMs, 0 s for LXCs).
+
+**NFS readiness gate**:
+The post-start hookscript on the TrueNAS VM that holds `startall` inside order=1 until the
+NFS server can actually serve guest disks. It gates only *later* order groups, which is why
+the TrueNAS VM must stay alone in order=1.
+_Avoid_: "NFS check" - the gate is a blocking hold, not a test that reports a result.
+
+**Storage ready**:
+The NFS server can complete an `OPEN` and a write on the exports that back guest disks.
+Strictly stronger than "answering": `showmount` replies while the server is still refusing
+every open.
+_Avoid_: "NFS is up" - that phrase hid the distinction that caused the 2026-08-08 incident.
+
+**Grace period**:
+The 90 s window after `nfsd` starts during which the server refuses all non-reclaim `OPEN`
+requests with `NFS4ERR_GRACE`, so clients can reclaim prior state first. Per-server, not
+per-export. No guest disk can be opened until it ends.
+
+**Start budget**:
+The timeout PVE computes per guest for the kvm start phase (`config_aware_timeout`: 30 s
+base, plus 5 s per NIC, x4 with PCI passthrough). Not configurable from the guest config,
+and unrelated to `startup: up=N`, which is a delay *after* a guest starts.
+
 ## Relationships
 
 - A **Job** produces exactly one **Job end**, which is either **Finished** or **Cancelled/aborted**
@@ -89,6 +118,9 @@ the bridge can be read or written.
 - **Fabric state** loss is re-commission-class, like Thread dataset loss; the two stores back different halves of the same Matter estate
 - **Passive Mode** is reachable only over the **wired bridge**; the **logger stick** answers no local protocol at all, so it can be neither read nor written
 - **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
+- The **NFS readiness gate** delays only *later* **startup order groups**, so any guest sharing order=1 with the TrueNAS VM starts ungated
+- **Storage ready** cannot be true before the **grace period** ends; any probe that goes green earlier is measuring something other than what guests need
+- A guest whose **start budget** expires while the **grace period** is still running fails permanently - `startall` never retries a failed guest and still reports `TASK OK`
 
 ## Example dialogue
 
@@ -104,3 +136,4 @@ the bridge can be read or written.
 
 - "task status sensor" - the deleted `sensor.vrt_luba_task_area_path` looked like a stable device-level status enum but was a **map-derived entity** whose display name was bugged upstream (Mammotion-HA #700). Resolved: job state is reconstructed from device-level entities only.
 - "push NTP time to all devices" - resolved: the mechanism is a **Time push** (Matter commands, no NTP protocol), and "all devices" is in practice one device (the ALPSTUGA). NTP appears in this project only as clock hygiene on the hosts, chiefly rpi4.
+- "NFS is up" - the 2026-07-22 **NFS readiness gate** treated a `showmount` reply as proof that guests could start. On 2026-08-08 that went green 1 s before `nfsd` had even started and 91 s before the **grace period** ended, and HAOS missed its **start budget** by one second. Resolved: the term is **Storage ready**, and only a completed open-and-write on a real NFS mount proves it.

@@ -67,10 +67,21 @@
     # trigger an unintended reboot.
     truenas_allow_reboot: false
     # NFS readiness gate hookscript (templates/truenas-nfs-gate.sh.j2):
-    # poll cadence/cap for the post-start showmount loop, and the PVE
-    # volume id the hookscript is attached under.
+    # poll cadence/cap for the post-start write probe, and the PVE volume id
+    # the hookscript is attached under.
     truenas_nfs_gate_poll_interval: 5
     truenas_nfs_gate_timeout: 600
+    # Per-attempt cap. The NFS client blocks rather than erroring while the
+    # server is in its NFSv4 grace period, so each probe must be bounded or the
+    # poll loop never gets to iterate.
+    truenas_nfs_gate_attempt_timeout: 5
+    # Host mountpoints backing guests that autostart. The gate holds startall
+    # until every one of these is writable. Grace is per-server so probing one
+    # would technically do, but a per-path probe also catches a single mount
+    # that failed to come back.
+    truenas_nfs_gate_probe_paths:
+      - /mnt/pve/truenas-vms      # VMs 101/102/148, CTs 200-205
+      - /mnt/pve/truenas-vms-enc  # CT 207
     truenas_hookscript_volid: "local:snippets/truenas-nfs-gate.sh"
   tasks:
     - name: Check if TrueNAS VM already exists
