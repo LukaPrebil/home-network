@@ -30,6 +30,7 @@ was 31.8 °C against a 4 K cooler outdoor.
 | `sensor.utility_climate_status` | The decision. State says why there is or is not a notification |
 | `sensor.utility_climate_action` | The advice text, or `-` when there is nothing to do |
 | `sensor.utility_temp_rate` | Derivative of the room temperature, K/h, 30 min window |
+| `sensor.outdoor_temp_24hr_mean` | Statistics mean over 24 h of the ARSO outdoor temperature. Gates the purge |
 | `input_number.utility_temp_engage` | Urgency threshold, default 26.0 °C |
 | `input_boolean.utility_climate_active` | Whether a notification is currently displayed |
 | `input_boolean.utility_doors_snoozed` | Path advice suppressed until midnight |
@@ -44,7 +45,7 @@ render and send. Change behaviour in the sensors, not the automations.
 ## Decision logic
 
 ```
-purge_ok     = month in 4..10 AND outdoor_24h_mean >= 15
+purge_ok     = month in 4..10 AND outdoor_24hr_mean >= 15
 purge_viable = purge_ok AND zunaj <= utility - 3
 
 want window open = purge_viable
@@ -105,16 +106,30 @@ cell temperature, since LFP calendar ageing roughly doubles per 10 K. Once the E
 bridge is installed (ADR 0007) and cell temperature is readable, retune against that and
 consider pointing the whole decision at it instead of room air.
 
-## Known gap
+## Why the purge gate needs both month and the trailing mean
 
-`sensor.outdoor_temp_24h_mean` does not exist yet. The `statistics` and `filter` helpers are
-multi-step config flows that the management API cannot drive, so it must be created by hand:
+Neither signal alone is sufficient, and October is where that shows:
+
+| Day | Month gate | Mean gate | Outcome |
+|---|---|---|---|
+| Cold October, mean 11 °C, room 27 °C | allows, 10 is in range | blocks | Window stays shut, plant heat kept for the house |
+| Hot early October, mean 21 °C, room 30 °C | allows | allows | Window opens, room purges for free |
+
+A tighter month window would get the second day wrong. Month alone would get the first day
+wrong and dump heat you are paying the heat pump to make. The wide April to October window
+plus a trailing mean threshold gets both.
+
+## Rebuilding the statistics helper
+
+`sensor.outdoor_temp_24hr_mean` had to be created through the UI. The `statistics` and
+`filter` helpers are multi-step config flows that the management API cannot drive, so if it is
+ever lost it must be recreated by hand:
 
 > Settings > Devices & Services > Helpers > Create helper > Statistics
 > Source `sensor.arso_weather_letalisce_jozeta_pucnika_ljubljana_temperatura`,
 > characteristic **mean**, max age **24:00:00**, sampling size 500.
-> Rename the resulting entity to `sensor.outdoor_temp_24h_mean`.
 
-Until it exists `purge_ok` is false, so the window is never advised open and the automation
-degrades to path advice only. That is the safe direction: path advice is the mechanism that
-does the work, and a missing sensor cannot cause a wrong window recommendation.
+It back-fills from the recorder, so it is usable within seconds rather than needing 24 h to
+warm up. If it is missing, `purge_ok` evaluates false and the automation degrades to path
+advice only. That is the safe direction: path advice is the mechanism that does the work, and
+an absent sensor cannot produce a wrong window recommendation.
