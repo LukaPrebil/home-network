@@ -87,6 +87,18 @@ While snoozed with nothing else actionable the automation stays silent rather th
 advice already overruled. `sensor.utility_climate_status` reads `blocked` so the silence is
 explainable.
 
+## Recipients
+
+Sent through `script.notify_home_users_dynamic`, so it reaches whoever is home: Luka and Maša
+are both in the script's `user_map`, Miha and Mitja are not. The clear path deliberately skips
+the presence check and fires at both phones, so a notification cannot strand on a device that
+has left the house.
+
+This is a deliberate choice to treat it as a household chore rather than an operator alert.
+Low battery, 3D printer filament and Luba offline all bypass the script and address one device
+directly. This one does not, because whoever is nearest the door is the person who can act,
+and that is worth more than keeping the plant reasoning to one person.
+
 ## Timings
 
 | Behaviour | Value | Why |
