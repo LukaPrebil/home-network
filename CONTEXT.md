@@ -80,6 +80,37 @@ _Avoid_: conflating it with the **wired bridge**, the Elfin EE11A on the inverte
 port that will carry both monitoring and control. Both reach the same inverter; only
 the bridge can be read or written.
 
+### Utility room thermal
+
+**Vhod**:
+The vestibule where shoes and slippers are kept. It has three doors: **Vhodna vrata** to
+outside, **Vrata utility** to the utility room, and **Notranja vrata** to the living space.
+It has no heat source or sink of its own, so it is a corridor rather than a destination.
+_Avoid_: "vrata notri" for the living-space door - two of the three doors are interior from
+some standpoint, so relative names are ambiguous. Name each door by where it leads.
+
+**Cooling path**:
+The route by which utility room heat reaches the air conditioner: Utility -> **Vrata utility**
+-> **Vhod** -> **Notranja vrata** -> conditioned space. Open only when *both* doors are open.
+With Notranja vrata shut, Vhod is a dead end that saturates (it reached 26.5 C on 2026-08-07),
+so opening Vrata utility alone achieves almost nothing.
+_Avoid_: "open the door" - naming a single door hides that the path needs both.
+
+**Plant heat**:
+The conversion loss from the inverter and battery pack, dissipated into the utility room.
+Afternoon-weighted, peaking 16:00 to 19:00 local because 20 of the 30 panels face west at 45
+degrees, so it arrives after the outdoor air peak. December throughput is about a fifth of July.
+_Avoid_: treating it as the room's only heat source - the network cabinet's 67 W runs around
+the clock and exceeds plant heat in winter.
+
+**Free cooling**:
+Purging the utility room through Okno instead of through the **cooling path**. Valid only when
+outdoor air is both cooler than the room and drier in absolute terms. On a heatwave afternoon
+it is never valid, and an extract fan to outside would be wrong year-round: it cannot beat 36 C
+air in summer, and in winter it discards heat already banked inside the thermal envelope.
+_Avoid_: "ventilation" - the existing humidity automations use that word for whole-house
+moisture, which is a different decision with a different trigger.
+
 ### Guest autostart (n5p)
 
 **Startup order group**:
@@ -121,6 +152,8 @@ and unrelated to `startup: up=N`, which is a delay *after* a guest starts.
 - The **NFS readiness gate** delays only *later* **startup order groups**, so any guest sharing order=1 with the TrueNAS VM starts ungated
 - **Storage ready** cannot be true before the **grace period** ends; any probe that goes green earlier is measuring something other than what guests need
 - A guest whose **start budget** expires while the **grace period** is still running fails permanently - `startall` never retries a failed guest and still reports `TASK OK`
+- The **cooling path** is open only when both **Vrata utility** and **Notranja vrata** are open; with either shut, **free cooling** is the only remaining lever, and it works only while outdoor air is below the room
+- **Plant heat** peaks after the outdoor air peak, so the hours of greatest need are hours when **free cooling** is becoming more viable rather than less
 
 ## Example dialogue
 
@@ -136,4 +169,5 @@ and unrelated to `startup: up=N`, which is a delay *after* a guest starts.
 
 - "task status sensor" - the deleted `sensor.vrt_luba_task_area_path` looked like a stable device-level status enum but was a **map-derived entity** whose display name was bugged upstream (Mammotion-HA #700). Resolved: job state is reconstructed from device-level entities only.
 - "push NTP time to all devices" - resolved: the mechanism is a **Time push** (Matter commands, no NTP protocol), and "all devices" is in practice one device (the ALPSTUGA). NTP appears in this project only as clock hygiene on the hosts, chiefly rpi4.
+- "open the door to the utility room" - resolved: the unit is the **cooling path**, not either door on its own. **Vrata utility** alone routes heat into **Vhod**, which has no sink and saturates; only both doors together reach the air conditioner.
 - "NFS is up" - the 2026-07-22 **NFS readiness gate** treated a `showmount` reply as proof that guests could start. On 2026-08-08 that went green 1 s before `nfsd` had even started and 91 s before the **grace period** ended, and HAOS missed its **start budget** by one second. Resolved: the term is **Storage ready**, and only a completed open-and-write on a real NFS mount proves it.

@@ -96,6 +96,7 @@ Read these files **only when working on the relevant topic** - do not load them 
 | OTBR Thread dataset capture / restore / migration | `docs/infrastructure/otbr-thread-recovery.md` |
 | ATProto PDS (accounts, migration, goat CLI) | `docs/services/atproto-pds-migration.md` |
 | HA automations (humidity/air quality ventilation) | `docs/home-assistant/automations/ventilation-humidity.md`, `ventilation-air-quality.md` |
+| HA automations (utility room climate, cooling path, window) | `docs/home-assistant/automations/utility-climate.md` |
 | HA automations (motion lights, pantry, office) | `docs/home-assistant/automations/motion-lights.md` |
 | HA automations (blinds, window ventilation) | `docs/home-assistant/automations/blinds.md` |
 | HA automations (laundry state machine, WLED) | `docs/home-assistant/automations/laundry.md` |

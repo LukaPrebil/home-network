@@ -69,6 +69,7 @@ All notifications use Android notification channels for organized alert behavior
 | `Ventilation` | `default` | `#4CAF50` (green) | Humidity and air quality alerts |
 | `Maintenance` | `default` | `#FF9800` (orange) | AC filter (lowered to `low`), battery (lowered to `low`), 3D printer |
 | `Monitoring` | `default` | `#F44336` (red) | Mold risk alerts |
+| `Utility` | `default` | `#009688` (teal) | Utility room climate advisory (window and cooling path) |
 
 ### Standard notification data keys
 
@@ -96,6 +97,7 @@ data:
 | Mold risk | `mdi:alert-circle` |
 | Low battery | `mdi:battery-alert` |
 | 3D printer | `mdi:printer-3d` |
+| Utility climate | `mdi:home-thermometer` |
 
 ## Live Update Notification Pattern
 
@@ -125,3 +127,4 @@ Every notification should include a `clickAction` field in `data` that links to 
 | Air quality (CO2/PM2.5) | `/air-quality` | Hidden air quality dashboard (Alpstuga + ARSO) |
 | Mold risk | `/climate` | Climate dashboard |
 | AC filter | `/air-conditioner/0` | AC dashboard |
+| Utility climate | `/home/areas-utility` | Utility area view, where the status and action sensors live |
