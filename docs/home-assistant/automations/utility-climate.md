@@ -31,7 +31,9 @@ was 31.8 °C against a 4 K cooler outdoor.
 | `sensor.utility_climate_action` | The advice text, or `-` when there is nothing to do |
 | `sensor.utility_temp_rate` | Derivative of the room temperature, K/h, 30 min window |
 | `sensor.outdoor_temp_24hr_mean` | Statistics mean over 24 h of the ARSO outdoor temperature. Gates the purge |
+| `binary_sensor.utility_purge_wet` | Purge is thermally viable but outdoor air is too moist. Drives the explanatory line in the notification |
 | `input_number.utility_temp_engage` | Urgency threshold, default 26.0 °C |
+| `input_number.utility_dew_point_margin` | Dew point deadband, default 1.0 K. `dp_margin` in the rules above |
 | `input_boolean.utility_climate_active` | Whether a notification is currently displayed |
 | `input_boolean.utility_doors_snoozed` | Path advice suppressed until midnight |
 | `input_datetime.utility_quiet_last_sent` | Daily cap for the quiet tier |
@@ -46,11 +48,29 @@ render and send. Change behaviour in the sensors, not the automations.
 
 ```
 purge_ok     = month in 4..10 AND outdoor_24hr_mean >= 15
-purge_viable = purge_ok AND zunaj <= utility - 3
+inputs_ok    = zunaj, dp_zunaj and dp_utility are all present
+
+purge_viable = purge_ok AND inputs_ok
+               AND zunaj    <= utility    - 3
+               AND dp_zunaj <= dp_utility + dp_margin
+
+purge_wet    = purge_ok AND inputs_ok
+               AND zunaj    <= utility    - 3
+               AND dp_zunaj >  dp_utility + dp_margin
 
 want window open = purge_viable
 want path open   = (utility - hisa) > 2  AND NOT (purge_viable AND zunaj > hisa)
 ```
+
+`purge_viable` and `purge_wet` are complements within the thermally-viable set: exactly one is
+true whenever outdoor is at least 3 K below the room, and both are false otherwise. `purge_wet`
+exists to explain a silence, which is why it requires thermal viability rather than just being
+the negation of the moisture test.
+
+The path rule carries no moisture term. The utility room ran 0.4 to 3.0 K moister than the house
+on 7 of the 8 days to 2026-08-11, so a symmetric gate would shut the path on most days,
+including every hot one. The window gate already prevents outdoor air transiting the room into
+the house, because a moist night now closes the window rather than opening it.
 
 The path rule carries no season branch. In summer it routes heat to the AC, in winter to the
 house. The action is identical, so only urgency differs.
@@ -131,6 +151,69 @@ A tighter month window would get the second day wrong. Month alone would get the
 wrong and dump heat you are paying the heat pump to make. The wide April to October window
 plus a trailing mean threshold gets both.
 
+## Why the moisture gate has a deadband instead of comparing signs
+
+A purge that is thermally correct can still be a bad trade, because outdoor air at night is
+often moister than the room. Over 191 hourly samples from 2026-08-03 to 2026-08-11, 86 hours
+were thermally viable and outdoor was moister in 39 of them. But only **10 of those 86 hours
+were adverse by more than 1 K** of dew point. The other 29 sat between 0 and 1 K.
+
+A sign test would therefore block 45% of viable purge hours to avoid the 12% that matter.
+
+The 1 K is not a fudge factor, it is a measured offset. Over 2026-08-10 22:00 to 2026-08-11
+07:00, the one stretch where the utility window state is actually known and it was open the
+whole time, the room held its dew point about 1 K **below** ARSO rather than converging on it.
+ARSO is Brnik airport, roughly 25 km away in a frost hollow that runs humid at night. A
+persistent station bias against this site is the straightforward reading, and a deadband of
+about 1 K absorbs exactly that. A sign test would read the bias as signal on every calm night.
+
+Dew point rather than absolute humidity, for the reason recorded under **free cooling** in
+`CONTEXT.md`: g/m3 is volumetric, so it shifts as incoming air warms to room temperature and
+reports a gradient across an exchange that moves no moisture at all.
+
+The deadband's sign makes the rule self-stabilising, which is worth knowing before anyone
+"fixes" it. Opening the window pulls `dp_utility` up toward outdoor, which moves the comparison
+further *inside* the deadband, never out. So it cannot oscillate. It can still close the window
+when a moist air mass arrives faster than the room mixes, which takes roughly 3 hours.
+
+## Winter moisture is not a problem
+
+The utility room runs 1 to 5 K moister than the house year-round, and the cooling path carries
+that laundry moisture into the house with no dehumidification once the AC is idle. This looks
+like a defect and is not one.
+
+Weekly `sensor.average_humidity` in the cold season:
+
+| Week | Mean | Min |
+|---|---|---|
+| 2026-03-23 | 40.0% | 31.3% |
+| 2026-03-30 | 41.2% | 31.9% |
+| 2026-04-06 | 41.9% | 32.9% |
+
+The house runs **dry** in winter, not humid. Moisture arriving from the utility room pulls it
+toward the 40 to 50% comfort band. `automation.remind_to_ventilate` only fires above 50%, so it
+is dormant all winter and cannot conflict either.
+
+Revisit if the winter mean passes roughly 55%. Until then this is a free humidifier, and the
+window stays shut in winter by the month gate for the heat reason in ADR 0011.
+
+Expect `automation.mold_risk_notification` to start firing in the utility room on deep-winter
+laundry days. That is a consequence of repairing the dead ARSO reference in the mold sensors,
+which had been modelling a warmer surface than reality and so under-reporting. It is the sensor
+working, not a regression.
+
+## Known issue: two entities are named "Okno"
+
+`binary_sensor.utility_okno` is Matter node 30, on a device in area `utility`, and is the one
+every template here reads. It is correct.
+
+`binary_sensor.myggbett_door_window_sensor_door_4` is Matter node 12, carries the same custom
+name "Okno", and sits in `luka_s_room` on the second floor at the opposite end of the house. Its
+diagnostics are named `lukova_soba_window_sensor_*`. Its history is continuous back to early
+August and looks entirely plausible as a record of this room's window. It is not. Do not use it
+as a proxy for the utility window, and be aware there is no utility window history before
+2026-08-10 12:49, because that sensor was commissioned then rather than renamed.
+
 ## Rebuilding the statistics helper
 
 `sensor.outdoor_temp_24hr_mean` had to be created through the UI. The `statistics` and
@@ -143,5 +226,16 @@ ever lost it must be recreated by hand:
 
 It back-fills from the recorder, so it is usable within seconds rather than needing 24 h to
 warm up. If it is missing, `purge_ok` evaluates false and the automation degrades to path
-advice only. That is the safe direction: path advice is the mechanism that does the work, and
-an absent sensor cannot produce a wrong window recommendation.
+advice only. That is the safe direction: path advice is the mechanism that does the work.
+
+An earlier version of this page generalised that into "an absent sensor cannot produce a wrong
+window recommendation". That was true of the mean and false of everything else, and it is worth
+knowing why, because the failure was not obvious. Outdoor temperature was read as
+`states(...)|float(0)`, so an unavailable ARSO sensor became **0 °C**, `0 <= utility - 3` held
+for any room above 3 °C, and the automation advised opening the window. The 24 h mean did not
+catch it either: a statistics helper keeps serving a valid mean from its buffer while its source
+is down, so `purge_ok` stayed true throughout. In an August heatwave that combination advises
+opening the window at 37 °C outside.
+
+`inputs_ok` now guards outdoor temperature, outdoor dew point and utility dew point explicitly,
+so any of them going missing suppresses window advice entirely and leaves path advice running.

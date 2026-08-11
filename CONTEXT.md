@@ -105,11 +105,16 @@ the clock and exceeds plant heat in winter.
 
 **Free cooling**:
 Purging the utility room through Okno instead of through the **cooling path**. Valid only when
-outdoor air is both cooler than the room and drier in absolute terms. On a heatwave afternoon
-it is never valid, and an extract fan to outside would be wrong year-round: it cannot beat 36 C
-air in summer, and in winter it discards heat already banked inside the thermal envelope.
+outdoor air is both cooler than the room and at a lower dew point, judged with a 1 K deadband so
+the disagreement between an airport station and a room sensor is not read as signal. On a
+heatwave afternoon it is never valid, and an extract fan to outside would be wrong year-round:
+it cannot beat 36 C air in summer, and in winter it discards heat already banked inside the
+thermal envelope.
 _Avoid_: "ventilation" - the existing humidity automations use that word for whole-house
 moisture, which is a different decision with a different trigger.
+_Avoid_: comparing absolute humidity in g/m3. It is volumetric, so it shifts as incoming air
+warms to room temperature and reports a gradient across an exchange that moves no moisture at
+all. Dew point is the invariant the room settles at. Relative humidity is wronger still.
 
 ### Guest autostart (n5p)
 
