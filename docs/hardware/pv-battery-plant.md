@@ -62,7 +62,8 @@ about running mixed planes through a two-MPPT inverter.
 
 ## Mounting
 
-- **House**: clay tile, standard hook mounting on both 45 degree planes.
+- **House**: concrete tile (Bramac Platinum, black/anthracite), standard hook
+  mounting on both 45 degree planes.
 - **Carport**: ballasted flat EPDM using angled aluminium triangles, concrete
   ballasts, and wind deflectors.
 - **Snow guards**: linear snow guards fitted. The house has a modern facade with
