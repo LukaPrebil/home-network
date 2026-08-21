@@ -4,7 +4,7 @@
 
 vms_to_create:
   - name: containers
-    vmid: 101
+    vmid: 111  # Rebuilt onto 26.04 2026-08-21; predecessor 101 kept stopped as rollback
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
     ip: 192.168.1.140  # Temporary IP (will migrate to 192.168.30.4 when VLANs are active)
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
