@@ -16,12 +16,26 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Proxmox Host metrics via Proxmox Exporter
+  # Proxmox Host metrics via Proxmox Exporter.
+  # Multi-target exporter: the PVE node goes in `target`, and the exporter is
+  # reached via relabelling. Scraping /metrics directly returns only the
+  # exporter's own self-metrics, never pve_up or any guest state.
   - job_name: 'proxmox'
+    metrics_path: /pve
+    params:
+      cluster: ['1']
+      node: ['1']
     static_configs:
-      - targets: ['proxmox-exporter:9221']
+      - targets: ['{{ hostvars['n5p']['ansible_host'] }}']
         labels:
           instance: 'n5p'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 'proxmox-exporter:{{ monitoring_stack_proxmox_exporter_port }}'
 
   # Omada Controller metrics
   - job_name: 'omada'

@@ -15,8 +15,8 @@ adguard_deployment_method: "native"
 adguard_migrate_from_docker: true  # one-time teardown of the old adguard container
 
 # Shorter retention than the 90d/30d defaults to limit SD-card write wear.
-adguard_querylog_interval: "168h"    # 7 days
-adguard_statistics_interval: "168h"  # 7 days
+adguard_querylog_interval: "7d"
+adguard_statistics_interval: "7d"
 
 # Matter Server Configuration (rpi4 hosts Matter Server)
 matter_server_port: 5580

@@ -20,27 +20,27 @@ monitoring_stack_compose_dir: "/opt/monitoring"
 monitoring_stack_compose_file: "{{ monitoring_stack_compose_dir }}/docker-compose.yml"
 
 # Grafana configuration
-monitoring_stack_grafana_version: "12.4.3"
+monitoring_stack_grafana_version: "12.4.9"
 monitoring_stack_grafana_port: 3000
 monitoring_stack_grafana_admin_user: "admin"
 monitoring_stack_grafana_admin_password: "{{ vault_grafana_admin_password }}"
 
 # Prometheus configuration
-monitoring_stack_prometheus_version: "v3.11.2"
+monitoring_stack_prometheus_version: "v3.14.0"
 monitoring_stack_prometheus_port: 9090
 monitoring_stack_prometheus_retention: "30d"
 
 # Loki configuration
-monitoring_stack_loki_version: "3.7.1"
+monitoring_stack_loki_version: "3.7.6"
 monitoring_stack_loki_port: 3100
 monitoring_stack_loki_retention_days: 30
 
 # cAdvisor configuration
-monitoring_stack_cadvisor_version: "0.56.2"
+monitoring_stack_cadvisor_version: "0.60.5"
 monitoring_stack_cadvisor_port: 8080
 
 # Proxmox Exporter configuration
-monitoring_stack_proxmox_exporter_version: "3.8.2"
+monitoring_stack_proxmox_exporter_version: "3.10.0"
 monitoring_stack_proxmox_exporter_port: 9221
 monitoring_stack_proxmox_api_url: "https://{{ hostvars['n5p']['ansible_host'] }}:8006"
 monitoring_stack_proxmox_api_verify_ssl: false

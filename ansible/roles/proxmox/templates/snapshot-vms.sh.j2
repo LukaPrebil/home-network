@@ -6,9 +6,15 @@
 # the proxmox role to add or remove VMs from this list.
 set -euo pipefail
 
+# cron runs with PATH=/usr/bin:/bin, which excludes the /usr/sbin where qm lives;
+# without this every invocation failed with "qm: command not found".
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
 LABEL="auto-$(date +%Y-%m-%d)"
 KEEP=4
 PRUNE_FAILED=0
+SNAPSHOT_FAILED=0
 
 VMIDS=({% for vm in vms_to_create | selectattr('snapshot_weekly', 'defined') | selectattr('snapshot_weekly', 'equalto', true) | list %}{{ vm.vmid }} {% endfor %})
 
@@ -22,7 +28,8 @@ fi
 for vmid in "${VMIDS[@]}"; do
   echo "[snapshot-vms] $(date -Iseconds) snapshotting $vmid as $LABEL"
   if ! qm snapshot "$vmid" "$LABEL" --description "Auto weekly pre-upgrade snapshot"; then
-    echo "[snapshot-vms] WARN: snapshot failed for $vmid (continuing)"
+    echo "[snapshot-vms] ERROR: snapshot failed for $vmid"
+    SNAPSHOT_FAILED=1
     continue
   fi
 
@@ -43,7 +50,7 @@ for vmid in "${VMIDS[@]}"; do
   done
 done
 
-if [[ "$PRUNE_FAILED" -ne 0 ]]; then
-  echo "[snapshot-vms] $(date -Iseconds) finished with prune failures (see ERROR lines above)"
+if [[ "$SNAPSHOT_FAILED" -ne 0 || "$PRUNE_FAILED" -ne 0 ]]; then
+  echo "[snapshot-vms] $(date -Iseconds) finished with failures (see ERROR lines above)"
   exit 1
 fi

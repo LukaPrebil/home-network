@@ -26,6 +26,7 @@
   register: pds_iscsi_initiator_current
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Check for active iSCSI sessions before touching initiator identity
   ansible.builtin.command:
@@ -33,6 +34,7 @@
   register: pds_iscsi_active_sessions
   changed_when: false
   failed_when: false
+  check_mode: false
 
 - name: Refuse to change initiator IQN under active iSCSI sessions
   ansible.builtin.fail:

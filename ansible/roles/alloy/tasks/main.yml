@@ -32,6 +32,9 @@
   register: alloy_docker_check
   changed_when: false
   failed_when: false
+  # Read-only probe: without this it is skipped during a dry run, rc defaults
+  # truthy, and the config renders Docker log scraping on hosts with no Docker.
+  check_mode: false
   tags:
     - alloy
     - monitoring
@@ -104,7 +107,11 @@
     dest: "{{ alloy_stage_dir }}"
     remote_src: true
     creates: "{{ alloy_stage_dir }}/{{ alloy_binary_name }}"
-  when: alloy_needs_upgrade | bool
+  # Check mode never creates the staging dir above, so the download and the
+  # swap that reads from it cannot be dry-run - they fail on a version bump.
+  when:
+    - alloy_needs_upgrade | bool
+    - not ansible_check_mode
   tags:
     - alloy
     - monitoring
@@ -127,7 +134,9 @@
     dest: "{{ alloy_install_dir }}/{{ alloy_binary_name }}"
     remote_src: true
     mode: '0755'
-  when: alloy_needs_upgrade | bool
+  when:
+    - alloy_needs_upgrade | bool
+    - not ansible_check_mode
   notify: Restart Alloy
   tags:
     - alloy

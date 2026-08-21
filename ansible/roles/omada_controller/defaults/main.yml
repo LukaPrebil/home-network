@@ -2,9 +2,9 @@
 # Omada Controller role defaults
 
 # Omada Controller version
-omada_controller_version: "6.2.0.17"
-omada_controller_deb_url: "https://static.tp-link.com/upload/software/2026/202604/20260402/Omada_Network_Application_v6.2.0.17_linux_x64_20260331104746.deb"
-omada_controller_deb_local: "{{ playbook_dir }}/../backups/omada/Omada_Network_Application_v6.2.0.17_linux_x64_20260331104746.deb"
+omada_controller_version: "6.2.14.11"
+omada_controller_deb_url: "https://static.tp-link.com/upload/software/2026/202607/20260717/Omada_SDN_Controller_v6.2.14.11_linux_x64.deb"
+omada_controller_deb_local: "{{ playbook_dir }}/../backups/omada/Omada_SDN_Controller_v6.2.14.11_linux_x64.deb"
 
 # Installation paths
 omada_controller_install_dir: "/opt/tplink/EAPController"
@@ -30,7 +30,7 @@ omada_controller_java_version: "21"  # Java 21 recommended for v6.0
 
 # Upgrade configuration
 omada_controller_upgrade_mode: false  # Set to true when upgrading
-omada_controller_previous_version: "6.1.0.19"  # Track previous version for upgrade path
+omada_controller_previous_version: "6.2.0.17"  # Track previous version for upgrade path
 
 # Migration/backup configuration
 omada_controller_restore_backup: false

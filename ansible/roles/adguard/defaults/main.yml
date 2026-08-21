@@ -2,7 +2,7 @@
 # AdGuard Home role defaults
 
 # Installation
-adguard_version: "v0.107.74"
+adguard_version: "v0.107.79"
 adguard_install_dir: "/opt/adguardhome"
 adguard_work_dir: "/var/lib/adguardhome"
 adguard_config_dir: "/etc/adguardhome"
@@ -41,16 +41,19 @@ adguard_fallback_dns:
   - "tls://1.1.1.1"
   - "tls://1.0.0.1"
 
-# HTTP session
-adguard_session_ttl: "720h"
+# HTTP session.
+# Durations use the day unit AdGuard adopted in v0.107.76: it rewrites its own
+# config compact on every start, so the template must render the same form it
+# writes back or each converge diffs and restarts DNS.
+adguard_session_ttl: "30d"
 
 # Query log
 adguard_querylog_enabled: true
-adguard_querylog_interval: "2160h"  # 90 days
+adguard_querylog_interval: "90d"
 adguard_querylog_anonymize_client_ip: false
 
 # Statistics
-adguard_statistics_interval: "720h"  # 30 days
+adguard_statistics_interval: "30d"
 
 # DNS settings
 adguard_dnssec_enabled: true
