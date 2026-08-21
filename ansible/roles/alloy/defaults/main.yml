@@ -2,7 +2,7 @@
 # Grafana Alloy role default variables
 
 # Alloy version (check https://github.com/grafana/alloy/releases for latest)
-alloy_version: "1.15.1"
+alloy_version: "1.18.1"
 
 # Alloy installation (architecture is detected automatically)
 alloy_install_dir: "/usr/local/bin"
