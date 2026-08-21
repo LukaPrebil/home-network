@@ -3,7 +3,7 @@
 
 # Docker images
 matter_server_image: "ghcr.io/matter-js/matterjs-server"
-matter_server_version: "1.3.3"
+matter_server_version: "1.4.0"
 
 # Container names
 matter_server_container_name: "matter-server"

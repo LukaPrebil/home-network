@@ -23,6 +23,29 @@
   register: common_reboot_required
   when: ansible_os_family == "Debian"
 
+# /var/run/reboot-required is written by update-notifier-common, which is an
+# Ubuntu package - on plain Debian hosts it never appears, so a kernel upgrade
+# there would silently skip the reboot. Compare the running kernel against the
+# newest installed one instead.
+- name: Compare running kernel against the newest installed kernel
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      newest=$(ls -1 /boot/vmlinuz-* 2>/dev/null | sed 's|.*/vmlinuz-||' | sort -V | tail -1)
+      [ -n "$newest" ] && [ "$newest" != "$(uname -r)" ] && echo stale || echo current
+    executable: /bin/bash
+  register: common_kernel_state
+  changed_when: false
+  check_mode: false
+  when: ansible_os_family == "Debian"
+
+- name: Record whether a reboot is needed
+  ansible.builtin.set_fact:
+    common_reboot_needed: >-
+      {{ (common_reboot_required.stat.exists | default(false))
+         or (common_kernel_state.stdout | default('') | trim == 'stale') }}
+  when: ansible_os_family == "Debian"
+
 - name: Warn when reboot is required but not allowed
   ansible.builtin.debug:
     msg: >-
@@ -30,7 +53,7 @@
       re-run with `-e reboot_allowed=true` to auto-reboot, or reboot manually.
   when:
     - ansible_os_family == "Debian"
-    - common_reboot_required.stat.exists | default(false)
+    - common_reboot_needed | default(false) | bool
     - not (reboot_allowed | default(false) | bool)
 
 - name: Reboot host (only when explicitly allowed)
@@ -40,5 +63,5 @@
     test_command: uptime
   when:
     - ansible_os_family == "Debian"
-    - common_reboot_required.stat.exists | default(false)
+    - common_reboot_needed | default(false) | bool
     - reboot_allowed | default(false) | bool
