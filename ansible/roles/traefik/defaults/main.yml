@@ -2,7 +2,7 @@
 # Traefik role default variables
 
 # Traefik version
-traefik_version: "v3.6.13"
+traefik_version: "v3.7.11"
 
 # Traefik directories
 traefik_base_dir: "/opt/traefik"
@@ -59,7 +59,7 @@ traefik_warp_version: "v1.1.5"
 
 # CrowdSec bouncer plugin
 traefik_crowdsec_enabled: false  # Enable in host_vars alongside CrowdSec role
-traefik_crowdsec_bouncer_version: "v1.5.1"
+traefik_crowdsec_bouncer_version: "v1.7.1"
 traefik_crowdsec_bouncer_key: ""  # Set in host_vars, vault-encrypted
 
 # Logs directory (used when CrowdSec is enabled for shared access log volume)
