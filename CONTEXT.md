@@ -145,6 +145,38 @@ The timeout PVE computes per guest for the kvm start phase (`config_aware_timeou
 base, plus 5 s per NIC, x4 with PCI passthrough). Not configurable from the guest config,
 and unrelated to `startup: up=N`, which is a delay *after* a guest starts.
 
+### Guest state and rebuilds
+
+**Local-rootfs state**:
+Service state stored on a guest's own disk rather than on an NFS export, because the
+workload is NFS-hostile (SQLite locking, a Postgres or Mongo data directory, a Prometheus
+TSDB). It is the state a guest rebuild must carry across by hand; everything else on the
+disk is reproducible by converge.
+_Avoid_: "local data" - the distinction is not where the bytes are useful, it is which
+bytes survive the guest being replaced.
+
+**NFS-backed state**:
+Service state on a TrueNAS export, reachable from any guest that mounts it. It survives a
+guest rebuild untouched, which is also exactly why two guests must never run the same
+service at once - both would write the same files.
+
+**Staged cutover**:
+The guest replacement sequence in which the new guest's services are converged only after
+the old guest is stopped: copy **local-rootfs state** out, stop the old guest, provision
+the replacement on the same IP, converge the base layer, restore state, converge the
+service roles. Trades a bounded outage for never having two instances of a service live
+against the same **NFS-backed state**.
+_Avoid_: "blue-green", "DNS flip" - both imply the two instances run concurrently, which
+is the case this pattern exists to prevent.
+
+**Orphaned guest**:
+A stopped predecessor left behind by a **staged cutover**, still present on the hypervisor
+but no longer declared in `vars/lxc.yml` or `vars/vms.yml`. It is the only rollback on a
+fleet where snapshots are structurally impossible, and it is invisible to Ansible's onboot
+drift correction, which loops over declared guests only. An orphaned guest left at
+`onboot: 1` will be started by the boot-time reconciler on the next power event, colliding
+with its replacement on the same IP.
+
 ## Relationships
 
 - A **Job** produces exactly one **Job end**, which is either **Finished** or **Cancelled/aborted**
@@ -159,6 +191,9 @@ and unrelated to `startup: up=N`, which is a delay *after* a guest starts.
 - A guest whose **start budget** expires while the **grace period** is still running fails permanently - `startall` never retries a failed guest and still reports `TASK OK`
 - The **cooling path** is open only when both **Vrata utility** and **Notranja vrata** are open; with either shut, **free cooling** is the only remaining lever, and it works only while outdoor air is below the room
 - **Plant heat** peaks after the outdoor air peak, so the hours of greatest need are hours when **free cooling** is becoming more viable rather than less
+- **NFS-backed state** survives a guest rebuild but forbids concurrency; **local-rootfs state** is the opposite on both counts, which is why the two demand different handling in a **staged cutover**
+- A guest's rebuild cost is set by its **local-rootfs state**, not by its disk size - the six 26.04 rebuild targets total 43.6 GB on disk but only ~10 GB of state that a converge cannot recreate
+- An **orphaned guest** is rollback only while it stays stopped; leaving it at `onboot: 1` converts the safety net into a duplicate-IP incident on the next power event
 
 ## Example dialogue
 
