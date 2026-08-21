@@ -2,7 +2,7 @@
 # Jellyfin role default variables
 
 # Jellyfin version
-jellyfin_version: "10.11.8"
+jellyfin_version: "10.11.11"
 
 # Base directories
 # Config (holds library.db, a SQLite database) lives on the local LXC rootfs, NOT
