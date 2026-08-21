@@ -250,6 +250,17 @@
         label: "{{ item.name }} - onboot {{ item.onboot | default('unset') }}"
       changed_when: true
 
+    - name: Attach declared USB devices to VMs
+      # Clone-flow only, matching disk_size and dns_servers above: this applies
+      # at create time, not on every converge. A guest that already holds the
+      # device keeps it.
+      ansible.builtin.command:
+        cmd: qm set {{ vm_vmid_map[item.0.name] }} --{{ item.1.slot }} host={{ item.1.host }}
+      loop: "{{ vms_to_provision | subelements('usb_devices', skip_missing=true) }}"
+      loop_control:
+        label: "{{ item.0.name }} - {{ item.1.slot }} host={{ item.1.host }}"
+      changed_when: true
+
     - name: Set startup order for VMs
       ansible.builtin.command:
         cmd: qm set {{ vm_vmid_map[item.name] }} --startup {{ item.startup }}
