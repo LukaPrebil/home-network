@@ -32,6 +32,9 @@
   register: alloy_docker_check
   changed_when: false
   failed_when: false
+  # Read-only probe: without this it is skipped during a dry run, rc defaults
+  # truthy, and the config renders Docker log scraping on hosts with no Docker.
+  check_mode: false
   tags:
     - alloy
     - monitoring
