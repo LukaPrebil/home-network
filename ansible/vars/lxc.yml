@@ -40,7 +40,7 @@ lxc_containers:
     nfs_docker_volumes: true  # Bind mount Docker volumes from NFS
 
   - name: traefik
-    vmid: 201
+    vmid: 211  # Rebuilt onto 26.04 2026-08-21; predecessor 201 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
