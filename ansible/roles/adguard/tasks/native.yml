@@ -50,6 +50,27 @@
     masked: true
   when: "'systemd-resolved.service' in ansible_facts.services"
 
+# NetworkManager owns /etc/resolv.conf on rpi4 (Debian trixie) and rewrites it
+# with the router's address on every reboot, which points this resolver at a
+# router that forwards straight back to AdGuard. dns=none makes NM leave the
+# file alone so the static copy below survives a reboot. Skipped where
+# NetworkManager is not installed (the adguard LXC).
+- name: Stop NetworkManager from managing resolv.conf
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/99-adguard-dns.conf
+    content: |
+      # Managed by Ansible - do not edit manually
+      [main]
+      dns=none
+    mode: '0644'
+  when: "'NetworkManager.service' in ansible_facts.services"
+  notify: Reload NetworkManager
+
+# The reload has to land before resolv.conf is written, so the converge that
+# first adds the drop-in cannot race NM into rewriting the file it just placed.
+- name: Flush handlers so NetworkManager releases resolv.conf before it is written
+  ansible.builtin.meta: flush_handlers
+
 - name: Check whether resolv.conf is a symlink
   ansible.builtin.stat:
     path: /etc/resolv.conf

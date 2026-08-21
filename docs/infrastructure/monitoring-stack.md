@@ -34,6 +34,27 @@ Configured via Ansible template (`prometheus.yml.j2`). All API keys/passwords so
 
 **Note:** `node_exporter` targets are dynamically generated from the `monitoring_agents` inventory group via Jinja2 templating.
 
+### Proxmox exporter credentials
+
+The exporter authenticates as the `root@pam!monitoring` API token. The token is created with
+`privsep=1`, which means it inherits nothing from `root@pam` and holds no permissions until it
+is granted an ACL of its own. Without one, every scrape returns
+`403 Permission check failed (/, Sys.Audit)` and `pve_up` is simply absent, which reads like a
+healthy fleet rather than a broken exporter.
+
+The `proxmox` role grants that ACL (`roles/proxmox/tasks/monitoring_acl.yml`, tag
+`monitoring-acl`): `PVEAuditor` on `/`, propagating. It is idempotent, and reports what is
+missing instead of failing the play when the token itself is absent.
+
+The token cannot be created by Ansible. Proxmox generates its secret once and never shows it
+again, so a rebuilt hypervisor needs the token recreated by hand and the new secret written to
+`vault_proxmox_api_token_secret` before the ACL grant has anything to attach to:
+
+```bash
+pveum user token add root@pam monitoring --privsep 1
+ansible-playbook site.yml --tags monitoring-acl --limit n5p
+```
+
 ---
 
 ## Log Aggregation (Loki + Alloy)

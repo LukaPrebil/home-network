@@ -1,0 +1,59 @@
+---
+# ACL for the API token prometheus-pve-exporter authenticates with.
+#
+# The token itself cannot be codified: Proxmox generates its secret once at
+# creation and never reveals it again, so a rebuild needs `pveum user token add`
+# by hand plus a vault update. The ACL is the reproducible half, and without it
+# the token holds no permissions at all (privsep=1) - every scrape comes back
+# 403 Permission check failed (/, Sys.Audit) and pve_up is silently empty
+# rather than reporting a failed guest.
+
+- name: Read the current Proxmox ACL table
+  ansible.builtin.command:
+    cmd: pveum acl list --output-format json
+  register: proxmox_acl_current
+  changed_when: false
+  # Read-only probe feeding the grant's when: without this the whole path is
+  # invisible under --check.
+  check_mode: false
+
+- name: Read the API tokens defined for the monitoring user
+  ansible.builtin.command:
+    cmd: "pveum user token list {{ proxmox_monitoring_token_user }} --output-format json"
+  register: proxmox_monitoring_token_current
+  changed_when: false
+  check_mode: false
+
+# Granting an ACL to a token that does not exist errors out, which would take
+# the whole proxmox play down on a freshly rebuilt hypervisor. Say what is
+# missing instead and let the rest of the play converge.
+- name: Report a missing monitoring API token
+  ansible.builtin.debug:
+    msg: >-
+      No '{{ proxmox_monitoring_token_name }}' API token exists for
+      {{ proxmox_monitoring_token_user }}, so Proxmox metrics will stay empty.
+      Create it with 'pveum user token add {{ proxmox_monitoring_token_user }}
+      {{ proxmox_monitoring_token_name }} --privsep 1', store the generated
+      secret as vault_proxmox_api_token_secret, then re-run this role.
+  when: >-
+    proxmox_monitoring_token_name not in
+    (proxmox_monitoring_token_current.stdout | from_json | map(attribute='tokenid') | list)
+
+- name: Grant the monitoring API token audit access on the whole tree
+  ansible.builtin.command:
+    cmd: >-
+      pveum acl modify /
+      --tokens {{ proxmox_monitoring_token_id }}
+      --roles {{ proxmox_monitoring_token_role }}
+  changed_when: true
+  when:
+    - >-
+      proxmox_monitoring_token_name in
+      (proxmox_monitoring_token_current.stdout | from_json | map(attribute='tokenid') | list)
+    - >-
+      (proxmox_acl_current.stdout | from_json)
+      | selectattr('type', 'equalto', 'token')
+      | selectattr('path', 'equalto', '/')
+      | selectattr('ugid', 'equalto', proxmox_monitoring_token_id)
+      | selectattr('roleid', 'equalto', proxmox_monitoring_token_role)
+      | list | length == 0

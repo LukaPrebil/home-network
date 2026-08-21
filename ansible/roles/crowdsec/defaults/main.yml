@@ -27,7 +27,17 @@ crowdsec_collections:
   - "crowdsecurity/traefik"
 
 # Bouncer API key (pre-registered on first start via BOUNCER_KEY_traefik env var)
-# Must match traefik_crowdsec_bouncer_key — set both in host_vars, vault-encrypted
+# Must match traefik_crowdsec_bouncer_key - set both in host_vars, vault-encrypted
+#
+# `cscli bouncers list` shows two rows for this one key and both belong there.
+# `traefik` (auto_created false) is the registration the entrypoint creates from
+# BOUNCER_KEY_traefik and is what actually holds the key; its last_pull froze
+# when the Traefik plugin moved to v1.7, which started announcing itself per IP.
+# `traefik@<traefik-container-ip>` (auto_created true) is the child LAPI derives
+# from the same key and is the row that keeps pulling. The frozen parent looks
+# like cruft but is not removable: deleting it revokes the key and takes the
+# child with it, so the live bouncer 403s on every stream pull until the
+# container is restarted to re-register.
 crowdsec_bouncer_key: ""
 
 # Traefik log path on host (bind-mounted read-only into CrowdSec)

@@ -57,3 +57,14 @@
   tags:
     - autostart-reconcile
     - proxmox
+
+- name: Include monitoring API token ACL tasks
+  ansible.builtin.include_tasks:
+    file: monitoring_acl.yml
+    apply:
+      tags:
+        - monitoring-acl
+        - proxmox
+  tags:
+    - monitoring-acl
+    - proxmox

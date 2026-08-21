@@ -5,3 +5,13 @@
 # its cap and startall is released into a server that refuses opens.
 proxmox_autostart_reconcile_passes: 6
 proxmox_autostart_reconcile_delay: 30
+
+# API token prometheus-pve-exporter authenticates with (tasks/monitoring_acl.yml).
+# Derived from the same vault values the exporter's env file renders from, so the
+# ACL granted here and the credential the exporter presents cannot drift apart.
+proxmox_monitoring_token_user: "{{ vault_proxmox_api_user }}"
+proxmox_monitoring_token_name: "{{ vault_proxmox_api_token_name }}"
+proxmox_monitoring_token_id: "{{ proxmox_monitoring_token_user }}!{{ proxmox_monitoring_token_name }}"
+# Least-privileged built-in role that covers the Sys.Audit and VM.Audit checks
+# the exporter makes for node and guest metrics.
+proxmox_monitoring_token_role: "PVEAuditor"

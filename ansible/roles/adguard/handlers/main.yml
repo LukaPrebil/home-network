@@ -11,3 +11,10 @@
   community.docker.docker_compose_v2:
     project_src: "{{ adguard_docker_dir }}"
     state: restarted
+
+# SIGHUP re-reads NetworkManager.conf and conf.d without touching active
+# connections; a restart would bounce the only link Ansible reaches this host on.
+- name: Reload NetworkManager
+  ansible.builtin.systemd:
+    name: NetworkManager
+    state: reloaded
