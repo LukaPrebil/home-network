@@ -285,6 +285,56 @@ range but are normally set from the inverter's LCD menu or the installer app rat
 than over Modbus. Treat island mode as out of scope for automation until someone maps
 those registers.
 
+## Energy dashboard
+
+Home Assistant's energy configuration is not reachable through `ha-mcp`. It lives in
+`.storage/energy` behind the `energy/save_prefs` websocket call, so the mapping is set by
+hand under Settings, Dashboards, Energy.
+
+| Section | Entity |
+|---|---|
+| Grid consumption | `sensor.utility_sofar_inverter_import_energy_total` |
+| Return to grid | `sensor.utility_sofar_inverter_export_energy_total` |
+| Solar panels | `sensor.utility_sofar_inverter_solar_generation_total` |
+| Battery, energy going in | `sensor.utility_sofar_inverter_battery_input_energy_total` |
+| Battery, energy coming out | `sensor.utility_sofar_inverter_battery_output_energy_total` |
+
+Use the `_total` sensors, never the `_today` ones. The dashboard wants monotonic lifetime
+counters and derives daily figures itself; a sensor that resets to zero at midnight
+corrupts its statistics.
+
+Two things not to be caught by. The `ed_mapping_present` attribute these sensors carry is
+**not** a way to check whether the mapping took: it reads `false` even on sensors the
+energy dashboard is demonstrably using. Read the dashboard itself instead. And the history
+starts the day the entities are created and cannot be backfilled, because Home Assistant
+has no long-term statistics from before they existed. The lifetime counters arrive already
+populated, but the hourly shape of everything earlier lives only in SofarCloud.
+
+The integration also ships a separate `Sofar Energy Dashboard` device carrying three
+switches that gate optional sensors. Home Consumption and Grid to Battery are on; PV
+Variant Detail is off, because per-string power is already exposed and TIGO covers
+per-panel. Home Consumption produces
+`sensor.utility_sofar_inverter_load_consumption_total`, which the energy dashboard does
+not consume directly (it derives consumption from the other flows) but which is useful
+elsewhere. Grid to Battery produces nothing while the inverter runs Self Use, since the
+battery only ever charges from surplus; expect those sensors to appear once Passive Mode
+starts charging from the grid across **Blok** boundaries.
+
+The figures reconcile against each other. Taking a reading on 2026-08-21: 864.7 kWh
+generated, 529.4 exported, 145.7 into the battery and 110.4 back out, 3.4 imported, with
+about 17 kWh still stored at 92 percent SOC. That leaves roughly 18 kWh of battery
+round-trip loss and about 58 kWh unaccounted against a reported load of 245.1 kWh, which
+is near 7 percent of generation and is the conversion loss the utility room feels as
+**plant heat**.
+
+**Treat grid import with suspicion until it is checked against the utility meter.** The
+DTSU666 is bypassed, so the inverter measures grid exchange with its own internal CTs and
+there is no independent meter to cross-check. A lifetime import of 3.4 kWh against 529.4
+kWh exported is plausible for a young plant in August with 13.65 kWp and 18.5 kWh usable
+storage, but it is also exactly what would appear if those CTs measure only what passes
+through the inverter rather than the whole house at the point of connection. If the two
+diverge over a few days, restoring the meter stops being out of scope.
+
 ## Plan
 
 There is no cheap interim step. Nothing happens in Home Assistant until the bridge is
