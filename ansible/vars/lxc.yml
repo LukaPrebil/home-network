@@ -118,7 +118,7 @@ lxc_containers:
     nfs_docker_volumes: false
 
   - name: monitoring
-    vmid: 204
+    vmid: 214  # Rebuilt onto 26.04 2026-08-21; predecessor 204 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
