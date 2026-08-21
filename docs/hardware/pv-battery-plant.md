@@ -77,7 +77,7 @@ about running mixed planes through a two-MPPT inverter.
 
 | Component | Role |
 |---|---|
-| CHINT DTSU666 | Three-phase smart meter; grid data reaches the inverter over Modbus |
+| CHINT DTSU666 | Three-phase smart meter, installed but bypassed. Its RS485 `A(24)` / `B(25)` terminals are unoccupied and the inverter senses grid power from its own internal CTs instead. The pair the installer ran for it sits loose in the cabinet, landing on nothing |
 | TIGO CCA gateway | Optimizer telemetry; the GW/TAP port carries it, not RS485-1/2 |
 | ABB manual isolator | Manual disconnect |
 | Schrack MCBs | Circuit protection |
@@ -94,8 +94,8 @@ coil whine away from sleeping space under heavy load.
 |---|---|---|
 | SOFAR LSW-3 Wi-Fi logger stick | `192.168.1.6` | Static lease in the Innbox DHCP table. Cloud uplink only, serves nothing locally |
 | TIGO CCA gateway | unknown | Still to be recorded. Keeps its internet uplink per ADR 0013: TIGO EI is the only source of the panel-to-serial mapping, and the warranty-diagnosis channel |
-| Elfin EE11A (inverter bridge) | unallocated | Ordered 2026-08-07, not yet wired |
-| Elfin EE11A (tap bridge) | `192.168.1.162` | Live since 2026-08-26. TCP server on port 7160, 38400/8-N-1, transparent mode, no termination |
+| Elfin EE11A (inverter bridge) | `192.168.1.161` | `elfin-inverter`. Static on the device plus a DHCP reservation. Lands on the inverter's Link0 **monitoring bus**. Not yet wired |
+| Elfin EE11A (tap bridge) | `192.168.1.162` | `elfin-tigo`. Static on the device plus a DHCP reservation. Live since 2026-08-26: TCP server on port 7160, 38400/8-N-1, transparent mode, no termination, must never transmit |
 
 Firmware as commissioned:
 

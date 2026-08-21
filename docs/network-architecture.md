@@ -160,18 +160,26 @@ The network currently runs on a flat `192.168.1.0/24` subnet. The VLAN architect
 | **TrueNAS VM** | `tn-storage` | `192.168.1.150` |
 | **SOFAR LSW-3 logger stick** | `sofar-logger` | `192.168.1.6` |
 | **Elfin EW11** (heat pump RS485 bridge) | `elfin-heatpump` | `192.168.1.160` |
-| **Elfin EE11A** (TIGO CCA tap bridge) | `elfin-tigo-tap` | `192.168.1.162` |
+| **Elfin EE11A** (inverter bridge) | `elfin-inverter` | `192.168.1.161` |
+| **Elfin EE11A** (TIGO CCA tap bridge) | `elfin-tigo` | `192.168.1.162` |
 | **Desktop PC** | `desktop-pc` | DHCP |
 
 The SOFAR logger stick sits outside the `.140`-`.150` service block because it is a
 static lease in the Innbox DHCP table rather than a host-configured static address.
 Ports 8899 and 80 are open on it, but it answers no local protocol and is a cloud
-uplink only. Of the two Elfin EE11A wired RS485 bridges ordered on 2026-08-07, the
-**tap bridge** on the TIGO CCA is live at `192.168.1.162`, serving the optimizer bus as
-a raw TCP stream on port 7160. The **inverter bridge** for the SOFAR COM port is still
-unwired and unaddressed, as is the CCA itself. The two are easy to confuse and must not
-be: only the inverter link takes 120 ohm termination, and terminating the tap would
-degrade the CCA's own traffic. See
+uplink only.
+
+The two Elfin EE11A bridges sit at `.161` and `.162`, contiguous with the heat pump's
+EW11 at `.160`, so the RS485 bridges read as one group. Each is configured with a static
+address on the device **and** a matching DHCP reservation in the Innbox: a static alone
+does not stop the router issuing the same address to something else, which is what took
+TrueNAS off the network for twenty minutes on 2026-07-22. The TIGO CCA itself still needs
+an address recorded.
+
+The **tap bridge** at `.162` is live, serving the optimizer bus as a raw TCP stream on
+port 7160; the **inverter bridge** at `.161` is addressed but not yet wired. The two are
+easy to confuse and must not be: only the inverter link takes 120 ohm termination, and
+terminating the tap would degrade the CCA's own traffic. See
 [`hardware/pv-battery-plant.md`](hardware/pv-battery-plant.md).
 
 ### Automation Configuration
