@@ -303,7 +303,31 @@ Use the `_total` sensors, never the `_today` ones. The dashboard wants monotonic
 counters and derives daily figures itself; a sensor that resets to zero at midnight
 corrupts its statistics.
 
-Two things not to be caught by. The `ed_mapping_present` attribute these sensors carry is
+### Both power sensors need the Inverted sign convention
+
+This inverter reports power with the opposite sign to what Home Assistant assumes, on
+**both** the battery and the grid. In each section of the energy configuration, set **Type
+of power measurement** to **Inverted**, not Standard.
+
+| Sensor | This inverter | HA "Standard" expects |
+|---|---|---|
+| `battery_power_total` | positive = charging | positive = discharging |
+| `active_power_pcc_total` | positive = exporting | positive = importing |
+
+Left on Standard, each fault inflates reported household consumption by **twice** the flow
+it gets wrong, because the quantity is added where it should have been subtracted. Observed
+on 2026-08-21: with the house actually drawing 0.48 kW while exporting 7.73 kW and charging
+at 2.7 kW, the dashboard read 17 kW and attributed nearly all of it to "Untracked
+consumption".
+
+The trap is that this is invisible in the Summary and Totals views, which read the kWh
+counters and stay correct. Only the "Now" tab and the live Sankey use the power sensors, so
+a plant can look perfectly healthy on the energy totals while the live view is nonsense.
+Verify the sign against a known state rather than a quiet moment: check while the battery is
+charging hard or the plant is exporting strongly, because near zero crossing the sign cannot
+be read off at all.
+
+Two more things not to be caught by. The `ed_mapping_present` attribute these sensors carry is
 **not** a way to check whether the mapping took: it reads `false` even on sensors the
 energy dashboard is demonstrably using. Read the dashboard itself instead. And the history
 starts the day the entities are created and cannot be backfilled, because Home Assistant
