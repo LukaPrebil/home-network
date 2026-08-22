@@ -210,6 +210,78 @@
       become: true
       changed_when: true
 
+    - name: Check if any declared containers need the Immich NFS mounts
+      ansible.builtin.set_fact:
+        need_immich_photos_mount: "{{ lxc_containers | selectattr('nfs_immich_photos', 'defined') | selectattr('nfs_immich_photos', 'equalto', true) | list | length > 0 }}"
+        need_external_data_mount: "{{ lxc_containers | selectattr('nfs_external_data', 'defined') | selectattr('nfs_external_data', 'equalto', true) | list | length > 0 }}"
+      tags: nfs-host-mounts
+
+    - name: Ensure NFS mount point exists on Proxmox host for Immich photos
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-immich-photos
+        state: directory
+        mode: '0755'
+      become: true
+      when: need_immich_photos_mount | default(false)
+      tags: nfs-host-mounts
+
+    - name: Mount TrueNAS Immich photos NFS share on Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/truenas-immich-photos
+        src: "{{ truenas_nfs_server }}:{{ truenas_immich_photos_share }}"
+        fstype: nfs
+        opts: "{{ nfs_common_opts }}"
+        state: mounted
+      become: true
+      when: need_immich_photos_mount | default(false)
+      tags: nfs-host-mounts
+
+    # 0770 rather than the 0755 used by the mount points above, because this path
+    # is normally an active NFS mount and the external-data dataset root is 0770.
+    # Declaring 0755 here would chmod the TrueNAS dataset instead of a local
+    # directory. Once mounted the local mode is covered by the mount anyway.
+    - name: Ensure NFS mount point exists on Proxmox host for external data
+      ansible.builtin.file:
+        path: /mnt/pve/truenas-external-data
+        state: directory
+        mode: '0770'
+      become: true
+      when: need_external_data_mount | default(false)
+      tags: nfs-host-mounts
+
+    - name: Mount TrueNAS external data NFS share on Proxmox host
+      ansible.posix.mount:
+        path: /mnt/pve/truenas-external-data
+        src: "{{ truenas_nfs_server }}:{{ truenas_external_data_share }}"
+        fstype: nfs
+        opts: "{{ nfs_common_opts }}"
+        state: mounted
+      become: true
+      when: need_external_data_mount | default(false)
+      tags: nfs-host-mounts
+
+    - name: Configure bind mount for Immich photos in containers
+      ansible.builtin.shell:
+        cmd: |
+          pct set {{ item.vmid }} -mp1 /mnt/pve/truenas-immich-photos,mp=/mnt/immich-photos
+      loop: "{{ containers_to_create }}"
+      when:
+        - containers_to_create | length > 0
+        - item.nfs_immich_photos | default(false)
+      become: true
+      changed_when: true
+
+    - name: Configure bind mount for external data in containers
+      ansible.builtin.shell:
+        cmd: |
+          pct set {{ item.vmid }} -mp2 /mnt/pve/truenas-external-data,mp=/mnt/external-data
+      loop: "{{ containers_to_create }}"
+      when:
+        - containers_to_create | length > 0
+        - item.nfs_external_data | default(false)
+      become: true
+      changed_when: true
+
     - name: Check if any declared containers need Plex NFS mounts
       ansible.builtin.set_fact:
         need_plex_apps_mount: "{{ lxc_containers | selectattr('nfs_plex_apps', 'defined') | selectattr('nfs_plex_apps', 'equalto', true) | list | length > 0 }}"

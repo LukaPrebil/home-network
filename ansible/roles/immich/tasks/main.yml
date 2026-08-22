@@ -1,13 +1,6 @@
 ---
 # Main tasks file for Immich role
 
-- name: Include ROCm installation tasks
-  ansible.builtin.include_tasks: rocm.yml
-  tags:
-    - immich
-    - rocm
-    - gpu
-
 - name: Include VA-API installation tasks
   ansible.builtin.include_tasks: vaapi.yml
   tags:

@@ -36,8 +36,11 @@ lxc_containers:
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # GPU passthrough configuration for AMD Radeon 880M/890M iGPU
     gpu_passthrough: true  # Enable GPU passthrough for hardware transcoding
-    # NFS storage configuration
+    # NFS storage configuration. All three are bind mounts of host NFS mounts:
+    # mp0 /srv/docker, mp1 /mnt/immich-photos, mp2 /mnt/external-data.
     nfs_docker_volumes: true  # Bind mount Docker volumes from NFS
+    nfs_immich_photos: true   # The photo library itself
+    nfs_external_data: true   # Read-only external library, consumed via immich_external_libraries
 
   - name: traefik
     vmid: 211  # Rebuilt onto 26.04 2026-08-21; predecessor 201 kept stopped as rollback

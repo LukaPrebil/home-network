@@ -56,8 +56,32 @@
         immich_deployed_version: "{{ immich_version_probe.json.major }}.{{ immich_version_probe.json.minor }}.{{ immich_version_probe.json.patch }}"
       when: "'v' ~ immich_deployed_version != immich_version"
 
+    # The ML container ships its own /opt/rocm and reaches the GPU through the
+    # /dev/dri and /dev/kfd passthrough alone, so there is nothing ROCm-shaped on
+    # the guest left to test. Probing inside the container is the stronger check
+    # anyway: it proves the GPU is visible where inference actually runs. Losing
+    # it means silently falling back to CPU, which nothing else would report.
+    - name: Verify the GPU is visible inside the ML container
+      ansible.builtin.command:
+        cmd: docker exec immich_machine_learning rocminfo
+      register: immich_rocminfo
+      changed_when: false
+      failed_when: false
+      when: immich_enable_rocm
+
+    - name: Fail if the ML container cannot see the GPU
+      ansible.builtin.fail:
+        msg: >-
+          rocminfo reported no {{ immich_gpu_target }} agent inside
+          immich_machine_learning (rc={{ immich_rocminfo.rc }}). ROCm is enabled,
+          so inference would silently fall back to CPU.
+      when:
+        - immich_enable_rocm
+        - immich_gpu_target not in immich_rocminfo.stdout | default('')
+
     - name: Display Immich deployment status
       ansible.builtin.debug:
         msg:
           - "Immich {{ immich_version }} is running"
           - "Access: http://{{ ansible_host }}:2283"
+          - "GPU: {{ immich_gpu_target }} visible in the ML container"
