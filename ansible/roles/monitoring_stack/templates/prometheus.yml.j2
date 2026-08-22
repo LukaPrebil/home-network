@@ -44,6 +44,15 @@ scrape_configs:
         labels:
           instance: 'omada-controller'
 
+  # Loki's own metrics. Needed because Loki's health cannot be judged from its
+  # logs: it writes the text of every query it serves into them, so a log-based
+  # rule matches the echo of itself.
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:{{ monitoring_stack_loki_port }}']
+        labels:
+          instance: 'monitoring-lxc'
+
   # Docker container metrics via cAdvisor
   - job_name: 'cadvisor'
     static_configs:

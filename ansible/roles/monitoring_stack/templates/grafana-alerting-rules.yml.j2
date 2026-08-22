@@ -1216,14 +1216,20 @@ groups:
             relativeTimeRange:
               from: 600
               to: 0
-            datasourceUid: loki
+            datasourceUid: prometheus
             model:
               refId: A
-              expr: sum(count_over_time({container="loki"} |~ "(?i)(error|failed to flush|context deadline exceeded)" [5m]))
+              # Deliberately a metric, not a log search. Loki writes the text of every
+              # query it serves into its own container log, so any content-based rule
+              # on {container="loki"} matches the echo of itself and flaps forever -
+              # including a rule searching for the literal string level=error. Caller
+              # markers cannot fix it either: the query text is emitted from
+              # metrics.go, engine.go and roundtrip.go, and that set moves between
+              # versions. The push path is instrumented, so ask it directly.
+              expr: sum(rate(loki_request_duration_seconds_count{job="loki",route="loki_api_v1_push",status_code!~"2.."}[5m]))
               instant: false
               intervalMs: 60000
               maxDataPoints: 43200
-              queryType: range
           - refId: B
             datasourceUid: "__expr__"
             model:
@@ -1242,7 +1248,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - 10
+                      - 0.05
                     type: gt
                   operator:
                     type: and
@@ -1254,9 +1260,9 @@ groups:
                     type: last
         noDataState: OK
         execErrState: Error
-        for: 0s
+        for: 10m
         annotations:
-          summary: "Loki ingestion errors detected"
-          description: "More than 10 error log lines from Loki container in 5 minutes. Log pipeline may be degraded."
+          summary: "Loki is rejecting log pushes"
+          description: "Loki returned a non-2xx response on its push endpoint. Agents are dropping the batches they cannot deliver, so logs are being lost rather than delayed."
         labels:
           severity: warning
