@@ -11,7 +11,7 @@ lxc_template_url: "http://download.proxmox.com/images/system/ubuntu-26.04-standa
 
 lxc_containers:
   - name: immich
-    vmid: 200
+    vmid: 210  # Rebuilt onto 26.04 2026-08-22; predecessor 200 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
