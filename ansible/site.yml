@@ -65,16 +65,6 @@
   roles:
     - node_exporter
 
-- name: Deploy Grafana Alloy for metrics and log shipping
-  hosts: monitoring_agents
-  become: true
-  tags:
-    - alloy
-    - monitoring
-    - monitoring-agents
-  roles:
-    - alloy
-
 - name: Deploy docker-socket-proxy and Autoheal container health monitor
   hosts: docker_runtime_hosts
   become: true
@@ -84,6 +74,20 @@
     - docker
     - docker_socket_proxy
     - autoheal
+
+# Must run after the docker play above. The alloy role decides whether to render
+# its container-log block from a runtime `which docker` probe, so on a host being
+# built for the first time it would otherwise render no docker log block at all
+# and ship nothing under job="docker" until the next converge.
+- name: Deploy Grafana Alloy for metrics and log shipping
+  hosts: monitoring_agents
+  become: true
+  tags:
+    - alloy
+    - monitoring
+    - monitoring-agents
+  roles:
+    - alloy
 
 - name: Deploy monitoring stack
   hosts: monitoring_hosts
