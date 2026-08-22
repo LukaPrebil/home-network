@@ -16,7 +16,7 @@ where HAOS failed again for a reason the first fix did not model.
    blocks `startall` until the NFS export is genuinely writable, because every
    other guest's root disk lives on `truenas-vms` (NFS). "Writable" and not
    "answering": see the grace period below.
-4. **order=2 group** (containers 101, HAOS 102, LXCs 200-205), then **order=3**
+4. **order=2 group** (containers 111, HAOS 102, LXCs 200 and 211-215), then **order=3**
    (dev 148, hermes 206 when provisioned).
 5. **`pve-autostart-reconcile.service` sweeps up** - after `startall` finishes,
    it starts any `onboot=1` guest still down, because `startall` never retries.
@@ -120,13 +120,13 @@ check the guests, not the task.
 4. **Is the autostart config still correct?**
 
    ```bash
-   for id in 100 101 102 148; do echo "== $id"; qm config $id | grep -E 'onboot|startup|hookscript'; done
-   for id in 200 201 202 203 204 205; do echo "== $id"; pct config $id | grep -E 'onboot|startup'; done
+   for id in 100 102 111 148; do echo "== $id"; qm config $id | grep -E 'onboot|startup|hookscript'; done
+   for id in 200 211 212 213 214 215; do echo "== $id"; pct config $id | grep -E 'onboot|startup'; done
    ```
 
    Expected: VM 100 `onboot: 1`, `startup: order=1,up=120` plus
-   `hookscript: local:snippets/truenas-nfs-gate.sh`; VMs 101/102 and LXCs
-   200-205 `onboot: 1`, `order=2` (hermes 206: `order=3`); dev 148
+   `hookscript: local:snippets/truenas-nfs-gate.sh`; VMs 102/111 and LXCs
+   200 and 211-215 `onboot: 1`, `order=2` (hermes 206: `order=3`); dev 148
    `onboot: 1`, `order=3`.
 
 5. **Gate log**: the hookscript's output (`truenas-nfs-gate: ...`) appears in
@@ -200,7 +200,7 @@ reconciled. After editing the declared values, or to re-converge live drift:
 
 ```bash
 cd ansible
-ansible-playbook provision-vms.yml --tags vm-startup-reconcile     # VMs 101, 148
+ansible-playbook provision-vms.yml --tags vm-startup-reconcile     # VMs 111, 148
 ansible-playbook provision-haos.yml --tags haos-startup-reconcile  # VM 102 (qm only)
 ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile    # declared LXCs
 ansible-playbook provision-truenas.yml                             # VM 100 + gate hookscript
@@ -224,7 +224,7 @@ separately without a reboot:
   write probe after 96 s. It was also shown to refuse a writable non-NFS stub,
   refuse a missing path, and exit 0 on every failure path.
 - The reconciler was tested on n5p: a no-op run exits on pass 1, and stopping
-  plex (CT 205) is detected and started on pass 1.
+  media (CT 215) is detected and started on pass 1.
 
 What remains unproven is the two halves working together through a real
 `startall`, and the gate's behaviour against TrueNAS specifically rather than a
