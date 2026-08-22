@@ -13,6 +13,8 @@ dns_servers:
 # TrueNAS NFS configuration
 truenas_nfs_server: "192.168.1.150"  # Temporary IP (will migrate to 192.168.30.3)
 truenas_docker_volumes_share: "/mnt/tank/docker-volumes"
+truenas_immich_photos_share: "/mnt/tank/immich-photos"
+truenas_external_data_share: "/mnt/tank/external-data"
 truenas_paperless_share: "/mnt/tank/paperless"
 truenas_plex_apps_share: "/mnt/plex-apps"  # Separate pool
 truenas_plex_bulk_share: "/mnt/plex-bulk"  # Separate pool

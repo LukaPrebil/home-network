@@ -10,7 +10,7 @@ immich_upload_dir: "/mnt/immich-photos"  # NFS mount point for photo library
 
 # NFS configuration for photo storage
 immich_nfs_server: "{{ truenas_nfs_server }}"
-immich_nfs_share: "/mnt/tank/immich-photos"
+immich_nfs_share: "{{ truenas_immich_photos_share }}"
 immich_nfs_mount_point: "{{ immich_upload_dir }}"
 immich_nfs_opts: "{{ nfs_common_opts }}"
 
@@ -48,6 +48,10 @@ immich_gpu_devices:
 # HSA GFX version override for GPU compatibility (empty = use native gfx1150 support)
 # Set to "11.0.2" if the official ROCm 7.2 image doesn't work with gfx1150
 immich_hsa_override: ""
+
+# The agent name rocminfo must report inside the ML container for GPU inference to
+# be live. Radeon 880M/890M (RDNA 3.5) present as gfx1150.
+immich_gpu_target: "gfx1150"
 
 # VA-API packages for AMD GPU hardware transcoding
 immich_vaapi_packages:

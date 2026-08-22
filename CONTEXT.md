@@ -206,6 +206,7 @@ this is the opposite case.
 - A guest's rebuild cost is set by its **local-rootfs state**, not by its disk size - the six 26.04 rebuild targets total 43.6 GB on disk but only ~10 GB of state that a converge cannot recreate
 - An **orphaned guest** is rollback only while it stays stopped; leaving it at `onboot: 1` converts the safety net into a duplicate-IP incident on the next power event
 - A **respawned crash** is invisible to the container-restart alert by construction, so detecting one has to start from the container's logs, never from its restart count or health status
+- Where a guest's **local-rootfs state** is an index over its **NFS-backed state** - Immich's Postgres over the photo library - a **staged cutover** rollback desynchronises the two: anything written after cutover survives on NFS with no row in the restored index. Rollback value expires at the first write, not on a timer, which makes the **orphaned guest** worth far less here than for a guest whose state is self-contained
 
 ## Example dialogue
 
