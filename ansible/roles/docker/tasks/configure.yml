@@ -21,17 +21,27 @@
   changed_when: false
   when: docker_proc_environ.stat.exists
 
+# group root, not docker, and the distinction matters because this path is a
+# shared NFS export. NFS carries ownership as raw numbers and each client resolves
+# them through its own /etc/group, so `group: docker` wrote 986 from containers and
+# 985 from rpi4, each reverting the other on every converge - and the same directory
+# read back as libvirt-qemu on the storage server. GID 0 is root everywhere, so
+# there is nothing left to disagree about. Nothing is lost: at 0755 the group bits
+# already match other, every subdirectory here is owned root or 1000, and Docker
+# runs as root regardless.
 - name: Create Docker base directory (with ownership for VMs)
   ansible.builtin.file:
     path: "{{ docker_base_dir }}"
     state: directory
     mode: '0755'
     owner: root
-    group: docker
+    group: root
   when:
     - docker_nfs_volumes_enabled | bool
     - docker_is_lxc.rc | default(1) != 0
 
+# Unprivileged LXCs cannot chown across their ID map - this path reads as
+# nobody:nogroup inside them - so they assert the directory exists and nothing more.
 - name: Ensure Docker base directory exists (without ownership for LXCs)
   ansible.builtin.file:
     path: "{{ docker_base_dir }}"
