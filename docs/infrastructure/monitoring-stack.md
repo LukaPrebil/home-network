@@ -25,6 +25,7 @@ Configured via Ansible template (`prometheus.yml.j2`). All API keys/passwords so
 | :--- | :--- | :--- | :--- |
 | Proxmox Host (`n5p`) | `prometheus-pve-exporter` | monitoring LXC (Docker) | `proxmox-exporter:9221` |
 | All Linux Hosts | `node_exporter` | Each target host (native binary) | `<host_ip>:9100` |
+| Loki | Built-in | monitoring LXC (Docker) | `loki:3100` |
 | Containers on the monitoring LXC only | `cAdvisor` | monitoring LXC (Docker) | `cadvisor:8080` |
 | Omada Controller | `omada_exporter` | monitoring LXC (Docker) | `omada-exporter:9202` |
 | Traefik Proxy | Built-in | traefik LXC | `<traefik_ip>:8082` |
@@ -91,6 +92,15 @@ Filtering the offending log lines by marker is not durable: Loki emits query tex
 For the same reason, the error-spike rule is scoped to `job="system"` only. Its threshold is
 calibrated for host logs, and container logs carry routine application chatter where the word
 "error" is normal.
+
+**Loki's own health cannot be judged from its logs at all.** Excluding the `loki` container works
+for rules that are about something else, but not for a rule about Loki. A log rule on
+`{container="loki"}` matches the echo of its own evaluation and flaps indefinitely, and this holds
+even for a rule searching the literal string `level=error`, because the query text containing it is
+echoed on an otherwise ordinary `level=info` line. Loki's health is therefore taken from its
+metrics: Prometheus scrapes `loki:3100` and the ingestion alert reads
+`loki_request_duration_seconds_count{route="loki_api_v1_push"}`, firing on sustained non-2xx
+responses. Judge any component that logs the queries it serves by its metrics, not its logs.
 
 ---
 
