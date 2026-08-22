@@ -979,7 +979,11 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              expr: sum by (hostname) (count_over_time({job=~"system|docker"} |~ "(?i)(error|err|fatal|panic|critical)" !~ "(?i)(404|no error)" [5m]))
+              # Scoped to syslog on purpose. The 50-line threshold is calibrated for
+              # host logs; container logs carry routine application chatter where
+              # "error" is normal, so including job="docker" made this fire constantly
+              # the moment container log shipping started working.
+              expr: sum by (hostname) (count_over_time({job="system"} |~ "(?i)(error|err|fatal|panic|critical)" !~ "(?i)(404|no error)" [5m]))
               instant: false
               intervalMs: 60000
               maxDataPoints: 43200
@@ -1033,7 +1037,19 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              expr: sum by (hostname) (count_over_time({job=~"system|docker"} |~ "(?i)(out of memory|oom-kill|segfault|panic:|killed process)" [5m]))
+              # "was sent SIG..." catches a supervisor respawning a crashed child, which
+              # leaves the container itself running so the restart-loop alert never sees
+              # it. Only fatal signals are listed: SIGINT and SIGTERM are ordinary
+              # shutdown, and a SIGKILL timeout already carries "out of memory".
+              # Loki and Grafana log the text of every query they serve, so their
+              # container logs contain these keywords whenever anyone alerts on them or
+              # searches for them - including this rule's own evaluation, which made it
+              # fire on itself continuously. Excluding the log text by marker does not
+              # hold: Loki emits the query from metrics.go, engine.go and roundtrip.go,
+              # and the set changes between versions. These two are excluded wholesale
+              # instead; a crash of either still shows up as a container restart.
+              # Syslog streams carry no container label and survive this matcher.
+              expr: sum by (hostname, container) (count_over_time({job=~"system|docker", container!~"loki|grafana"} |~ "(?i)(out of memory|oom-kill|segfault|panic:|killed process|was sent sig(segv|abrt|bus|fpe|ill))" [5m]))
               instant: false
               intervalMs: 60000
               maxDataPoints: 43200
@@ -1070,8 +1086,8 @@ groups:
         execErrState: Error
         for: 0s
         annotations:
-          summary: "Crash detected on {{ '{{' }} $labels.hostname {{ '}}' }}"
-          description: "OOM kill, segfault, or panic detected in logs on {{ '{{' }} $labels.hostname {{ '}}' }}."
+          summary: "Crash detected on {{ '{{' }} $labels.hostname {{ '}}' }} {{ '{{' }} $labels.container {{ '}}' }}"
+          description: "OOM kill, segfault, panic, or a child process killed by a fatal signal, in logs on {{ '{{' }} $labels.hostname {{ '}}' }} container {{ '{{' }} $labels.container {{ '}}' }}. A supervisor may have respawned the child, so the container itself can still look healthy."
         labels:
           severity: critical
 

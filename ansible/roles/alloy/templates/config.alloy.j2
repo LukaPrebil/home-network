@@ -57,9 +57,16 @@ loki.source.file "system_logs" {
 
 {% if alloy_docker_installed %}
 // Loki - Docker container logs
+// loki.source.docker tails only the targets it is handed; it discovers nothing on
+// its own. With an empty targets list it starts cleanly, reports healthy and ships
+// zero lines, which is how container logs went missing fleet-wide without an error.
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
 loki.source.docker "docker_logs" {
   host       = "unix:///var/run/docker.sock"
-  targets    = []
+  targets    = discovery.docker.containers.targets
   forward_to = [loki.process.add_docker_labels.receiver]
   relabel_rules = loki.relabel.docker.rules
 }
@@ -68,8 +75,11 @@ loki.source.docker "docker_logs" {
 loki.relabel "docker" {
   forward_to = []
 
+  // Docker reports container names with a leading slash, so the raw label would be
+  // "/immich_server" and every query would have to carry it. Capture past the slash.
   rule {
     source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
     target_label  = "container"
   }
 
