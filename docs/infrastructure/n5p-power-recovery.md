@@ -16,7 +16,7 @@ where HAOS failed again for a reason the first fix did not model.
    blocks `startall` until the NFS export is genuinely writable, because every
    other guest's root disk lives on `truenas-vms` (NFS). "Writable" and not
    "answering": see the grace period below.
-4. **order=2 group** (containers 111, HAOS 102, LXCs 200 and 211-215), then **order=3**
+4. **order=2 group** (containers 111, HAOS 102, LXCs 210-215), then **order=3**
    (dev 148, hermes 206 when provisioned).
 5. **`pve-autostart-reconcile.service` sweeps up** - after `startall` finishes,
    it starts any `onboot=1` guest still down, because `startall` never retries.
@@ -121,12 +121,12 @@ check the guests, not the task.
 
    ```bash
    for id in 100 102 111 148; do echo "== $id"; qm config $id | grep -E 'onboot|startup|hookscript'; done
-   for id in 200 211 212 213 214 215; do echo "== $id"; pct config $id | grep -E 'onboot|startup'; done
+   for id in 210 211 212 213 214 215; do echo "== $id"; pct config $id | grep -E 'onboot|startup'; done
    ```
 
    Expected: VM 100 `onboot: 1`, `startup: order=1,up=120` plus
    `hookscript: local:snippets/truenas-nfs-gate.sh`; VMs 102/111 and LXCs
-   200 and 211-215 `onboot: 1`, `order=2` (hermes 206: `order=3`); dev 148
+   210-215 `onboot: 1`, `order=2` (hermes 206: `order=3`); dev 148
    `onboot: 1`, `order=3`.
 
 5. **Gate log**: the hookscript's output (`truenas-nfs-gate: ...`) appears in
