@@ -134,6 +134,12 @@
         api_user: "{{ proxmox_api_user }}"
         api_password: "{{ vault_proxmox_api_password }}"
         vmid: "{{ item.vmid }}"
+        # hostname is cosmetic for state=started (lookup is by vmid), but the
+        # module does `hostname or lxc["name"]` and the cluster-resources entry
+        # for a just-created container has no name key until it has run once.
+        # Passing it short-circuits that lookup; without it the first start
+        # after creation dies with "An error occurred: 'name'".
+        hostname: "{{ item.name }}"
         state: started
       loop: "{{ containers_to_create }}"
       when: containers_to_create | length > 0

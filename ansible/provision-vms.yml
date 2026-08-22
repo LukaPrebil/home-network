@@ -24,13 +24,14 @@
       ansible.builtin.assert:
         that:
           - item.name is defined
+          - item.vmid is defined
           - item.vlan_id is defined
           - item.ip is defined
           - item.gateway is defined
           - (item.vlan_id is none) or (item.vlan_id | string in ['10', '20', '30', '40', '50', '60', '99'])
         fail_msg: |
           Invalid VM definition: {{ item }}
-          Required fields: name, vlan_id, ip, gateway
+          Required fields: name, vmid, vlan_id, ip, gateway
           Valid VLANs: null (no VLAN), 10, 20, 30, 40, 50, 60, 99
       loop: "{{ vms_to_create }}"
       loop_control:
@@ -75,18 +76,21 @@
           ERROR: Template VM {{ template_vmid }} ({{ template_name }}) does not exist.
           Please run 'ansible-playbook create-cloudinit-template.yml' first.
       when: template_exists.rc != 0
-
     - name: Check which VMs already exist
+      # Matched on vmid, not name, the way provision-lxc.yml does. A
+      # side-by-side rebuild leaves the predecessor running the same name, so a
+      # name match reports the replacement as already existing and silently
+      # skips creating it.
       ansible.builtin.shell:
         cmd: |
           set -o pipefail
-          qm list | grep -w '{{ item.name }}' || true
+          qm list | awk '$1 == "{{ item.vmid }}" { print }' || true
         executable: /bin/bash
       register: existing_vms_check
       changed_when: false
       loop: "{{ vms_to_create }}"
       loop_control:
-        label: "{{ item.name }}"
+        label: "{{ item.name }} (vmid {{ item.vmid }})"
 
     - name: Build list of VMs to create (filter out existing ones)
       ansible.builtin.set_fact:
@@ -128,24 +132,17 @@
       register: clone_results
       changed_when: clone_results.rc | default(0) == 0
 
-    - name: Get actual VMIDs for cloned VMs
-      ansible.builtin.shell:
-        cmd: |
-          set -o pipefail
-          qm list | grep -w '{{ item.name }}' | awk '{print $1}'
-        executable: /bin/bash
-      register: vmid_results
-      changed_when: false
+    - name: Build VM VMID mapping
+      # Straight from the declaration: qm clone is handed item.vmid as the new
+      # id, so the mapping is already known. Deriving it with
+      # `qm list | grep -w <name>` returned two ids during a side-by-side
+      # rebuild, where the predecessor still carries the same name, and every
+      # later `qm set` was then handed a two-line vmid.
+      ansible.builtin.set_fact:
+        vm_vmid_map: "{{ vm_vmid_map | default({}) | combine({item.name: item.vmid | string}) }}"
       loop: "{{ vms_to_provision }}"
       loop_control:
-        label: "{{ item.name }}"
-
-    - name: Build VM VMID mapping
-      ansible.builtin.set_fact:
-        vm_vmid_map: "{{ vm_vmid_map | default({}) | combine({item.item.name: item.stdout}) }}"
-      loop: "{{ vmid_results.results }}"
-      loop_control:
-        label: "{{ item.item.name }}: {{ item.stdout }}"
+        label: "{{ item.name }}: {{ item.vmid }}"
 
     - name: Configure network with VLAN tag
       ansible.builtin.shell:
@@ -248,6 +245,17 @@
       loop: "{{ vms_to_provision }}"
       loop_control:
         label: "{{ item.name }} - onboot {{ item.onboot | default('unset') }}"
+      changed_when: true
+
+    - name: Attach declared USB devices to VMs
+      # Clone-flow only, matching disk_size and dns_servers above: this applies
+      # at create time, not on every converge. A guest that already holds the
+      # device keeps it.
+      ansible.builtin.command:
+        cmd: qm set {{ vm_vmid_map[item.0.name] }} --{{ item.1.slot }} host={{ item.1.host }}
+      loop: "{{ vms_to_provision | subelements('usb_devices', skip_missing=true) }}"
+      loop_control:
+        label: "{{ item.0.name }} - {{ item.1.slot }} host={{ item.1.host }}"
       changed_when: true
 
     - name: Set startup order for VMs

@@ -2,12 +2,26 @@
 # Prerequisites for OTBR
 # Ensures kernel modules, sysctl settings, and USB device are available
 
+# Ubuntu 26.04 has no linux-modules-extra package for any kernel, and the USB
+# serial drivers it used to carry are in the base kernel modules there instead:
+# on the 26.04 containers VM cdc_acm, ch341, cp210x and ftdi_sio are all
+# loadable without it, and the Thread dongle binds to cdc_acm on its own.
+# Older hosts still need the package, so install it only where apt actually has
+# a candidate rather than failing the play where it simply does not exist.
+- name: Check whether linux-modules-extra exists for the running kernel
+  ansible.builtin.command:
+    cmd: apt-cache policy linux-modules-extra-{{ ansible_kernel }}
+  register: otbr_modules_extra_policy
+  changed_when: false
+  check_mode: false
+
 - name: Install linux-modules-extra for USB serial support
   ansible.builtin.apt:
     name: "linux-modules-extra-{{ ansible_kernel }}"
     state: present
     update_cache: true
   register: otbr_modules_install
+  when: "otbr_modules_extra_policy.stdout is search('Candidate: [^(]')"
 
 - name: Enable IPv4 forwarding (required for Thread border routing)
   ansible.posix.sysctl:

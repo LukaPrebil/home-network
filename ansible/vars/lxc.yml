@@ -40,7 +40,7 @@ lxc_containers:
     nfs_docker_volumes: true  # Bind mount Docker volumes from NFS
 
   - name: traefik
-    vmid: 201
+    vmid: 211  # Rebuilt onto 26.04 2026-08-21; predecessor 201 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
@@ -66,7 +66,7 @@ lxc_containers:
     nfs_docker_volumes: false
 
   - name: omada
-    vmid: 202
+    vmid: 212  # Rebuilt onto 26.04 2026-08-21; predecessor 202 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
@@ -81,7 +81,10 @@ lxc_containers:
     description: "TP-Link Omada SDN Controller - network management"
     unprivileged: true  # Use unprivileged container (more secure)
     features:
+      - nesting=1  # Required for systemd 257+ in unprivileged containers
       - keyctl=1   # Required for systemd
+      - fuse=1     # Required for FUSE filesystems
+      - mknod=1    # Required for device access
     onboot: true  # Start on Proxmox boot
     startup: "order=2"  # Boot after TrueNAS (order=1) provides NFS storage
     # No Docker needed (native .deb installation)
@@ -89,7 +92,7 @@ lxc_containers:
     nfs_docker_volumes: false
 
   - name: adguard
-    vmid: 203
+    vmid: 213  # Rebuilt onto 26.04 2026-08-21; predecessor 203 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
@@ -115,7 +118,7 @@ lxc_containers:
     nfs_docker_volumes: false
 
   - name: monitoring
-    vmid: 204
+    vmid: 214  # Rebuilt onto 26.04 2026-08-21; predecessor 204 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)
@@ -147,7 +150,7 @@ lxc_containers:
     nfs_docker_volumes: false
 
   - name: media
-    vmid: 205
+    vmid: 215  # Rebuilt onto 26.04 2026-08-21; predecessor 205 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
     vlan_id: null  # No VLAN until router is deployed (flat network for now)

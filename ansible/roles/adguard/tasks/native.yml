@@ -53,8 +53,19 @@
 # NetworkManager owns /etc/resolv.conf on rpi4 (Debian trixie) and rewrites it
 # with the router's address on every reboot, which points this resolver at a
 # router that forwards straight back to AdGuard. dns=none makes NM leave the
-# file alone so the static copy below survives a reboot. Skipped where
-# NetworkManager is not installed (the adguard LXC).
+# file alone so the static copy below survives a reboot.
+#
+# Gated on the conf.d directory, not on service_facts: a fresh Ubuntu LXC has
+# NetworkManager.service in ansible_facts.services while the package is not
+# installed at all (dpkg reports `un`, systemctl reports not-found, and the host
+# is on systemd-networkd), so the fact-based guard passed and the copy then died
+# on the missing directory. The directory ships with the package, so its
+# presence is the reliable marker.
+- name: Check whether NetworkManager is installed
+  ansible.builtin.stat:
+    path: /etc/NetworkManager/conf.d
+  register: adguard_nm_confdir
+
 - name: Stop NetworkManager from managing resolv.conf
   ansible.builtin.copy:
     dest: /etc/NetworkManager/conf.d/99-adguard-dns.conf
@@ -63,7 +74,7 @@
       [main]
       dns=none
     mode: '0644'
-  when: "'NetworkManager.service' in ansible_facts.services"
+  when: adguard_nm_confdir.stat.isdir | default(false)
   notify: Reload NetworkManager
 
 # The reload has to land before resolv.conf is written, so the converge that
