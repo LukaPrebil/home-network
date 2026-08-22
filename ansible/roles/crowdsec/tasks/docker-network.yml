@@ -1,7 +1,15 @@
 ---
 # Ensure the Docker network exists for CrowdSec <-> Traefik communication
 
+# Addressing is pinned rather than left to Docker's pool - see the rationale on
+# traefik_network_subnet in group_vars/all/main.yml. The traefik role ensures
+# this same network with the same values, so whichever play runs first wins and
+# the other is a no-op.
 - name: Ensure Docker network exists
   community.docker.docker_network:
     name: "{{ crowdsec_docker_network }}"
+    driver: bridge
+    ipam_config:
+      - subnet: "{{ traefik_network_subnet }}"
+        gateway: "{{ traefik_network_gateway }}"
     state: present

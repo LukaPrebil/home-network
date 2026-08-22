@@ -9,7 +9,8 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - {{ crowdsec_docker_network }}
+      {{ crowdsec_docker_network }}:
+        ipv4_address: "{{ traefik_network_crowdsec_address }}"
     ports:
       - "127.0.0.1:{{ crowdsec_lapi_port }}:8080"
       - "{{ crowdsec_metrics_port }}:6060"
