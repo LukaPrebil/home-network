@@ -1,0 +1,150 @@
+---
+# The service account behind Home Assistant's Proxmox VE integration: the four
+# custom roles, the group that carries them and the user in that group.
+#
+# Like the monitoring token next door, the API token itself cannot be codified -
+# Proxmox reveals a token secret once at creation and never again - so a rebuilt
+# hypervisor still needs one `pveum user token add` by hand. Everything else here
+# is reproducible, and without it a rebuild silently drops HA's ability to see or
+# power-cycle any guest, with nothing in the repo to say what was lost.
+#
+# Privileges are declared exactly as they were found on 2026-08-22. Note that the
+# grant reaches Sys.PowerMgmt and Sys.Modify at / - it can power off the
+# hypervisor, not just read from it. Narrowing that is a deliberate change to make
+# against HA's automations, not a drive-by.
+#
+# Order matters: roles and the group must exist before the user can be created
+# into that group, and the ACL can only reference roles that already exist.
+
+- name: Read the Proxmox roles currently defined
+  ansible.builtin.command:
+    cmd: pveum role list --output-format json
+  register: proxmox_ha_roles_current
+  changed_when: false
+  # Read-only probe feeding the when: below - without this the create and the
+  # drift correction are both invisible under --check.
+  check_mode: false
+
+- name: Create the missing Home Assistant custom roles
+  ansible.builtin.command:
+    cmd: pveum role add {{ item.key }} --privs "{{ item.value }}"
+  loop: "{{ proxmox_ha_roles | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  when: >-
+    item.key not in
+    (proxmox_ha_roles_current.stdout | from_json | map(attribute='roleid') | list)
+  changed_when: true
+
+# Compared as sorted sets because Proxmox returns the privilege list in its own
+# order, which does not match the order it was written in.
+- name: Correct the privileges on existing Home Assistant custom roles
+  ansible.builtin.command:
+    cmd: pveum role modify {{ item.key }} --privs "{{ item.value }}"
+  loop: "{{ proxmox_ha_roles | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  vars:
+    _existing: >-
+      {{ (proxmox_ha_roles_current.stdout | from_json)
+         | selectattr('roleid', 'equalto', item.key) | list }}
+  when:
+    - _existing | length > 0
+    - >-
+      (_existing | first).privs | default('') | split(',') | reject('equalto', '') | sort
+      != item.value | split(',') | sort
+  changed_when: true
+
+- name: Read the Proxmox groups currently defined
+  ansible.builtin.command:
+    cmd: pveum group list --output-format json
+  register: proxmox_ha_groups_current
+  changed_when: false
+  check_mode: false
+
+- name: Create the Home Assistant group
+  ansible.builtin.command:
+    cmd: pveum group add {{ proxmox_ha_group }}
+  when: >-
+    proxmox_ha_group not in
+    (proxmox_ha_groups_current.stdout | from_json | map(attribute='groupid') | list)
+  changed_when: true
+
+- name: Read the Proxmox users currently defined
+  ansible.builtin.command:
+    cmd: pveum user list --output-format json
+  register: proxmox_ha_users_current
+  changed_when: false
+  check_mode: false
+
+- name: Create the Home Assistant user in its group
+  ansible.builtin.command:
+    cmd: pveum user add {{ proxmox_ha_user }} --groups {{ proxmox_ha_group }}
+  when: >-
+    proxmox_ha_user not in
+    (proxmox_ha_users_current.stdout | from_json | map(attribute='userid') | list)
+  changed_when: true
+
+# Membership is read off the group, not the user: `pveum user list` returns no
+# groups field at all, so testing the user side matches nothing and re-applies the
+# membership on every run. `pveum group list` returns a comma-separated users
+# string, which is the only place the association is visible. A group absent from
+# the probe was just created above, and the user add already placed the user in it.
+- name: Ensure the Home Assistant user is a member of its group
+  ansible.builtin.command:
+    cmd: pveum user modify {{ proxmox_ha_user }} --groups {{ proxmox_ha_group }} --append 1
+  vars:
+    _group: >-
+      {{ (proxmox_ha_groups_current.stdout | from_json)
+         | selectattr('groupid', 'equalto', proxmox_ha_group) | list }}
+  when:
+    - _group | length > 0
+    - >-
+      proxmox_ha_user not in
+      ((_group | first).users | default('') | split(',') | map('trim') | list)
+  changed_when: true
+
+- name: Read the current Proxmox ACL table
+  ansible.builtin.command:
+    cmd: pveum acl list --output-format json
+  register: proxmox_ha_acl_current
+  changed_when: false
+  check_mode: false
+
+- name: Grant the Home Assistant group its roles on the whole tree
+  ansible.builtin.command:
+    cmd: >-
+      pveum acl modify /
+      --groups {{ proxmox_ha_group }}
+      --roles {{ item }}
+  loop: "{{ proxmox_ha_roles.keys() | list }}"
+  when: >-
+    (proxmox_ha_acl_current.stdout | from_json)
+    | selectattr('type', 'equalto', 'group')
+    | selectattr('path', 'equalto', '/')
+    | selectattr('ugid', 'equalto', proxmox_ha_group)
+    | selectattr('roleid', 'equalto', item)
+    | list | length == 0
+  changed_when: true
+
+- name: Read the API tokens defined for the Home Assistant user
+  ansible.builtin.command:
+    cmd: "pveum user token list {{ proxmox_ha_user }} --output-format json"
+  register: proxmox_ha_token_current
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# The secret is unrecoverable after creation, so this reports rather than creates
+# - silently minting a new token would leave HA holding a stale one.
+- name: Report a missing Home Assistant API token
+  ansible.builtin.debug:
+    msg: >-
+      No '{{ proxmox_ha_token_name }}' API token exists for {{ proxmox_ha_user }},
+      so the Home Assistant Proxmox integration cannot authenticate. Create it with
+      'pveum user token add {{ proxmox_ha_user }} {{ proxmox_ha_token_name }}
+      --privsep 0', then paste the generated secret into the integration.
+  when: >-
+    proxmox_ha_token_current.rc == 0 and
+    proxmox_ha_token_name not in
+    (proxmox_ha_token_current.stdout | from_json | map(attribute='tokenid') | list)
