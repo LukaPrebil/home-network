@@ -168,7 +168,7 @@ except TrueNAS itself, so boot order is storage-driven:
 | Order | Guests | Why |
 |---|---|---|
 | 1 | TrueNAS VM 100 (`up=120` + NFS-gate hookscript) | Provides NFS for everything else |
-| 2 | containers VM 101, HAOS VM 102, LXCs 200-205 | Need `truenas-vms` NFS |
+| 2 | containers VM 111, HAOS VM 102, LXCs 200 and 211-215 | Need `truenas-vms` NFS |
 | 3 | dev VM 148, hermes LXC 206 | Need order=2 services (DNS, ha-mcp) |
 
 **Invariant: TrueNAS stays ALONE in startup order=1.** Its post-start
@@ -190,7 +190,7 @@ running".
 2026-07-22):
 
 ```bash
-ansible-playbook provision-vms.yml --tags vm-startup-reconcile     # VMs 101, 148
+ansible-playbook provision-vms.yml --tags vm-startup-reconcile     # VMs 111, 148
 ansible-playbook provision-haos.yml --tags haos-startup-reconcile  # VM 102 (qm only, guest untouched)
 ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile    # declared LXCs; skips unprovisioned (hermes)
 ansible-playbook provision-truenas.yml                             # VM 100 knobs + gate hookscript

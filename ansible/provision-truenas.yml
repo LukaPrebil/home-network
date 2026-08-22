@@ -82,7 +82,7 @@
     # proving this export is writable proves the server is out of grace for
     # every export on it.
     truenas_nfs_gate_probe_paths:
-      - /mnt/pve/truenas-vms  # VMs 101/102/148, CTs 200-205
+      - /mnt/pve/truenas-vms  # VMs 102/111/148, CTs 200 and 211-215
     truenas_hookscript_volid: "local:snippets/truenas-nfs-gate.sh"
   tasks:
     - name: Check if TrueNAS VM already exists
