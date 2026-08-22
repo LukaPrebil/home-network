@@ -21,9 +21,6 @@ alloy_arch_map:
   aarch64: "arm64"
   armv7l: "armv7"
 
-# Prometheus server configuration (for sending metrics)
-alloy_prometheus_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:9090"
-
 # Loki server configuration (for sending logs)
 alloy_loki_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:3100"
 
@@ -34,6 +31,3 @@ alloy_ui_enabled: true
 # Log paths to scrape (can be overridden in group_vars or host_vars)
 alloy_log_paths:
   - /var/log/syslog
-
-# Metrics collection (node_exporter compatible metrics)
-alloy_collect_host_metrics: true
