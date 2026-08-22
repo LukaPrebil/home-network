@@ -177,6 +177,17 @@ drift correction, which loops over declared guests only. An orphaned guest left 
 `onboot: 1` will be started by the boot-time reconciler on the next power event, colliding
 with its replacement on the same IP.
 
+### Service health
+
+**Respawned crash**:
+A process crash inside a container that the container's own supervisor restarts, so the
+container itself never restarts. `RestartCount` stays 0, the Docker healthcheck stays
+green, and autoheal never fires. The only trace is a line in the container's log. Named
+after the immich ML worker, where gunicorn's master respawned a segfaulting worker 13 times
+across four months without a single alert.
+_Avoid_: "crash loop" - a crash loop is visible precisely because the container restarts;
+this is the opposite case.
+
 ## Relationships
 
 - A **Job** produces exactly one **Job end**, which is either **Finished** or **Cancelled/aborted**
@@ -194,6 +205,7 @@ with its replacement on the same IP.
 - **NFS-backed state** survives a guest rebuild but forbids concurrency; **local-rootfs state** is the opposite on both counts, which is why the two demand different handling in a **staged cutover**
 - A guest's rebuild cost is set by its **local-rootfs state**, not by its disk size - the six 26.04 rebuild targets total 43.6 GB on disk but only ~10 GB of state that a converge cannot recreate
 - An **orphaned guest** is rollback only while it stays stopped; leaving it at `onboot: 1` converts the safety net into a duplicate-IP incident on the next power event
+- A **respawned crash** is invisible to the container-restart alert by construction, so detecting one has to start from the container's logs, never from its restart count or health status
 
 ## Example dialogue
 

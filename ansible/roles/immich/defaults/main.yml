@@ -2,7 +2,7 @@
 # Immich role default variables
 
 # Immich version
-immich_version: "v2.7.5"
+immich_version: "v3.1.0"
 
 # Immich directories
 immich_base_dir: "/opt/immich"
