@@ -7,43 +7,12 @@ logging {
   format = "logfmt"
 }
 
-{% if alloy_collect_host_metrics %}
-// Prometheus - Unix/Node exporter metrics
-prometheus.exporter.unix "host_metrics" {
-  // Collect standard node_exporter metrics
-}
-
-// Scrape the unix exporter metrics
-prometheus.scrape "host_metrics" {
-  targets    = prometheus.exporter.unix.host_metrics.targets
-  forward_to = [prometheus.remote_write.metrics.receiver]
-
-  scrape_interval = "15s"
-
-  clustering {
-    enabled = true
-  }
-}
-{% endif %}
-
-// Prometheus remote write to monitoring stack
-prometheus.remote_write "metrics" {
-  endpoint {
-    url = "{{ alloy_prometheus_url }}/api/v1/write"
-
-    // Add labels to identify the source
-    queue_config {
-      capacity             = 10000
-      max_shards           = 10
-      max_samples_per_send = 5000
-    }
-  }
-
-  external_labels = {
-    hostname = "{{ inventory_hostname }}",
-    job      = "alloy",
-  }
-}
+// There is deliberately no prometheus.remote_write here. Host metrics come from
+// the standalone node_exporter, which Prometheus scrapes directly and which covers
+// every host this role runs on. Alloy's own prometheus.exporter.unix duplicated
+// those metrics and forwarded them to a receiver Prometheus never had enabled, so
+// every push 404d once a minute and dropped its whole batch. Alloy's own internal
+// metrics still reach Prometheus, via the :12345 scrape rather than a push.
 
 // Loki - Log collection from local files
 loki.source.file "system_logs" {
