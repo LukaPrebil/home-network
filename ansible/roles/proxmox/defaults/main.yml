@@ -15,3 +15,17 @@ proxmox_monitoring_token_id: "{{ proxmox_monitoring_token_user }}!{{ proxmox_mon
 # Least-privileged built-in role that covers the Sys.Audit and VM.Audit checks
 # the exporter makes for node and guest metrics.
 proxmox_monitoring_token_role: "PVEAuditor"
+
+# Service account for Home Assistant's Proxmox VE integration
+# (tasks/home_assistant_acl.yml). Declared from the state found on the hypervisor
+# on 2026-08-22, which had been created by hand in the web UI and existed in no
+# playbook. The roles are custom rather than built-in because the integration
+# needs a narrower set than PVEVMAdmin while still reaching Sys.PowerMgmt.
+proxmox_ha_user: "HomeAssistant@pve"
+proxmox_ha_group: "HomeAssistant"
+proxmox_ha_token_name: "HomeAssistant"
+proxmox_ha_roles:
+  HomeAssistant.Audit: "Datastore.Audit,Sys.Audit,VM.Audit"
+  HomeAssistant.NodePowerMgmt: "Sys.PowerMgmt"
+  HomeAssistant.Update: "Sys.Modify"
+  HomeAssistant.VMPowerMgmt: "VM.PowerMgmt"

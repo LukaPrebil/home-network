@@ -68,3 +68,14 @@
   tags:
     - monitoring-acl
     - proxmox
+
+- name: Include Home Assistant service account tasks
+  ansible.builtin.include_tasks:
+    file: home_assistant_acl.yml
+    apply:
+      tags:
+        - home-assistant-acl
+        - proxmox
+  tags:
+    - home-assistant-acl
+    - proxmox
