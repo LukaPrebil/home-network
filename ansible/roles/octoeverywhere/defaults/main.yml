@@ -6,7 +6,7 @@ octoeverywhere_base_dir: "/srv/docker/octoeverywhere"
 octoeverywhere_data_dir: "{{ octoeverywhere_base_dir }}/data"
 
 # Docker image
-octoeverywhere_image: "octoeverywhere/octoeverywhere:4.6.8"
+octoeverywhere_image: "octoeverywhere/octoeverywhere:5.3.0"
 octoeverywhere_container_name: "octoeverywhere"
 
 # OctoEverywhere configuration
