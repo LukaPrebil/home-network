@@ -64,3 +64,19 @@ automation_user:
   groups:
     - sudo
   ssh_key: "{{ vault_ansible_ssh_public_key }}"
+
+# Traefik <-> CrowdSec bridge network. Shared by the traefik and crowdsec roles,
+# which both ensure the network exists, so the addressing has to agree in one
+# place or the second role would fight the first.
+#
+# Subnet and both container addresses are pinned because CrowdSec's LAPI
+# auto-creates a bouncer row named <name>@<ip> the first time a source IP
+# presents an API key. Left dynamic, the subnet moves whenever the network is
+# recreated (Docker takes the next free block from its pool) and the two
+# containers swap .2/.3 by start order, so every recreate mints another stale
+# bouncer row against the same single key. Values below are the ones already in
+# use, so declaring them changes nothing at runtime.
+traefik_network_subnet: "172.19.0.0/16"
+traefik_network_gateway: "172.19.0.1"
+traefik_network_traefik_address: "172.19.0.2"
+traefik_network_crowdsec_address: "172.19.0.3"

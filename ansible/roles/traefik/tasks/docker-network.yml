@@ -1,8 +1,15 @@
 ---
 # Create Docker network for Traefik
 
+# Addressing is pinned rather than left to Docker's pool - see the rationale on
+# traefik_network_subnet in group_vars/all/main.yml. The crowdsec role ensures
+# this same network with the same values, so whichever play runs first wins and
+# the other is a no-op.
 - name: Create Docker network for Traefik
   community.docker.docker_network:
     name: "{{ traefik_docker_network }}"
     driver: bridge
+    ipam_config:
+      - subnet: "{{ traefik_network_subnet }}"
+        gateway: "{{ traefik_network_gateway }}"
     state: present

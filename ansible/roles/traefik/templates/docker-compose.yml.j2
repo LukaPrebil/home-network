@@ -10,7 +10,8 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - {{ traefik_docker_network }}
+      {{ traefik_docker_network }}:
+        ipv4_address: "{{ traefik_network_traefik_address }}"
     ports:
       - "{{ traefik_http_port }}:80"
       - "{{ traefik_https_port }}:443"
