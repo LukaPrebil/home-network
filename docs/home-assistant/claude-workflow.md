@@ -12,7 +12,7 @@ Because the HA instance runs on **HAOS** (Home Assistant Operating System), it i
 
 ### Ansible
 
-The ha-mcp server itself is provisioned and configured through an Ansible role (`roles/ha-mcp`), with secrets managed via Ansible Vault. The deployment follows the same patterns as all other services in the homelab — Docker Compose templates, health checks, and Traefik integration.
+The ha-mcp server itself is provisioned and configured through an Ansible role (`roles/ha_mcp`), with secrets managed via Ansible Vault. The deployment follows the same patterns as all other services in the homelab — Docker Compose templates, health checks, and Traefik integration.
 
 ### Claude Code
 
