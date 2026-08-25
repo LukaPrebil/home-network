@@ -2,7 +2,7 @@
 # Paperless-ngx default configuration
 
 # Version pinning
-paperless_ngx_version: "2.20.14"
+paperless_ngx_version: "3.0.5"
 paperless_ngx_redis_version: "8-alpine"
 paperless_ngx_postgres_version: "18-alpine"
 

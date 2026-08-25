@@ -44,6 +44,8 @@ services:
       - {{ paperless_ngx_base_dir }}/paperless.env
     environment:
       PAPERLESS_REDIS: redis://paperless-broker:6379
+      # v3 stopped inferring the engine from PAPERLESS_DBHOST; Postgres users must set it explicitly.
+      PAPERLESS_DBENGINE: postgresql
       PAPERLESS_DBHOST: paperless-db
       PAPERLESS_DBNAME: {{ paperless_ngx_db_name }}
       PAPERLESS_DBUSER: {{ paperless_ngx_db_user }}
