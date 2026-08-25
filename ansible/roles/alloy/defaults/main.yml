@@ -27,7 +27,3 @@ alloy_loki_url: "http://{{ hostvars['monitoring']['ansible_host'] }}:3100"
 # Alloy service configuration
 alloy_listen_port: 12345
 alloy_ui_enabled: true
-
-# Log paths to scrape (can be overridden in group_vars or host_vars)
-alloy_log_paths:
-  - /var/log/syslog

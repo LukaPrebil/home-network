@@ -70,8 +70,22 @@ Two sources, both landing in Loki:
 
 | Source | Loki labels | Applies to |
 | :--- | :--- | :--- |
-| `/var/log/syslog` | `job="system"`, `hostname` | every `monitoring_agents` host |
+| systemd journal | `job="system"`, `hostname`, `unit` | every `monitoring_agents` host |
 | Docker container stdout/stderr | `job="docker"`, `hostname`, `container`, `stream` | hosts where Alloy detects a Docker engine |
+
+Host logs come from journald, not from `/var/log/syslog`. Debian 13 ships no rsyslog, so that file
+never existed on n5p or rpi4 and the file source shipped nothing from either for the whole of
+Loki's retention while reporting healthy. journald needs no package and exists everywhere, which
+removes the failure mode rather than papering over it. Alloy runs as root here, so it needs no
+`adm` / `systemd-journal` group membership.
+
+Alloy drops every `__journal_*` label before forwarding, so the `unit` label is promoted explicitly
+by a `loki.relabel` component. Without it there is no way to tell which service produced a line.
+
+Do not rewrite the log alerts to filter on journald `PRIORITY`. Every line on this fleet is
+`PRIORITY=6`: services log to stdout and their units carry `StandardOutput=journal`, so systemd
+stamps everything info regardless of the application's own `[error]` marker. A severity-based rule
+would match nothing and look permanently healthy. The text regex is load-bearing.
 
 The `container` label has Docker's leading slash stripped, so it reads `immich_server` rather than
 `/immich_server`.
@@ -80,6 +94,23 @@ The `container` label has Docker's leading slash stripped, so it reads `immich_s
 by a `discovery.docker` component; without one it starts cleanly, reports healthy, and ships zero
 lines. Container log shipping was broken exactly that way until 2026-08-22, which is why a service
 could crash repeatedly with no trace anywhere outside the container's own log.
+
+### Proving a host actually ships
+
+A source with an empty target list is a valid config: the component reports healthy, `/ready`
+answers 200, and the alerts reading its stream simply go quiet, which looks exactly like a healthy
+host. Liveness cannot detect it. Ask the source to account for its throughput instead.
+
+Two guards do that, added 2026-08-25 after n5p and rpi4 were found to have shipped nothing for a
+full 30-day retention window while every signal read green:
+
+- The `alloy` role fails the converge unless `loki_source_journal_target_lines_total` is present
+  and non-zero on the host it just configured.
+- The `Host Log Shipping Stopped` alert fires when a host reads no journal lines in 2 hours. Its
+  expression carries an `or` arm because the counter *disappearing* leaves an absent series rather
+  than a zero one, which a plain `== 0` would never match.
+
+To check by hand: `curl -s localhost:12345/metrics | grep loki_source_journal`.
 
 ### Alerting on log content
 

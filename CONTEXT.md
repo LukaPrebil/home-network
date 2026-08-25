@@ -188,6 +188,19 @@ across four months without a single alert.
 _Avoid_: "crash loop" - a crash loop is visible precisely because the container restarts;
 this is the opposite case.
 
+**Blind source**:
+An Alloy log source that is configured, running and reporting healthy while shipping
+nothing, because its target list resolved to empty. `systemctl is-active` says active,
+the component logs no error, and the alerts that read its stream simply stay quiet,
+which is indistinguishable from the host being fine. The only tell is a zero in the
+source's own target-count metric (`loki_source_file_files_active_total`,
+`loki_source_docker_target_entries_total`), already scraped and, so far, never watched.
+It has now happened four times: docker logs with no `discovery.docker`, host metrics
+pushed to a disabled receiver, container logs missing until a second converge, and
+n5p plus rpi4 tailing a `/var/log/syslog` that Debian 13 never creates.
+_Avoid_: "log shipping is broken" - nothing is broken; the source is doing exactly what
+its empty target list asks of it.
+
 ## Relationships
 
 - A **Job** produces exactly one **Job end**, which is either **Finished** or **Cancelled/aborted**
@@ -207,6 +220,8 @@ this is the opposite case.
 - An **orphaned guest** is rollback only while it stays stopped; leaving it at `onboot: 1` converts the safety net into a duplicate-IP incident on the next power event
 - A **respawned crash** is invisible to the container-restart alert by construction, so detecting one has to start from the container's logs, never from its restart count or health status
 - Where a guest's **local-rootfs state** is an index over its **NFS-backed state** - Immich's Postgres over the photo library - a **staged cutover** rollback desynchronises the two: anything written after cutover survives on NFS with no row in the restored index. Rollback value expires at the first write, not on a timer, which makes the **orphaned guest** worth far less here than for a guest whose state is self-contained
+- A **blind source** and a **respawned crash** fail identically from the outside: the evidence that would show a problem is absent rather than negative, so every liveness check reads green. Both are found only by asking a component to account for its own throughput - target count for the source, log lines for the supervisor - never by asking whether it is running
+- A **blind source** silently disables every alert reading its stream, so the alert going quiet is the symptom; on `job="system"` that is Error Log Spike, Service Crash Detected and Authentication Failure Spike at once
 
 ## Example dialogue
 

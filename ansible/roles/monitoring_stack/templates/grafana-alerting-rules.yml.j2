@@ -1018,7 +1018,12 @@ groups:
                     type: last
         noDataState: OK
         execErrState: Error
-        for: 0s
+        # Calibrated against the 2026-08-24 SafeBrowsing outage: both spikes held
+        # above threshold for ~6 minutes, so 10m rides out a transient third-party
+        # failure while a genuinely sustained one still fires. The sibling log rules
+        # keep for: 0s - a crash or an auth burst is a point event that never
+        # sustains, so a duration there would stop them firing at all.
+        for: 10m
         annotations:
           summary: "Error log spike on {{ '{{' }} $labels.hostname {{ '}}' }}"
           description: "More than 50 error-level log lines in 5 minutes on {{ '{{' }} $labels.hostname {{ '}}' }}."
@@ -1264,5 +1269,67 @@ groups:
         annotations:
           summary: "Loki is rejecting log pushes"
           description: "Loki returned a non-2xx response on its push endpoint. Agents are dropping the batches they cannot deliver, so logs are being lost rather than delayed."
+        labels:
+          severity: warning
+
+      # 22. A host stopped shipping its own logs
+      - uid: alert-alloy-blind-source
+        title: Host Log Shipping Stopped
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 7200
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              # An Alloy log source with nothing to read starts cleanly, answers /ready
+              # with 200 and ships zero lines, so every liveness signal stays green while
+              # the alerts reading its stream fall silent - which is indistinguishable
+              # from the host being healthy. n5p and rpi4 sat like that for a full
+              # retention window. Ask the source to account for its throughput instead.
+              # The `or` arm covers the other shape: the counter gone entirely (component
+              # removed or renamed) while Alloy is still up. The first arm cannot see
+              # that, because a vanished series is simply absent from the result rather
+              # than present and zero.
+              expr: (sum by (instance) (increase(loki_source_journal_target_lines_total[2h]))) or (sum by (instance) (up{job="alloy"} == 1) - 1)
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: "Host log shipping stopped on {{ '{{' }} $labels.instance {{ '}}' }}"
+          description: "Alloy on {{ '{{' }} $labels.instance {{ '}}' }} has read no journal lines in 2 hours. Host logs from it are not reaching Loki, so Error Log Spike, Service Crash Detected and Authentication Failure Spike are all blind for that host."
         labels:
           severity: warning
