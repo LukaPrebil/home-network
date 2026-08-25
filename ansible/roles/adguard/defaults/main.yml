@@ -62,7 +62,15 @@ adguard_use_private_ptr_resolvers: true
 
 # Filtering
 adguard_filtering_enabled: true
-adguard_safebrowsing_enabled: true
+# SafeBrowsing off. It blocked 0 of ~1.06M queries over 40 days while the three
+# blocklists blocked 14803, and it was the only thing tying DNS to
+# family.adguard-dns.com: a separate upstream hardcoded into the binary, with no
+# config key to point elsewhere. When it stalled for 80 seconds on 2026-08-24 it
+# turned four lookups into ~290 error lines on each resolver. It also sends a
+# SHA256 prefix of every unique hostname resolved to AdGuard, the one cleartext
+# leak left on a resolver that uses DoH for everything else. It fails open, so
+# turning it off costs a malware safety net and nothing else.
+adguard_safebrowsing_enabled: false
 adguard_parental_enabled: false
 adguard_safesearch_enabled: false
 
