@@ -14,14 +14,34 @@ logging {
 // every push 404d once a minute and dropped its whole batch. Alloy's own internal
 // metrics still reach Prometheus, via the :12345 scrape rather than a push.
 
-// Loki - Log collection from local files
-loki.source.file "system_logs" {
-  targets = [
-{% for log_path in alloy_log_paths %}
-    {__path__ = "{{ log_path }}", job = "system", hostname = "{{ inventory_hostname }}"},
-{% endfor %}
-  ]
-  forward_to = [loki.write.logs.receiver]
+// Loki - host logs, read straight from the systemd journal.
+// This used to tail /var/log/syslog. Debian 13 ships no rsyslog, so that file never
+// existed on n5p or rpi4, and loki.source.file reported healthy while shipping nothing
+// for the whole of Loki's retention - which silently disabled Error Log Spike, Service
+// Crash Detected and Authentication Failure Spike on both hosts. journald needs no
+// package and exists on every host, so the empty-target failure mode goes away.
+// max_age bounds the one-time backfill on the converge that switches a host over.
+loki.source.journal "system_logs" {
+  max_age = "12h"
+
+  labels = {
+    job      = "system",
+    hostname = "{{ inventory_hostname }}",
+  }
+
+  relabel_rules = loki.relabel.journal.rules
+  forward_to    = [loki.write.logs.receiver]
+}
+
+// Alloy drops every __journal_* label before forwarding, so the unit name has to be
+// promoted explicitly or there is no way to tell which service produced a line.
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
 }
 
 {% if alloy_docker_installed %}
