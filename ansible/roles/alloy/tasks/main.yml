@@ -201,6 +201,11 @@
     - monitoring
     - logging
 
+# Both checks below have to run against the process the new config produced, and
+# the config task notifies a restart handler that would otherwise fire at end of play.
+- name: Flush handlers so a config change restarts Alloy before the checks below
+  ansible.builtin.meta: flush_handlers
+
 - name: Check Alloy is responding
   ansible.builtin.uri:
     url: "http://localhost:{{ alloy_listen_port }}/ready"
@@ -210,6 +215,26 @@
   until: alloy_health.status == 200
   retries: 5
   delay: 2
+  changed_when: false
+  tags:
+    - alloy
+    - monitoring
+    - logging
+    - healthcheck
+
+# /ready answers 200 while a source ships nothing: an empty target list is a valid
+# config, so the component reports healthy and the alerts reading its stream just
+# stay quiet. That is how n5p and rpi4 went a full retention window unnoticed.
+# Assert on throughput instead of liveness - the counter must exist and be non-zero.
+- name: Verify Alloy is actually shipping host logs from the journal
+  ansible.builtin.uri:
+    url: "http://localhost:{{ alloy_listen_port }}/metrics"
+    method: GET
+    return_content: true
+  register: alloy_journal_metrics
+  until: alloy_journal_metrics.content is search('loki_source_journal_target_lines_total\S*\s+[1-9]')
+  retries: 12
+  delay: 5
   changed_when: false
   tags:
     - alloy
