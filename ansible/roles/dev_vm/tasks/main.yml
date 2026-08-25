@@ -2,10 +2,6 @@
 # Top-level orchestration for the dev_vm role. Each include carries the
 # 'dev-vm' tag so subtasks remain reachable when running with --tags dev-vm.
 
-- name: Preflight - verify GitHub PAT scope and validity
-  ansible.builtin.include_tasks: github_preflight.yml
-  tags: dev-vm
-
 - name: Apt packages and apt-based dependencies
   ansible.builtin.include_tasks: packages.yml
   tags: dev-vm

@@ -1,8 +1,12 @@
 ---
-# Generate a per-host ed25519 keypair on the VM, pin GitHub's host key
-# literal in known_hosts (no TOFU), and register the public key with GitHub
-# via community.general.github_key. Idempotent by title - re-runs are a no-op
-# once the key is registered.
+# Generate a per-host ed25519 keypair on the VM, pin GitHub's host key literal
+# in known_hosts (no TOFU), and register the public key with GitHub.
+#
+# The GitHub PAT is only consulted when the key is not already registered, which
+# in practice means only when bootstrapping a new VM. An already-provisioned VM
+# converges with no token present at all - the SSH key's validity is independent
+# of the PAT that registered it. That keeps this from needing a long-lived
+# credential: mint a short-lived one for the build, then let it expire.
 
 - name: Ensure SSH directory exists for {{ dev_vm_user.name }}
   ansible.builtin.file:
@@ -30,12 +34,97 @@
   become: true
   become_user: "{{ dev_vm_user.name }}"
 
+# GitHub's SSH service answers rc=1 with "Hi <user>! You've successfully
+# authenticated" when the key is known, and rc=255 when it is not. This is the
+# authoritative test of whether registration is still needed - asking GitHub
+# rather than trusting a token to tell us about state it does not own.
+- name: Check whether the VM's key is already registered with GitHub
+  ansible.builtin.command:
+    cmd: ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes git@github.com
+  become: true
+  become_user: "{{ dev_vm_user.name }}"
+  register: dev_vm_github_ssh_probe
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Report that the SSH key is already registered
+  ansible.builtin.debug:
+    msg: >-
+      GitHub already accepts this VM's SSH key, so no token is needed. Skipping
+      key registration.
+  when: dev_vm_github_ssh_probe.rc in [0, 1]
+
+# Everything below runs only when GitHub does not yet accept the key.
+
+- name: Verify the GitHub PAT can register SSH keys
+  ansible.builtin.uri:
+    url: https://api.github.com/user/keys
+    method: GET
+    headers:
+      Authorization: "Bearer {{ vault_github_pat }}"
+      Accept: application/vnd.github+json
+      X-GitHub-Api-Version: "2022-11-28"
+    status_code: [200, 401, 403, 404]
+    return_content: false
+  delegate_to: localhost
+  become: false
+  # Guards the token itself. The status code is surfaced separately below, so
+  # the failure stays diagnosable without the credential reaching the log.
+  no_log: true
+  failed_when: false
+  register: dev_vm_github_preflight
+  when:
+    - dev_vm_github_ssh_probe.rc not in [0, 1]
+    - vault_github_pat | default('') | length > 0
+
+# A censored `failed_when` on the uri task above would abort with an unreadable
+# "expression evaluated to True", so the failure is raised here instead, with the
+# status code and the exact remedy.
+- name: Fail with instructions when the PAT cannot register the key
+  ansible.builtin.fail:
+    msg: |
+      This VM's SSH key is not registered with GitHub, and registering it needs a
+      Personal Access Token that works. Ansible cannot continue: the chezmoi and
+      Claude-config steps later in this role clone over SSH and would fail too.
+
+      What went wrong: {{ _reason }}
+
+      To fix it, mint a token and put it in vault_github_pat:
+
+        1. https://github.com/settings/personal-access-tokens/new
+        2. Repository access: none needed. Under Account permissions, set
+           "Git SSH keys" to Read and write.
+        3. Give it the shortest expiry you are offered - it is needed once, to
+           register this key, and never again for this VM.
+        4. sops group_vars/all/secrets.sops.yml, set vault_github_pat, re-run.
+
+      A classic token works too, with the admin:public_key scope.
+
+      Once the key is registered you can let the token expire. Converging this
+      VM afterwards does not read it - the check above asks GitHub directly
+      whether the key is accepted, and skips this whole path when it is.
+  vars:
+    _status: "{{ dev_vm_github_preflight.status | default(0) | int }}"
+    _by_status:
+      401: "GitHub returned 401 Bad credentials - the token is expired or revoked."
+      403: "GitHub returned 403 - the token is valid but lacks the Git SSH keys (admin:public_key) permission."
+    _reason: >-
+      {{ 'vault_github_pat is not set.'
+         if (vault_github_pat | default('') | length == 0)
+         else (_by_status[_status | int]
+               | default('GitHub returned status ' ~ _status ~ ' for /user/keys.')) }}
+  when:
+    - dev_vm_github_ssh_probe.rc not in [0, 1]
+    - dev_vm_github_preflight.status | default(0) != 200
+
 # Slurp the public key from the target VM. lookup('file', ...) would read
 # the control node, which is wrong here.
 - name: Slurp the VM's public SSH key
   ansible.builtin.slurp:
     src: "{{ dev_vm_user.home }}/.ssh/id_ed25519.pub"
   register: dev_vm_pubkey_slurp
+  when: dev_vm_github_ssh_probe.rc not in [0, 1]
 
 - name: Register VM SSH key with GitHub (idempotent by title)
   community.general.github_key:
@@ -45,10 +134,8 @@
     state: present
   no_log: true
   register: dev_vm_github_key_add
+  when: dev_vm_github_ssh_probe.rc not in [0, 1]
 
-# GitHub's SSH service returns rc=1 with the message "Hi <user>! You've
-# successfully authenticated, but GitHub does not provide shell access." once
-# the key has propagated. Retry until that succeeds.
 - name: Wait for GitHub key propagation
   ansible.builtin.command:
     cmd: ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes git@github.com
@@ -60,3 +147,4 @@
   delay: 3
   changed_when: false
   failed_when: dev_vm_github_ssh_check.rc not in [0, 1]
+  when: dev_vm_github_ssh_probe.rc not in [0, 1]
