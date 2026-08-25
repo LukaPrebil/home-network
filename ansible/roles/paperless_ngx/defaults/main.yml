@@ -20,6 +20,11 @@ paperless_ngx_nfs_share: "{{ truenas_paperless_share }}"
 paperless_ngx_nfs_mount_point: "/mnt/paperless"
 paperless_ngx_nfs_opts: "{{ nfs_common_opts }}"
 
+# The redis image chowns its data directory to this uid on every container start,
+# so Ansible has to create it with the same owner or the two flip it back and
+# forth on each converge, and redis loses write access to its RDB file in between.
+paperless_ngx_redis_uid: 999
+
 # Database
 paperless_ngx_db_name: "paperless"
 paperless_ngx_db_user: "paperless"
