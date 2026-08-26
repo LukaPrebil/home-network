@@ -1,0 +1,87 @@
+---
+# config.ini is bind-mounted INTO the container, so compose cannot see it change
+# and notifies the restart handler. The compose template below does not notify:
+# `docker_compose_v2` with state: present is itself the apply mechanism for
+# compose-file drift.
+- name: Deploy taptap-mqtt configuration
+  ansible.builtin.template:
+    src: config.ini.j2
+    dest: "{{ taptap_mqtt_base_dir }}/config.ini"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  notify: Restart taptap-mqtt
+
+- name: Deploy taptap-mqtt Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ taptap_mqtt_base_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Pull taptap-mqtt Docker image
+  community.docker.docker_compose_v2:
+    project_src: "{{ taptap_mqtt_base_dir }}"
+    pull: "always"
+  register: taptap_mqtt_pull
+
+- name: Start taptap-mqtt service
+  community.docker.docker_compose_v2:
+    project_src: "{{ taptap_mqtt_base_dir }}"
+    state: present
+  register: taptap_mqtt_deploy
+  when: taptap_mqtt_service_state != 'stopped'
+
+# A config change must land before readiness is judged, or a bridge still
+# running the previous config would pass the check.
+- name: Apply pending taptap-mqtt restarts before the readiness check
+  ansible.builtin.meta: flush_handlers
+
+# Deliberately NOT the repo's usual container-running probe. This bridge holds
+# its MQTT connection open even when the bus goes quiet, so "the container is
+# running" is true in exactly the failure this check exists to catch. The
+# heartbeat file is the one thing the process must keep doing to be alive.
+- name: Wait for the taptap-mqtt heartbeat file to appear
+  ansible.builtin.stat:
+    path: "{{ taptap_mqtt_base_dir }}/run/taptap.state"
+  register: taptap_mqtt_heartbeat
+  until: taptap_mqtt_heartbeat.stat.exists
+  retries: 30
+  delay: 5
+  when:
+    - taptap_mqtt_service_state == 'started'
+    - not ansible_check_mode
+
+- name: Read the current time on the target host
+  ansible.builtin.command: date +%s
+  register: taptap_mqtt_now
+  changed_when: false
+  check_mode: false
+  when:
+    - taptap_mqtt_service_state == 'started'
+    - not ansible_check_mode
+
+- name: Assert the taptap-mqtt heartbeat is fresh
+  ansible.builtin.assert:
+    that:
+      - (taptap_mqtt_now.stdout | int) - (taptap_mqtt_heartbeat.stat.mtime | int) < taptap_mqtt_heartbeat_max_age
+    fail_msg: >-
+      taptap-mqtt heartbeat is stale
+      ({{ (taptap_mqtt_now.stdout | int) - (taptap_mqtt_heartbeat.stat.mtime | int) }}s old).
+      The container may be running while the bridge loop is wedged - check
+      `docker logs {{ taptap_mqtt_container_name }}`.
+    success_msg: "taptap-mqtt heartbeat is fresh."
+  when:
+    - taptap_mqtt_service_state == 'started'
+    - not ansible_check_mode
+
+- name: Display taptap-mqtt deployment status
+  ansible.builtin.debug:
+    msg:
+      - "taptap-mqtt deployment complete!"
+      - "State: {{ taptap_mqtt_service_state }}"
+      - "Tap bridge: {{ taptap_mqtt_address }}:{{ taptap_mqtt_port }}"
+      - "Broker: {{ mosquitto_endpoint }}"
+      - "Modules go unavailable in HA after {{ taptap_mqtt_timeout }}s without a message."
+  when: taptap_mqtt_service_state == 'started'

@@ -1,0 +1,28 @@
+---
+- name: Create taptap-mqtt base directory
+  ansible.builtin.file:
+    path: "{{ taptap_mqtt_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+# Holds taptap.json, the discovered serial-to-node table. Losing it costs only
+# the time until the next enumeration frame, which can be most of a day.
+- name: Create taptap-mqtt state directory
+  ansible.builtin.file:
+    path: "{{ taptap_mqtt_base_dir }}/data"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+# Exposes the heartbeat file to the host so the post-deploy check can stat it
+# without entering the container.
+- name: Create taptap-mqtt runtime directory
+  ansible.builtin.file:
+    path: "{{ taptap_mqtt_base_dir }}/run"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'

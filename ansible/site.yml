@@ -12,6 +12,9 @@
 #   ansible-playbook site.yml --tags paperless-ngx       # Paperless-ngx document management
 #   ansible-playbook site.yml --tags pds                  # ATProto PDS
 #   ansible-playbook site.yml --tags ha-mcp              # Home Assistant MCP server
+#   ansible-playbook site.yml --tags tigo                # MQTT broker + TIGO optimizer bridge
+#   ansible-playbook site.yml --tags mosquitto           # Just the MQTT broker
+#   ansible-playbook site.yml --tags taptap              # Just the TIGO optimizer bridge
 #   ansible-playbook site.yml --tags crowdsec             # CrowdSec intrusion detection
 #   ansible-playbook site.yml --tags containers-services # Uptime Kuma + OctoEverywhere
 #   ansible-playbook site.yml --tags dev-vm              # Dev VM (apt, dotfiles, claude code, ufw)
@@ -220,6 +223,19 @@
   roles:
     - docker
     - ha_mcp
+
+# Ordered broker-then-bridge inside one play: the bridge's first action is to
+# connect to MQTT, and a bridge that starts against a missing broker burns its
+# whole MAX_ERROR budget and exits before the broker is up.
+- name: Deploy MQTT broker and TIGO optimizer telemetry bridge
+  hosts: containers
+  become: true
+  tags:
+    - tigo
+  roles:
+    - docker
+    - mosquitto
+    - taptap_mqtt
 
 - name: Deploy container services (Uptime Kuma, OctoEverywhere)
   hosts: containers

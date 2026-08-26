@@ -1,0 +1,7 @@
+---
+# Handlers for taptap_mqtt role
+
+- name: Restart taptap-mqtt
+  community.docker.docker_compose_v2:
+    project_src: "{{ taptap_mqtt_base_dir }}"
+    state: restarted
