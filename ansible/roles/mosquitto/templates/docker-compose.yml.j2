@@ -1,0 +1,16 @@
+# Docker Compose for Mosquitto MQTT broker
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+services:
+  mosquitto:
+    image: {{ mosquitto_image }}
+    container_name: {{ mosquitto_container_name }}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "{{ ansible_host }}:{{ mosquitto_port }}:{{ mosquitto_port }}"
+    volumes:
+      - {{ mosquitto_base_dir }}/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - {{ mosquitto_base_dir }}/config/passwd:/mosquitto/config/passwd:ro
+      - {{ mosquitto_base_dir }}/data:/mosquitto/data

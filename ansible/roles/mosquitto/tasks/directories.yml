@@ -1,0 +1,28 @@
+---
+- name: Create Mosquitto base directory
+  ansible.builtin.file:
+    path: "{{ mosquitto_base_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create Mosquitto config directory
+  ansible.builtin.file:
+    path: "{{ mosquitto_base_dir }}/config"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+# Persistence lives on the guest's own disk, not on an NFS export. Mosquitto's
+# persistence database is as hostile to NFS as SQLite is, and losing it costs
+# only the retained discovery topics, which the bridge re-publishes on the HA
+# birth message.
+- name: Create Mosquitto data directory
+  ansible.builtin.file:
+    path: "{{ mosquitto_base_dir }}/data"
+    state: directory
+    owner: "{{ mosquitto_uid }}"
+    group: "{{ mosquitto_gid }}"
+    mode: '0755'

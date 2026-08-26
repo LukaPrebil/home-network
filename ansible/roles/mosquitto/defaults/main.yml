@@ -1,0 +1,17 @@
+---
+# Mosquitto MQTT broker - default configuration
+#
+# The host/port/credential contract this broker publishes lives in
+# group_vars/all/main.yml, because consumers on other hosts read it. Only
+# deployment-internal values belong here.
+
+mosquitto_version: "2.0.22"
+mosquitto_image: "eclipse-mosquitto:{{ mosquitto_version }}"
+mosquitto_base_dir: "/srv/docker/mosquitto"
+
+# The image drops privileges to this uid/gid. The data directory and the
+# password file must be owned by it or the broker exits on start.
+mosquitto_uid: 1883
+mosquitto_gid: 1883
+
+mosquitto_service_state: "started"

@@ -1,0 +1,7 @@
+---
+# Handlers for Mosquitto role
+
+- name: Restart Mosquitto
+  community.docker.docker_compose_v2:
+    project_src: "{{ mosquitto_base_dir }}"
+    state: restarted
