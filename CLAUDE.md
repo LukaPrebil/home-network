@@ -50,7 +50,9 @@ If you add new roles or tasks, keep the conventions already in the tree so lint 
 
 ## Running Playbooks
 
-Vault password is read from `.vault_pass` via `ansible.cfg`. Never use `--ask-vault-pass`.
+Secrets are SOPS-encrypted (ADR 0006) and decrypted automatically by the
+`community.sops` vars plugin configured in `ansible.cfg`. The age key lives at
+`~/.config/sops/age/keys.txt`. There is no Ansible Vault and no `--ask-vault-pass`.
 
 ```bash
 ansible-playbook site.yml                                          # Full convergence

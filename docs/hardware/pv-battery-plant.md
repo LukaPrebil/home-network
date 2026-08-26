@@ -93,9 +93,9 @@ coil whine away from sleeping space under heavy load.
 | Device | Address | Notes |
 |---|---|---|
 | SOFAR LSW-3 Wi-Fi logger stick | `192.168.1.6` | Static lease in the Innbox DHCP table. Cloud uplink only, serves nothing locally |
-| TIGO CCA gateway | unknown | To be recorded when the RS485 tap is built |
-| Elfin EE11A (inverter bridge) | unallocated | Ordered 2026-08-07 |
-| Elfin EE11A (TIGO CCA tap) | unallocated | Ordered 2026-08-07 |
+| TIGO CCA gateway | unknown | Still to be recorded. Keeps its internet uplink per ADR 0013: TIGO EI is the only source of the panel-to-serial mapping, and the warranty-diagnosis channel |
+| Elfin EE11A (inverter bridge) | unallocated | Ordered 2026-08-07, not yet wired |
+| Elfin EE11A (tap bridge) | `192.168.1.162` | Live since 2026-08-26. TCP server on port 7160, 38400/8-N-1, transparent mode, no termination |
 
 Firmware as commissioned:
 

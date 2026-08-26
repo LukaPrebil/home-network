@@ -76,9 +76,37 @@ beats export.
 **Logger stick**:
 The SOFAR LSW-3 Wi-Fi dongle that talks to SofarCloud. Port 8899 is open but answers no
 protocol, so it carries nothing locally and is not a data source.
-_Avoid_: conflating it with the **wired bridge**, the Elfin EE11A on the inverter COM
-port that will carry both monitoring and control. Both reach the same inverter; only
+_Avoid_: conflating it with the **inverter bridge**. Both reach the same inverter; only
 the bridge can be read or written.
+
+**Inverter bridge**:
+The Elfin EE11A on the SOFAR inverter's COM port, carrying Modbus RTU at 9600 in both
+directions; the only path by which **Passive Mode** can be read or written. Needs 120
+ohm termination.
+_Avoid_: "wired bridge" - both EE11A units are wired, so that name stopped identifying
+anything once the second one was installed.
+
+**Tap bridge**:
+The Elfin EE11A at `192.168.1.162` on the TIGO CCA's GW/TAP port, serving the bus as a
+TCP stream on port 7160. Read-only by construction: it drives the RS485 transmitter
+only when a TCP client writes, and nothing ever does.
+_Avoid_: adding termination to it. It is a passive parallel tap on a bus already
+terminated at the CCA and at the furthest TAP; a third resistor degrades the CCA's own
+traffic.
+
+**Module**:
+One optimizer as taptap-mqtt names it, identified by the barcode serial printed on the
+unit (`A-1234567` form) and mapped by hand to a panel position (`A1` to `B15`).
+_Avoid_: "node" for this. A **node ID** is the bus-level address the TAP gateway assigns,
+it is not stable across gateway restarts, and it is what the raw taptap output carries.
+The module serial is the identity that survives.
+
+**TAP gateway**:
+A TIGO TAP radio bridging optimizers to the CCA over RF, identified on the bus by a
+gateway ID (`4609` and `4610` on this plant).
+_Avoid_: reading gateway membership as string membership. The two gateways are not the
+two strings - gateway 4609 carries nodes 4, 5, 6 and 9 while 4610 carries 10 to 30.
+Gateways are placed for RF coverage; string membership is operator-supplied config.
 
 ### Utility room thermal
 
@@ -208,7 +236,9 @@ its empty target list asks of it.
 - A **Fresh fault** at a low-progress **Job end** means aborted; without it, the same job end is a deliberate cancel
 - A **Time push** lands only on a **Time-capable device**; the other 19 Matter nodes have nowhere to store time
 - **Fabric state** loss is re-commission-class, like Thread dataset loss; the two stores back different halves of the same Matter estate
-- **Passive Mode** is reachable only over the **wired bridge**; the **logger stick** answers no local protocol at all, so it can be neither read nor written
+- **Passive Mode** is reachable only over the **inverter bridge**; the **logger stick** answers no local protocol at all, so it can be neither read nor written
+- The **inverter bridge** and the **tap bridge** are the same hardware in the same enclosure and are opposite in every property that matters: one is read-write and must be terminated, the other is read-only and must not be
+- A **module** is reported under a **node ID** that belongs to one **TAP gateway**, but its panel position comes only from TIGO EI - nothing on the bus carries it
 - **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
 - The **NFS readiness gate** delays only *later* **startup order groups**, so any guest sharing order=1 with the TrueNAS VM starts ungated
 - **Storage ready** cannot be true before the **grace period** ends; any probe that goes green earlier is measuring something other than what guests need
@@ -221,6 +251,7 @@ its empty target list asks of it.
 - A **respawned crash** is invisible to the container-restart alert by construction, so detecting one has to start from the container's logs, never from its restart count or health status
 - Where a guest's **local-rootfs state** is an index over its **NFS-backed state** - Immich's Postgres over the photo library - a **staged cutover** rollback desynchronises the two: anything written after cutover survives on NFS with no row in the restored index. Rollback value expires at the first write, not on a timer, which makes the **orphaned guest** worth far less here than for a guest whose state is self-contained
 - A **blind source** and a **respawned crash** fail identically from the outside: the evidence that would show a problem is absent rather than negative, so every liveness check reads green. Both are found only by asking a component to account for its own throughput - target count for the source, log lines for the supervisor - never by asking whether it is running
+- The taptap bridge is a **blind source** by default: if the **tap bridge** or the CCA goes quiet it keeps running and keeps its MQTT connection open, so its LWT never fires and a container-running probe stays green. Its heartbeat file is the only thing that accounts for its own throughput
 - A **blind source** silently disables every alert reading its stream, so the alert going quiet is the symptom; on `job="system"` that is Error Log Spike, Service Crash Detected and Authentication Failure Spike at once
 
 ## Example dialogue
@@ -238,4 +269,5 @@ its empty target list asks of it.
 - "task status sensor" - the deleted `sensor.vrt_luba_task_area_path` looked like a stable device-level status enum but was a **map-derived entity** whose display name was bugged upstream (Mammotion-HA #700). Resolved: job state is reconstructed from device-level entities only.
 - "push NTP time to all devices" - resolved: the mechanism is a **Time push** (Matter commands, no NTP protocol), and "all devices" is in practice one device (the ALPSTUGA). NTP appears in this project only as clock hygiene on the hosts, chiefly rpi4.
 - "open the door to the utility room" - resolved: the unit is the **cooling path**, not either door on its own. **Vrata utility** alone routes heat into **Vhod**, which has no sink and saturates; only both doors together reach the air conditioner.
+- "the wired bridge" - unambiguous while one Elfin EE11A existed, ambiguous the moment the second was installed on the TIGO CCA. Resolved: **inverter bridge** and **tap bridge**, each named for what is on the far end. The distinction is physical, not cosmetic - the inverter link needs 120 ohm termination and the tap must never be terminated.
 - "NFS is up" - the 2026-07-22 **NFS readiness gate** treated a `showmount` reply as proof that guests could start. On 2026-08-08 that went green 1 s before `nfsd` had even started and 91 s before the **grace period** ended, and HAOS missed its **start budget** by one second. Resolved: the term is **Storage ready**, and only a completed open-and-write on a real NFS mount proves it.

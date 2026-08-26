@@ -213,14 +213,25 @@ populates before writing anything. Once reads are stable, Passive Mode control c
 start, because writes over this transport report honestly.
 
 **Stage 2, optimizer telemetry.** Passive parallel RS485 tap on the TIGO CCA's GW/TAP
-port, using the second EE11A, with the CCA left powered but blocked from the internet.
-No termination on this one. Per-panel visualisation via the Solar Panel Visualizer
-Lovelace card.
+port, using the second EE11A. No termination on this one. Per-panel visualisation via
+the Solar Panel Visualizer Lovelace card.
 
-> **Blocker on stage 2**: the intended `taptap-mqtt` add-on needs an MQTT broker, and
-> this estate has had none since the orphaned integration was removed in June 2026.
-> Either stand a broker up or find a path into Home Assistant that does not need one.
-> Resolve this before wiring the tap, not after.
+The tap bridge went live on 2026-08-26 at `192.168.1.162`, serving the bus on port 7160.
+The route into Home Assistant is settled in ADR 0013: `taptap-mqtt` behind a Mosquitto
+broker, both Ansible-managed on the containers VM, with the add-on image run as an
+ordinary container. The broker blocker recorded here previously is resolved.
+
+**The CCA keeps its internet connection**, reversing what this section used to say. That
+line predated the discovery that TIGO EI is the only source of the panel-to-serial
+mapping - nothing on the bus carries panel position. The portal also stays the day-one
+cross-check for decoded values and the warranty-diagnosis channel, which is the same
+reasoning that kept SofarCloud alive in ADR 0007 and 0008.
+
+> **Prerequisite on stage 2**: capture all 30 optimizer serials with their panel
+> positions from TIGO EI before first deploy. Serials are optional in the bridge config,
+> but omitting them makes it assign discovered modules to randomly picked names, so the
+> data comes out confidently mislabelled rather than merely unlabelled, and cannot be
+> repaired retroactively.
 
 ## Gotchas
 
