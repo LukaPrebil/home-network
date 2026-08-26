@@ -35,40 +35,49 @@
     group: "{{ ansible_user }}"
     mode: '0644'
 
-- name: Pull Mosquitto Docker image
-  community.docker.docker_compose_v2:
-    project_src: "{{ mosquitto_base_dir }}"
-    pull: "always"
-  register: mosquitto_pull
-
-- name: Start Mosquitto service
-  community.docker.docker_compose_v2:
-    project_src: "{{ mosquitto_base_dir }}"
-    state: present
-  register: mosquitto_deploy
-  when: mosquitto_service_state != 'stopped'
-
 # The config notifies above must land before readiness is judged, or a broker
-# still running the previous config would pass the check.
+# still running the previous config would pass the check. meta tasks ignore
+# `when`, so this stays outside the check-mode block below; it is a no-op under
+# --check because nothing was actually written.
 - name: Apply pending Mosquitto restarts before the readiness check
   ansible.builtin.meta: flush_handlers
 
-# Mosquitto exposes no HTTP endpoint and writes no heartbeat file, so the
-# running container state is the readiness signal. The default('') keeps the
-# until null-safe while compose recreates.
-- name: Wait for Mosquitto container to be running
-  community.docker.docker_container_info:
-    name: "{{ mosquitto_container_name }}"
-  register: mosquitto_info
-  until: mosquitto_info.exists and (mosquitto_info.container.State.Status | default('')) == 'running'
-  retries: 30
-  delay: 5
-  when: mosquitto_service_state == 'started'
+- name: Deploy and verify Mosquitto (real-run only)
+  # Under --check the compose file above is only simulated, so docker_compose_v2
+  # fails outright with "does not contain docker-compose.yml" on a first deploy,
+  # and there is nothing live to health-check afterwards. Skip the chain rather
+  # than let --check fail on a host that has never run this role.
+  when: not ansible_check_mode
+  block:
+    - name: Pull Mosquitto Docker image
+      community.docker.docker_compose_v2:
+        project_src: "{{ mosquitto_base_dir }}"
+        pull: "always"
+      register: mosquitto_pull
 
-- name: Display Mosquitto deployment status
-  ansible.builtin.debug:
-    msg:
-      - "Mosquitto deployment complete!"
-      - "State: {{ mosquitto_service_state }}"
-      - "Broker: {{ mosquitto_endpoint }}"
-  when: mosquitto_service_state == 'started'
+    - name: Start Mosquitto service
+      community.docker.docker_compose_v2:
+        project_src: "{{ mosquitto_base_dir }}"
+        state: present
+      register: mosquitto_deploy
+      when: mosquitto_service_state != 'stopped'
+
+    # Mosquitto exposes no HTTP endpoint and writes no heartbeat file, so the
+    # running container state is the readiness signal. The default('') keeps the
+    # until null-safe while compose recreates.
+    - name: Wait for Mosquitto container to be running
+      community.docker.docker_container_info:
+        name: "{{ mosquitto_container_name }}"
+      register: mosquitto_info
+      until: mosquitto_info.exists and (mosquitto_info.container.State.Status | default('')) == 'running'
+      retries: 30
+      delay: 5
+      when: mosquitto_service_state == 'started'
+
+    - name: Display Mosquitto deployment status
+      ansible.builtin.debug:
+        msg:
+          - "Mosquitto deployment complete!"
+          - "State: {{ mosquitto_service_state }}"
+          - "Broker: {{ mosquitto_endpoint }}"
+      when: mosquitto_service_state == 'started'

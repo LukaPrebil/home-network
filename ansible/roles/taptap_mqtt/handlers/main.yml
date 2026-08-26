@@ -1,7 +1,11 @@
 ---
 # Handlers for taptap_mqtt role
 
+# Guarded for check mode: on a first --check run nothing has been written, so
+# docker_compose_v2 fails on the missing compose file before it ever gets to
+# simulate. Nothing needs restarting when nothing was applied.
 - name: Restart taptap-mqtt
   community.docker.docker_compose_v2:
     project_src: "{{ taptap_mqtt_base_dir }}"
     state: restarted
+  when: not ansible_check_mode
