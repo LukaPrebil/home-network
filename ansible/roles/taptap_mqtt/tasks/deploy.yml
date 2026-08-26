@@ -10,6 +10,7 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0600'
+  no_log: true  # don't print the rendered secret under --check --diff
   notify: Restart taptap-mqtt
 
 - name: Deploy taptap-mqtt Docker Compose file

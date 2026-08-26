@@ -24,6 +24,7 @@
     owner: "{{ mosquitto_uid }}"
     group: "{{ mosquitto_gid }}"
     mode: '0600'
+  no_log: true  # don't print the rendered secret under --check --diff
   notify: Restart Mosquitto
 
 - name: Deploy Mosquitto Docker Compose file
