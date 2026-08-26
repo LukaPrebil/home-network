@@ -33,7 +33,7 @@ chmod 600 "${WORK}/passwd"
 docker run -d --name mqtt-credcheck \
   -v "${WORK}/mosquitto.conf":/mosquitto/config/mosquitto.conf:ro \
   -v "${WORK}/passwd":/mosquitto/config/passwd:ro \
-  eclipse-mosquitto:2 >/dev/null
+  eclipse-mosquitto:2.1.2-alpine >/dev/null
 sleep 4
 
 check() { # label user password expected(0=should succeed,1=should fail)

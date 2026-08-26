@@ -5,7 +5,12 @@
 # group_vars/all/main.yml, because consumers on other hosts read it. Only
 # deployment-internal values belong here.
 
-mosquitto_version: "2.0.22"
+# Pinned to the 2.1 line on purpose. Mosquitto 2.1 changed the password-file
+# salt encoding, and 2.0.x rejects a 2.1-generated file with "Unable to decode
+# password salt ... removing entry" - which presents as every client being
+# refused with return code 5, not as a file error. Whatever generates the
+# hashes must be this exact tag; secrets.example.yml says so.
+mosquitto_version: "2.1.2-alpine"
 mosquitto_image: "eclipse-mosquitto:{{ mosquitto_version }}"
 mosquitto_base_dir: "/srv/docker/mosquitto"
 
