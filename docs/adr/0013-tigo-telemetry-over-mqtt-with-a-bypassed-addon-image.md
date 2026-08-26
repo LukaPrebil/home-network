@@ -82,6 +82,23 @@ Three parts of that will look wrong to a future reader, so each is recorded here
   IDs are gateway-assigned and unstable, serial frames appear rarely and mostly at night,
   and gateway membership is not string membership. All 30 serials come from TIGO EI
   before first deploy.
+- **Panel labels are provisional for roughly the first day, and that was accepted
+  deliberately.** Configuring the serials is necessary but not sufficient: the map the
+  operator supplies is position to serial, while the telemetry on the wire carries only a
+  gateway-assigned node ID. The missing serial-to-node-ID link arrives only in
+  enumeration frames, which are rare and mostly nocturnal - a 60 second capture on this
+  plant produced 68 power reports and zero barcode frames. Until one arrives per node,
+  the bridge assigns each node the first unused name in the list, so every panel reports
+  real values under a guessed label. It self-corrects on the first barcode frame
+  ("Permanently enumerated ... Delete invalid serial ...") and persists thereafter in the
+  state file, making this a one-time wait rather than a standing condition.
+
+  `NODES_AVAILABILITY_IDENTIFIED` would hide per-panel entities until their serial is
+  confirmed and avoid the mislabelled window entirely. It is left `false`: the operator
+  chose live data from the first day over a clean per-panel history. The cost is that
+  per-panel history for the deploy day is attributed to the wrong panels and stays that
+  way. String and plant aggregates are unaffected throughout, since a sum over all 30
+  modules is identical whichever label each carries.
 - **The CCA keeps its internet connection**, reversing the "blocked from the internet"
   line in the Stage 2 plan. That line predated the discovery that TIGO EI is the only
   source of the panel-to-serial mapping. The portal stays the day-one cross-check for
