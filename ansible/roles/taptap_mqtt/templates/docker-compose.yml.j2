@@ -1,0 +1,44 @@
+# Docker Compose for the taptap-mqtt TIGO bridge
+# Managed by Ansible - DO NOT EDIT MANUALLY
+#
+# This is a Home Assistant ADD-ON image run as an ordinary container, which is
+# why the entrypoint is overridden. The add-on's s6 init builds config.ini via
+# `bashio::config`, and in the bashio version baked into this image that resolves
+# to `bashio::api.supervisor GET /addons/self/options/config` - the Supervisor
+# API, not /data/options.json. Outside HAOS every config lookup errors, config.ini
+# never renders, and s6 halts the container. Mounting a hand-written
+# options.json does not help; older bashio read that file, this one does not.
+#
+# So we skip s6 and bashio entirely and invoke the bridge directly against a
+# config.ini we render ourselves. The image is then just a delivery vehicle for
+# the taptap binary and the bridge script. If a future tag moves either path,
+# this fails loudly at container start rather than misbehaving quietly.
+
+services:
+  taptap-mqtt:
+    image: {{ taptap_mqtt_image }}
+    container_name: {{ taptap_mqtt_container_name }}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: []
+    command: ["/usr/bin/taptap/taptap-mqtt.py", "/etc/taptap/config.ini"]
+    volumes:
+      - {{ taptap_mqtt_base_dir }}/config.ini:/etc/taptap/config.ini:ro
+      - {{ taptap_mqtt_base_dir }}/data:/data
+      - {{ taptap_mqtt_base_dir }}/run:/state
+    # Proves the loop is turning, nothing more. The bridge touches this file on
+    # every pass whether or not the bus produced data, so a stale file means a
+    # wedged or dead process; a silent bus shows up as HA entities going
+    # unavailable after TIMEOUT instead.
+    #
+    # The doubled $$ are compose escapes. A single $( is not valid interpolation
+    # syntax and compose rejects the file outright.
+    healthcheck:
+      test: ["CMD-SHELL", "test $$(( $$(date +%s) - $$(stat -c %Y /state/taptap.state) )) -lt {{ taptap_mqtt_heartbeat_max_age }}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "autoheal=true"

@@ -1,0 +1,41 @@
+{# Managed by Ansible - DO NOT EDIT MANUALLY.
+   Upstream's documented config format, rendered here instead of by the add-on's
+   own init script; see the compose template for why that script cannot run. #}
+[MQTT]
+SERVER = {{ mosquitto_host }}
+PORT = {{ mosquitto_port }}
+QOS = 1
+TIMEOUT = 5
+USER = {{ mosquitto_bridge_username }}
+PASS = {{ vault_mosquitto_bridge_password }}
+
+[TAPTAP]
+LOG_LEVEL = info
+BINARY = /usr/bin/taptap/taptap
+SERIAL =
+ADDRESS = {{ taptap_mqtt_address }}
+PORT = {{ taptap_mqtt_port }}
+MODULES = {{ vault_tigo_modules }}
+TOPIC_PREFIX = taptap
+TOPIC_NAME = tigo
+TIMEOUT = {{ taptap_mqtt_timeout }}
+UPDATE = {{ taptap_mqtt_update }}
+STATE_FILE = /data/taptap.json
+
+[HA]
+DISCOVERY_PREFIX = homeassistant
+DISCOVERY_LEGACY = false
+BIRTH_TOPIC = homeassistant/status
+NODES_AVAILABILITY_ONLINE = true
+NODES_AVAILABILITY_IDENTIFIED = false
+STRINGS_AVAILABILITY_ONLINE = true
+STRINGS_AVAILABILITY_IDENTIFIED = false
+STATS_AVAILABILITY_ONLINE = false
+STATS_AVAILABILITY_IDENTIFIED = false
+NODES_SENSORS_RECORDER = {{ taptap_mqtt_sensors_recorder }}
+STRINGS_SENSORS_RECORDER = {{ taptap_mqtt_sensors_recorder }}
+STATS_SENSORS_RECORDER = {{ taptap_mqtt_sensors_recorder }}
+
+[RUNTIME]
+MAX_ERROR = {{ taptap_mqtt_max_error }}
+RUN_FILE = /state/taptap.state

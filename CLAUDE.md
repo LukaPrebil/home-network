@@ -50,7 +50,16 @@ If you add new roles or tasks, keep the conventions already in the tree so lint 
 
 ## Running Playbooks
 
-Vault password is read from `.vault_pass` via `ansible.cfg`. Never use `--ask-vault-pass`.
+Secrets are SOPS-encrypted (ADR 0006) and decrypted automatically by the
+`community.sops` vars plugin configured in `ansible.cfg`. The age key lives at
+`~/.config/sops/age/keys.txt`. There is no Ansible Vault and no `--ask-vault-pass`.
+
+**The `sops` CLI needs to be told where that key is; Ansible does not.** `ansible.cfg`
+sets `age_keyfile` for the vars plugin, but the bare CLI defaults to the macOS
+user-config dir (`~/Library/Application Support/sops/age/keys.txt`) and fails with
+"identity did not match any of the recipients". Either export
+`SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt` or symlink the macOS path at the XDG
+one. Use `sops <file>` to edit; `sops decrypt` dumps plaintext to stdout.
 
 ```bash
 ansible-playbook site.yml                                          # Full convergence

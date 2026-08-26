@@ -36,6 +36,22 @@ docker_socket_proxy_container_name: "docker-socket-proxy"
 docker_socket_proxy_port: 2375
 docker_socket_proxy_endpoint: "tcp://{{ docker_socket_proxy_container_name }}:{{ docker_socket_proxy_port }}"
 
+# MQTT broker contract (served by the mosquitto role on the containers VM;
+# consumed by the taptap_mqtt bridge on the same host and by Home Assistant on
+# another). Declared here rather than in the role because a consumer on a
+# different host has to resolve the same address, port and credential names.
+#
+# One credential per client, never a shared one: the broker's own log is then
+# the record of which client connected, and rotating one does not disturb the
+# others. Adding a consumer means adding a credential here plus a line in the
+# sops-held password file - not a refactor.
+mosquitto_container_name: "mosquitto"
+mosquitto_port: 1883
+mosquitto_host: "{{ hostvars['containers']['ansible_host'] }}"
+mosquitto_endpoint: "{{ mosquitto_host }}:{{ mosquitto_port }}"
+mosquitto_bridge_username: "taptap"
+mosquitto_ha_username: "homeassistant"
+
 # Timezone
 timezone: Europe/Ljubljana
 

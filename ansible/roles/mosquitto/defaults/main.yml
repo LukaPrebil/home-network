@@ -1,0 +1,22 @@
+---
+# Mosquitto MQTT broker - default configuration
+#
+# The host/port/credential contract this broker publishes lives in
+# group_vars/all/main.yml, because consumers on other hosts read it. Only
+# deployment-internal values belong here.
+
+# Pinned to the 2.1 line on purpose. Mosquitto 2.1 changed the password-file
+# salt encoding, and 2.0.x rejects a 2.1-generated file with "Unable to decode
+# password salt ... removing entry" - which presents as every client being
+# refused with return code 5, not as a file error. Whatever generates the
+# hashes must be this exact tag; secrets.example.yml says so.
+mosquitto_version: "2.1.2-alpine"
+mosquitto_image: "eclipse-mosquitto:{{ mosquitto_version }}"
+mosquitto_base_dir: "/srv/docker/mosquitto"
+
+# The image drops privileges to this uid/gid. The data directory and the
+# password file must be owned by it or the broker exits on start.
+mosquitto_uid: 1883
+mosquitto_gid: 1883
+
+mosquitto_service_state: "started"

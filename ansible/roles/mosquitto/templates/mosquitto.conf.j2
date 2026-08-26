@@ -1,0 +1,13 @@
+# Managed by Ansible - DO NOT EDIT MANUALLY
+
+listener {{ mosquitto_port }}
+allow_anonymous false
+password_file /mosquitto/config/passwd
+
+persistence true
+persistence_location /mosquitto/data/
+
+log_dest stdout
+log_type error
+log_type warning
+log_type notice

@@ -1,0 +1,41 @@
+---
+# taptap_mqtt - TIGO optimizer telemetry bridge
+#
+# Reads the TIGO CCA's RS485 bus through the tap bridge and publishes per-module
+# telemetry to MQTT with Home Assistant discovery. Broker address and credential
+# names come from the mosquitto_* contract in group_vars/all/main.yml.
+
+taptap_mqtt_version: "0.3.4"
+taptap_mqtt_image: "ghcr.io/litinoveweedle/hassio-addon-taptap:{{ taptap_mqtt_version }}"
+taptap_mqtt_container_name: "taptap-mqtt"
+taptap_mqtt_base_dir: "/srv/docker/taptap-mqtt"
+
+# The tap bridge: an Elfin EE11A on the TIGO CCA's GW/TAP port, serving the bus
+# as a raw TCP stream. Read-only by construction - it drives the RS485
+# transmitter only when a TCP client writes, and this bridge never does.
+taptap_mqtt_address: "192.168.1.162"
+taptap_mqtt_port: 7160
+
+# How often module state is published, in seconds.
+taptap_mqtt_update: 10
+
+# Seconds without a message before a module is declared offline in HA. This,
+# not the heartbeat, is what surfaces a silent bus.
+taptap_mqtt_timeout: 180
+
+# Sensors given a state_class in the discovery payload, and therefore kept as
+# long-term statistics after the recorder purges raw history. The other sensors
+# are still recorded, they just do not accumulate 5-minute aggregates forever.
+taptap_mqtt_sensors_recorder: "energy,power"
+
+# Consecutive recoverable errors before the process exits. Upstream's add-on
+# ships 0, meaning retry forever, which leaves a wedged bridge running and
+# invisible. A finite budget lets it die so the restart policy can act.
+taptap_mqtt_max_error: 15
+
+# Staleness threshold for the heartbeat file, in seconds. The bridge touches it
+# on every pass of a one-second loop, so anything beyond a few seconds is
+# already generous.
+taptap_mqtt_heartbeat_max_age: 60
+
+taptap_mqtt_service_state: "started"
