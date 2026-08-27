@@ -7,10 +7,10 @@ For the plant itself (array, battery, enclosure, network addresses) see
 [`sofar-modbus-findings.md`](sofar-modbus-findings.md). For the decisions, see ADR 0007
 (control never over the stick) and ADR 0008 (nothing at all over the stick).
 
-> **Nothing here has been read off the actual inverter yet.** The register map is
-> inherited research and the plant has never been polled locally, because the logger
-> stick serves no local protocol on its current firmware. Local telemetry begins when
-> the wired bridge is installed. Correct this map against the hardware at that point.
+> **Read off the actual inverter on 2026-08-21**, over the wired bridge. The register map
+> below was inherited research until then, and the battery block in it was wrong: the
+> whole `0x02xx` range is unimplemented on this firmware. Addresses corrected here have
+> been verified against the hardware. Anything not marked as verified is still inherited.
 
 ## Protocol lineage
 
@@ -32,11 +32,11 @@ shared.
 
 ## Transport
 
-One path. A wired Elfin EE11A on the inverter's COM port.
+One path. A wired Elfin EE11A on the inverter's Link0 monitoring bus.
 
 | Path | Use | Status |
 |---|---|---|
-| Elfin EE11A on the inverter COM port | Everything | Ordered 2026-08-07, roughly a month out |
+| Elfin EE11A on the inverter's Link0 monitoring bus | Everything | Live at `192.168.1.161:502` since 2026-08-21 |
 | LSW-3 Wi-Fi logger stick, `192.168.1.6:8899` | Nothing. SofarCloud only | Ruled out, see findings |
 
 The stick was originally intended to carry monitoring while the wired bridge carried
@@ -59,9 +59,80 @@ so warranty is the only recourse left.
 
 ### Wiring the bridge
 
-Inverter COM port, RS485: pin 1/2 is A+, pin 3/4 is B-, 120 ohm termination,
-9600/8-N-1. An RJ45 to screw-terminal breakout avoids crimping a custom plug into the
-inverter and is reversible if the pinout is wrong first time.
+The COM port is not a pin block. It is a bank of six RJ45 jacks plus a dry-contact
+terminal, and two of those jacks carry RS485 in opposite master/slave roles.
+
+| Jack | Pin 1 (orange/white) | Pin 2 (orange) | Inverter's role |
+|---|---|---|---|
+| Meter/CT | Meter RS485 A | Meter RS485 B | Master, polls the DTSU666 |
+| Link0 / Link1 | Upper computer RS485 A | Upper computer RS485 B | Slave, answers an external master |
+
+**The bridge lands on Link0.** "Upper computer" is the vendor's term for a host or SCADA
+master, so that is the slave-side monitoring bus. Anything attached to Meter/CT competes
+with the inverter for the bus instead of being answered by it.
+
+```mermaid
+flowchart LR
+    subgraph INV["SOFAR ESI 12K-T1"]
+        LINK0["COM Link0, pins 1+2<br/>inverter is slave"]
+        METER["COM Meter/CT, pins 1+2<br/>inverter is master"]
+        DRY["COM dry contact<br/>DI NO / DI COM"]
+        DONGLE["Wi-Fi/4G port<br/>LSW-3 stick"]
+    end
+
+    subgraph CAB["Solar control cabinet"]
+        EE1["Bridge 1, elfin-inverter<br/>192.168.1.161<br/>Modbus TCP gateway"]
+        EE2["Bridge 2, elfin-tigo<br/>192.168.1.162<br/>transparent, listen only"]
+        CCA["TIGO CCA<br/>GW/TAP"]
+        DTSU["DTSU666<br/>A24 / B25 unused"]
+        PSU2["24 V PSU, 15 W"]
+        PSU1["Delta 24 V, 10 W"]
+        SW["Unmanaged switch"]
+        ES["E-STOP chain"]
+    end
+
+    HA["Home Assistant"]
+    CLOUD["SofarCloud"]
+
+    LINK0 == "RS485 A / B, 9600 8-N-1<br/>no termination" ==> EE1
+    METER -. "abandoned meter pair<br/>capped, lands on nothing" .-> DTSU
+    DRY --- ES
+    CCA == "passive parallel tap<br/>no termination" ==> EE2
+    DONGLE -. "warranty diagnostics only" .-> CLOUD
+
+    PSU2 -- "24 V" --> EE1
+    PSU2 -- "24 V" --> EE2
+    PSU1 -- "24 V" --> CCA
+    PSU1 -- "24 V" --> SW
+
+    EE1 == "Modbus TCP 502" ==> SW
+    EE2 == "raw TCP" ==> SW
+    SW ==> HA
+
+    classDef dead stroke-dasharray: 4 4
+    class METER,DTSU dead
+```
+
+Thick edges are the RS485 and Modbus data path. Dashed is abandoned or cloud-only.
+The two bridges run **opposite modes**: bridge 1 is an active master that polls the
+inverter, bridge 2 is a silent listener on a bus the CCA already masters. Nothing may
+ever write to bridge 2's socket, because transparent mode will push whatever it receives
+onto the bus and collide with the CCA.
+
+Because both buses use pins 1 and 2 of an RJ45, a cable moves between them unchanged.
+The pair the installer ran for the meter was repurposed by moving its plug from Meter/CT
+to Link0, so no new cable and no crimping were needed. Serial is 9600/8-N-1.
+
+**No termination and no separate ground conductor on this link.** At 9600 baud over a few
+metres a reflection settles within about 0.03 percent of a bit period, so termination is
+not merely redundant: two 120 ohm resistors put 60 ohm across the pair and fight the
+receivers' failsafe bias, which produces the intermittent framing errors it was supposed
+to prevent. Both ends already share protective earth, so a ground conductor would add a
+loop path rather than remove a common-mode offset. If CRC errors ever do appear, adding a
+resistor across A and B at the bridge is a two-minute change.
+
+If the inverter does not answer at all, swap A and B before investigating anything else.
+Reversed polarity presents as total silence rather than corruption.
 
 **Use the EE11A, not the plain EE11.** The EE11 accepts 5-18 VDC; the enclosure's Delta
 supply is 24 V. Only the EE11A spans 5-36 VDC and can be fed directly from the existing
@@ -115,6 +186,19 @@ raw values.
 
 ### Monitoring (read-only)
 
+**The whole `0x02xx` block is unimplemented on this firmware.** A read of `0x0200`,
+`0x020D`, `0x0210` or `0x0211` returns Modbus exception 2, illegal data address, while
+the `0x04xx`, `0x05xx` and `0x06xx` blocks answer normally. The battery rows below were
+originally inherited from HYD research pointing at `0x02xx`; they are corrected here to
+the addresses the hardware actually serves, read off the plant on 2026-08-21 over the
+wired bridge.
+
+The battery readings were cross-checked rather than assumed: `0x0604` x `0x0605` gives
+412.2 V x 8.14 A = 3355 W, which matches `0x0606` at 3350 W, and `0x0608` read 87 while
+the operator independently reported the pack at 87 percent. Every address below was then
+confirmed a second time against the entities `homeassistant-solax-modbus` produces once
+it is running, which map one-to-one onto this table.
+
 | Parameter | Hex | Dec | Type | Scale | Unit |
 |---|---|---|---|---|---|
 | PV1 Voltage | 0x0584 | 1412 | U16 | x0.1 | V |
@@ -123,11 +207,13 @@ raw values.
 | PV2 Voltage | 0x0587 | 1415 | U16 | x0.1 | V |
 | PV2 Current | 0x0588 | 1416 | U16 | x0.01 | A |
 | PV2 Power | 0x0589 | 1417 | U16 | x10 | W |
-| Battery SOC | 0x0210 | 528 | U16 | 1 | % |
-| Battery SOH | 0x0211 | 529 | U16 | 1 | % |
 | Battery Voltage | 0x0604 | 1540 | U16 | x0.1 | V |
 | Battery Current | 0x0605 | 1541 | I16 | x0.01 | A |
-| Battery Power | 0x020D | 525 | I16 | x10 | W (+ charge, - discharge) |
+| Battery Power | 0x0606 | 1542 | I16 | x10 | W (+ charge, - discharge) |
+| Battery Temperature | 0x0607 | 1543 | U16 | 1 | C |
+| Battery SOC | 0x0608 | 1544 | U16 | 1 | % |
+| Battery SOH | 0x0609 | 1545 | U16 | 1 | % |
+| Battery Cycle Count | 0x060A | 1546 | U16 | 1 | cycles |
 | Battery Temperature | 0x0608 | 1544 | I16 | 1 | C |
 | Battery Cycles | 0x0212 | 530 | U16 | 1 | cycles |
 | Grid Total Power (PCC) | 0x0488 | 1160 | I16 | x10 | W (+ export, - import) |
@@ -199,14 +285,89 @@ range but are normally set from the inverter's LCD menu or the installer app rat
 than over Modbus. Treat island mode as out of scope for automation until someone maps
 those registers.
 
+## Energy dashboard
+
+Home Assistant's energy configuration is not reachable through `ha-mcp`. It lives in
+`.storage/energy` behind the `energy/save_prefs` websocket call, so the mapping is set by
+hand under Settings, Dashboards, Energy.
+
+| Section | Entity |
+|---|---|
+| Grid consumption | `sensor.utility_sofar_inverter_import_energy_total` |
+| Return to grid | `sensor.utility_sofar_inverter_export_energy_total` |
+| Solar panels | `sensor.utility_sofar_inverter_solar_generation_total` |
+| Battery, energy going in | `sensor.utility_sofar_inverter_battery_input_energy_total` |
+| Battery, energy coming out | `sensor.utility_sofar_inverter_battery_output_energy_total` |
+
+Use the `_total` sensors, never the `_today` ones. The dashboard wants monotonic lifetime
+counters and derives daily figures itself; a sensor that resets to zero at midnight
+corrupts its statistics.
+
+### Both power sensors need the Inverted sign convention
+
+This inverter reports power with the opposite sign to what Home Assistant assumes, on
+**both** the battery and the grid. In each section of the energy configuration, set **Type
+of power measurement** to **Inverted**, not Standard.
+
+| Sensor | This inverter | HA "Standard" expects |
+|---|---|---|
+| `battery_power_total` | positive = charging | positive = discharging |
+| `active_power_pcc_total` | positive = exporting | positive = importing |
+
+Left on Standard, each fault inflates reported household consumption by **twice** the flow
+it gets wrong, because the quantity is added where it should have been subtracted. Observed
+on 2026-08-21: with the house actually drawing 0.48 kW while exporting 7.73 kW and charging
+at 2.7 kW, the dashboard read 17 kW and attributed nearly all of it to "Untracked
+consumption".
+
+The trap is that this is invisible in the Summary and Totals views, which read the kWh
+counters and stay correct. Only the "Now" tab and the live Sankey use the power sensors, so
+a plant can look perfectly healthy on the energy totals while the live view is nonsense.
+Verify the sign against a known state rather than a quiet moment: check while the battery is
+charging hard or the plant is exporting strongly, because near zero crossing the sign cannot
+be read off at all.
+
+Two more things not to be caught by. The `ed_mapping_present` attribute these sensors carry is
+**not** a way to check whether the mapping took: it reads `false` even on sensors the
+energy dashboard is demonstrably using. Read the dashboard itself instead. And the history
+starts the day the entities are created and cannot be backfilled, because Home Assistant
+has no long-term statistics from before they existed. The lifetime counters arrive already
+populated, but the hourly shape of everything earlier lives only in SofarCloud.
+
+The integration also ships a separate `Sofar Energy Dashboard` device carrying three
+switches that gate optional sensors. Home Consumption and Grid to Battery are on; PV
+Variant Detail is off, because per-string power is already exposed and TIGO covers
+per-panel. Home Consumption produces
+`sensor.utility_sofar_inverter_load_consumption_total`, which the energy dashboard does
+not consume directly (it derives consumption from the other flows) but which is useful
+elsewhere. Grid to Battery produces nothing while the inverter runs Self Use, since the
+battery only ever charges from surplus; expect those sensors to appear once Passive Mode
+starts charging from the grid across **Blok** boundaries.
+
+The figures reconcile against each other. Taking a reading on 2026-08-21: 864.7 kWh
+generated, 529.4 exported, 145.7 into the battery and 110.4 back out, 3.4 imported, with
+about 17 kWh still stored at 92 percent SOC. That leaves roughly 18 kWh of battery
+round-trip loss and about 58 kWh unaccounted against a reported load of 245.1 kWh, which
+is near 7 percent of generation and is the conversion loss the utility room feels as
+**plant heat**.
+
+**Treat grid import with suspicion until it is checked against the utility meter.** The
+DTSU666 is bypassed, so the inverter measures grid exchange with its own internal CTs and
+there is no independent meter to cross-check. A lifetime import of 3.4 kWh against 529.4
+kWh exported is plausible for a young plant in August with 13.65 kWp and 18.5 kWh usable
+storage, but it is also exactly what would appear if those CTs measure only what passes
+through the inverter rather than the whole house at the point of connection. If the two
+diverge over a few days, restoring the meter stops being out of scope.
+
 ## Plan
 
 There is no cheap interim step. Nothing happens in Home Assistant until the bridge is
 wired, so the plan is two stages, not three.
 
-**Stage 1, monitoring and control together.** When the EE11A arrives: wire it to the
-inverter COM port with 120 ohm termination and an RJ45 breakout, power it from the 24V
-rail, give it a LAN address and record it here and in the network doc. Install
+**Stage 1, monitoring and control together.** Wire the EE11A to the inverter's Link0 jack,
+pins 1 and 2, with no termination. Power it from its own 24 V supply rather than the Delta,
+which already carries the TIGO CCA and the switch on a 10 W budget. Give it a static
+address plus a DHCP reservation, and record both here and in the network doc. Install
 `homeassistant-solax-modbus` via HACS and point it at the bridge. No code editing, the
 `SH1` prefix is handled upstream. Confirm entities enumerate and the energy dashboard
 populates before writing anything. Once reads are stable, Passive Mode control can
@@ -235,6 +396,21 @@ reasoning that kept SofarCloud alive in ADR 0007 and 0008.
 
 ## Gotchas
 
+- **Turn the battery pack sweep off, or no sensors appear at all.** With it enabled the
+  integration loops over battery packs reading a per-pack serial that this inverter does
+  not serve, and the sensor platform blows through its 60 second startup budget. HA logs
+  `cannot get serial for batt_nr: 0, batt_pack_nr: 0`, then `Setup of platform
+  solax_modbus is taking longer than 60 seconds`, and you end up with buttons, numbers and
+  selects but zero sensors. The other platforms set up fine, which makes it look like a
+  partial success rather than a stall. Disabling the sweep brings all 91 sensors up
+  immediately. This is not a transport problem: every Modbus read on this bridge returns
+  in under 0.2 seconds, including the ones that fail.
+- **Per-pack battery data is not on Modbus.** SofarCloud shows all four BTS-5K packs
+  individually with serial, BMS version, voltage, current, power and SOC. None of that is
+  reachable over the wired bridge: a sweep of `0x0000` to `0x2000` finds the ASCII marker
+  `SH` exactly once, at `0x0445`, which is the inverter's own serial. The pack serials
+  (`SH2004400VE...`) appear nowhere. Only the aggregate at `0x0604` to `0x060A` is
+  available locally. If per-pack telemetry is ever needed, the cloud is the only source.
 - The logger stick answers nothing on 8899 despite the port being open. Do not spend an
   evening on it; read the findings document first.
 - The EEPROM has a finite write-cycle budget. Only the Passive Mode registers and the

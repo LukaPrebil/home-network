@@ -79,6 +79,20 @@ protocol, so it carries nothing locally and is not a data source.
 _Avoid_: conflating it with the **inverter bridge**. Both reach the same inverter; only
 the bridge can be read or written.
 
+**Monitoring bus**:
+The RS485 pair on the inverter's Link0 (or Link1) COM jack, pins 1 and 2, which the
+manual labels "Upper computer RS485A/B". The inverter is a Modbus *slave* here, so
+whatever attaches becomes the master. This is where the **inverter bridge** lands.
+_Avoid_: "the COM port" - that is a bank of six RJ45 jacks plus a dry-contact block, and
+two of those jacks carry RS485 in opposite master/slave roles.
+
+**Meter bus**:
+The RS485 pair on the inverter's Meter/CT COM jack, pins 1 and 2, intended for the
+DTSU666's terminals A(24) and B(25). The inverter is the *master* here, polling the meter.
+Bypassed at commissioning: the pair was run into the cabinet but left unlanded, and the
+inverter senses grid power from its own internal CTs instead.
+_Avoid_: attaching anything to this pair. A second master on it collides with the inverter.
+
 **Inverter bridge**:
 The Elfin EE11A on the SOFAR inverter's COM port, carrying Modbus RTU at 9600 in both
 directions; the only path by which **Passive Mode** can be read or written. Needs 120
@@ -239,6 +253,7 @@ its empty target list asks of it.
 - **Passive Mode** is reachable only over the **inverter bridge**; the **logger stick** answers no local protocol at all, so it can be neither read nor written
 - The **inverter bridge** and the **tap bridge** are the same hardware in the same enclosure and are opposite in every property that matters: one is read-write and must be terminated, the other is read-only and must not be
 - A **module** is reported under a **node ID** that belongs to one **TAP gateway**, but its panel position comes only from TIGO EI - nothing on the bus carries it
+- The **monitoring bus** and the **meter bus** both leave the inverter as RS485 on pins 1 and 2 of an RJ45 jack, so a cable moves between them unchanged; only the jack it is plugged into decides whether the inverter answers or competes
 - **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
 - The **NFS readiness gate** delays only *later* **startup order groups**, so any guest sharing order=1 with the TrueNAS VM starts ungated
 - **Storage ready** cannot be true before the **grace period** ends; any probe that goes green earlier is measuring something other than what guests need
