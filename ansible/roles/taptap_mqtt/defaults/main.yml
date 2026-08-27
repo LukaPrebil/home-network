@@ -39,3 +39,8 @@ taptap_mqtt_max_error: 15
 taptap_mqtt_heartbeat_max_age: 60
 
 taptap_mqtt_service_state: "started"
+
+# Number of optimizers declared in vault_tigo_modules, used to judge whether
+# enumeration is complete. Derived rather than hard-coded so it stays right if
+# the plant grows.
+taptap_mqtt_module_count: "{{ vault_tigo_modules.split(',') | length }}"

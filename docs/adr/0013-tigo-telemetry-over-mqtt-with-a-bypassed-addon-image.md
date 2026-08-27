@@ -89,9 +89,23 @@ Three parts of that will look wrong to a future reader, so each is recorded here
   enumeration frames, which are rare and mostly nocturnal - a 60 second capture on this
   plant produced 68 power reports and zero barcode frames. Until one arrives per node,
   the bridge assigns each node the first unused name in the list, so every panel reports
-  real values under a guessed label. It self-corrects on the first barcode frame
-  ("Permanently enumerated ... Delete invalid serial ...") and persists thereafter in the
-  state file, making this a one-time wait rather than a standing condition.
+  real values under a guessed label.
+
+  **Correction, 2026-08-27.** This bullet originally claimed the guess self-corrects on
+  the first barcode frame. It does not, and the failure is silent. taptap did learn the
+  full topology overnight and persisted it at 06:38, but the bridge left all 30 panels on
+  their guessed names for hours afterwards: when an infrastructure report arrives *after*
+  temporary mappings already exist, the bridge does not reconcile them. Nothing is logged
+  and nothing raised. The obvious health signal actively misleads - `nodes_identified_count`
+  read 30 throughout, because it counts nodes holding any node ID, guessed or confirmed.
+  The only true signal is the count of `Permanently enumerated` lines, which sat at 0.
+
+  Ordering is the whole problem, so a restart is the whole fix: with the state file
+  already on disk, taptap emits the infrastructure report before any power report and all
+  30 bind immediately. Since taptap persists what it learns, this can only bite a run that
+  begins with no state file - a first deploy, or a lost volume. The `taptap_mqtt` role now
+  detects exactly that (topology present, bindings incomplete) and restarts once, rather
+  than failing loudly and handing the operator the same restart to perform by hand.
 
   `NODES_AVAILABILITY_IDENTIFIED` would hide per-panel entities until their serial is
   confirmed and avoid the mislabelled window entirely. It is left `false`: the operator

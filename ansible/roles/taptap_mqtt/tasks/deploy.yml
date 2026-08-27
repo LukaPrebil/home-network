@@ -80,6 +80,85 @@
         success_msg: "taptap-mqtt heartbeat is fresh."
       when: taptap_mqtt_service_state == 'started'
 
+
+    # Enumeration self-heal.
+    #
+    # The bridge binds panel names to optimizers in two ways. Power reports
+    # carry only a gateway-assigned node ID, so on a first start it assigns each
+    # node the first unused name in the list - a guess. The real binding arrives
+    # in taptap's infrastructure report, which carries each node's barcode.
+    #
+    # The defect: when that report arrives AFTER temporary mappings already
+    # exist, the bridge does not reconcile them. It logs nothing, raises
+    # nothing, and every panel keeps its guessed name indefinitely. Worse, the
+    # obvious health signal lies - nodes_identified_count reads 30 because it
+    # counts nodes holding any node ID, confirmed or guessed.
+    #
+    # taptap persists the topology it learns, so the ordering is only wrong on
+    # a run that begins with no state file. Once the file exists, a restart
+    # processes the infrastructure report before any power report and all
+    # bindings resolve. That is the whole fix, hence a restart rather than an
+    # assertion: failing loudly would just hand the operator the same restart.
+    #
+    # Observed 2026-08-27: state file written at 06:38, still 0 of 30 bound
+    # hours later; one restart bound all 30.
+    - name: Read taptap-mqtt container state
+      community.docker.docker_container_info:
+        name: "{{ taptap_mqtt_container_name }}"
+      register: taptap_mqtt_state
+      changed_when: false
+
+    - name: Check whether taptap has persisted a topology yet
+      ansible.builtin.stat:
+        path: "{{ taptap_mqtt_base_dir }}/data/taptap.json"
+      register: taptap_mqtt_topology
+
+    - name: Count optimizers bound to a barcode since container start
+      ansible.builtin.shell: >
+        set -o pipefail &&
+        docker logs --since '{{ taptap_mqtt_state.container.State.StartedAt }}'
+        {{ taptap_mqtt_container_name }} 2>&1
+        | grep -c 'Permanently enumerated' || true
+      args:
+        executable: /bin/bash
+      register: taptap_mqtt_bound
+      changed_when: false
+      when: taptap_mqtt_topology.stat.exists
+
+    # Only ever fires when a topology is known but unbound - never on a genuine
+    # first run, where there is nothing to bind to yet.
+    - name: Restart taptap-mqtt to bind optimizers against the known topology
+      community.docker.docker_compose_v2:
+        project_src: "{{ taptap_mqtt_base_dir }}"
+        state: restarted
+      when:
+        - taptap_mqtt_topology.stat.exists
+        - (taptap_mqtt_bound.stdout | int) < (taptap_mqtt_module_count | int)
+
+    - name: Recount optimizers bound to a barcode after the restart
+      ansible.builtin.shell: >
+        set -o pipefail &&
+        docker logs --tail 2000 {{ taptap_mqtt_container_name }} 2>&1
+        | grep -c 'Permanently enumerated' || true
+      args:
+        executable: /bin/bash
+      register: taptap_mqtt_rebound
+      until: (taptap_mqtt_rebound.stdout | int) >= (taptap_mqtt_module_count | int)
+      retries: 12
+      delay: 5
+      changed_when: false
+      when:
+        - taptap_mqtt_topology.stat.exists
+        - (taptap_mqtt_bound.stdout | int) < (taptap_mqtt_module_count | int)
+
+    - name: Report optimizer binding state
+      ansible.builtin.debug:
+        msg: >-
+          {{ taptap_mqtt_module_count }} optimizers configured;
+          {{ 'topology not yet learned - panel names stay provisional until the bus reports barcodes'
+             if not taptap_mqtt_topology.stat.exists
+             else 'all bound to their barcodes' }}
+      when: taptap_mqtt_service_state == 'started'
     - name: Display taptap-mqtt deployment status
       ansible.builtin.debug:
         msg:
