@@ -1,13 +1,29 @@
 ---
+# `apply` is what makes --tags taptap reach the tasks inside these files.
+# Tags on a dynamic include select the include itself; without apply, the
+# included tasks carry only the play's tags, so a narrow --tags run walks in
+# and does nothing while reporting success.
 - name: Include directory setup tasks
-  ansible.builtin.include_tasks: directories.yml
+  ansible.builtin.include_tasks:
+    file: directories.yml
+    apply:
+      tags:
+        - taptap
+        - tigo
+        - directories
   tags:
     - taptap
     - tigo
     - directories
 
 - name: Include deployment tasks
-  ansible.builtin.include_tasks: deploy.yml
+  ansible.builtin.include_tasks:
+    file: deploy.yml
+    apply:
+      tags:
+        - taptap
+        - tigo
+        - deploy
   tags:
     - taptap
     - tigo
