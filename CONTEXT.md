@@ -69,9 +69,23 @@ credited and carries forward indefinitely; there is no lock-in and no exit penal
 Individual samooskrba today, with community samooskrba possible later.
 
 **Viški / manki**:
-Surplus and deficit against the metering point over a settlement period. Viški are
-credited at a much lower rate than manki are charged, which is why self-consumption
-beats export.
+Energy exported from and taken by the metering point over one **obračunsko obdobje**.
+Viški are credited at a much lower rate than manki are charged, which is why
+self-consumption beats export.
+
+**Obračunsko obdobje**:
+The settlement period for samooskrba, which under the ZSROVE monthly scheme is the
+calendar month.
+_Avoid_: "billing year" (the annual net settlement belongs to the older EZ-1 scheme)
+
+**Dobroimetje**:
+The monetary credit viški earn, netted against the same month's electricity bill and
+carried forward against future invoices with no expiry once it exceeds one bill.
+_Avoid_: treating it as banked kWh - it is euros at the viški rate, not energy
+
+**Gross-import rule**:
+Omrežnina, prispevki and trošarina are billed on the whole quantity taken from the
+grid, never on import net of export, so an exported kWh relieves no network charge.
 
 **Logger stick**:
 The SOFAR LSW-3 Wi-Fi dongle that talks to SofarCloud. Port 8899 is open but answers no
@@ -157,6 +171,44 @@ moisture, which is a different decision with a different trigger.
 _Avoid_: comparing absolute humidity in g/m3. It is volumetric, so it shifts as incoming air
 warms to room temperature and reports a gradient across an exchange that moves no moisture at
 all. Dew point is the invariant the room settles at. Relative humidity is wronger still.
+
+### Indoor climate
+
+**Room-air sensor**:
+A temperature or humidity entity measuring air a person breathes in a room of the house.
+The only kind that belongs in `sensor.average_temperature` and `sensor.average_humidity`.
+Membership is declared by the `indoor_climate` label and is never inferred from
+`device_class`, because the useful line is what the sensor measures rather than where its
+device sits.
+_Avoid_: "indoor sensor" - the SOFAR inverter heatsink is indoors and is not one.
+
+**Apparatus sensor**:
+A temperature entity reporting a machine's own temperature rather than room air: an inverter
+heatsink, a battery pack, a PV panel, a CPU. Whether the machine is indoors is irrelevant;
+what disqualifies it is that nobody breathes it. Roughly 43 of these entered the house
+average when TIGO and SOFAR telemetry landed, taking `sensor.average_temperature` to 47 C on
+an August afternoon.
+
+**Whole-house ventilation**:
+The decision to open house windows to drop indoor moisture, judged by the average room dew
+point against a smoothed ARSO dew point. Distinct from **free cooling**, which purges one
+room through its own window on its own threshold. The two read the same ARSO feed and answer
+different questions.
+
+**Ventilation window**:
+A window whose open state counts as the house being aired, declared by the
+`ventilation_window` label. `binary_sensor.utility_okno` is deliberately excluded: it is the
+**free cooling** purge path, it stood open about 80% of one sample week, and it was open at
+07:30 on all 8 sampled mornings, so admitting it would suppress the morning reminder every
+day.
+
+**Station wander**:
+The 1 to 2 K the ARSO dew point moves inside a single hour, occasionally 3 K, being an
+airport reading 25 km away reported at 0.1 K resolution. Larger than any deadband worth
+applying, so a rule comparing it against a slow indoor average has to smooth it rather than
+widen around it.
+_Avoid_: treating it as sensor noise. The station is reporting real air; it is just not
+reporting this house's air.
 
 ### Guest autostart (n5p)
 
@@ -255,6 +307,8 @@ its empty target list asks of it.
 - A **module** is reported under a **node ID** that belongs to one **TAP gateway**, but its panel position comes only from TIGO EI - nothing on the bus carries it
 - The **monitoring bus** and the **meter bus** both leave the inverter as RS485 on pins 1 and 2 of an RJ45 jack, so a cable moves between them unchanged; only the jack it is plugged into decides whether the inverter answers or competes
 - **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
+- The **gross-import rule** is what widens that spread: a self-consumed kWh avoids energy, omreznina, prispevki, trosarina and the DDV on all of it, while an exported kWh earns only the viski rate plus DDV
+- **Dobroimetje** carries across an **obračunsko obdobje** boundary but never expires, so surplus value is deferred rather than lost
 - The **NFS readiness gate** delays only *later* **startup order groups**, so any guest sharing order=1 with the TrueNAS VM starts ungated
 - **Storage ready** cannot be true before the **grace period** ends; any probe that goes green earlier is measuring something other than what guests need
 - A guest whose **start budget** expires while the **grace period** is still running fails permanently - `startall` never retries a failed guest and still reports `TASK OK`
@@ -268,6 +322,10 @@ its empty target list asks of it.
 - A **blind source** and a **respawned crash** fail identically from the outside: the evidence that would show a problem is absent rather than negative, so every liveness check reads green. Both are found only by asking a component to account for its own throughput - target count for the source, log lines for the supervisor - never by asking whether it is running
 - The taptap bridge is a **blind source** by default: if the **tap bridge** or the CCA goes quiet it keeps running and keeps its MQTT connection open, so its LWT never fires and a container-running probe stays green. Its heartbeat file is the only thing that accounts for its own throughput
 - A **blind source** silently disables every alert reading its stream, so the alert going quiet is the symptom; on `job="system"` that is Error Log Spike, Service Crash Detected and Authentication Failure Spike at once
+- A **room-air sensor** enters the house averages by label; an **apparatus sensor** never does, whatever room its machine stands in
+- **Whole-house ventilation** and **free cooling** read the same ARSO dew point and are opposite in stability: opening the utility window pulls that room toward outdoor and deeper inside its deadband, while opening house windows pulls the house average toward outdoor and out of the ventilation condition. Free cooling therefore settles on a bare deadband, and ventilation needs two thresholds
+- The **ventilation window** set excludes the one window **free cooling** drives, so the two decisions cannot silence each other
+- **Station wander** is why the ventilation comparison smooths ARSO to an hourly mean instead of widening its band: a deadband large enough to cover the wander would be large enough to miss the weather
 
 ## Example dialogue
 
