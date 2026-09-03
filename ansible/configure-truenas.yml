@@ -342,6 +342,34 @@
       when: (item.target_name ~ ' initiators') not in existing_initiator_groups.stdout_lines
       changed_when: true
 
+    - name: Check for an existing iSCSI authorized access record
+      # Midclt masks the secret in query output; no_log keeps the masked blob
+      # and any future shape change out of converge logs regardless.
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.auth.query | jq -r --arg u "{{ iscsi_chap_user }}" '[.[] | select(.user == $u) | .tag] | first // empty'
+        executable: /bin/bash
+      register: iscsi_chap_record_tag
+      changed_when: false
+      no_log: true
+
+    - name: Create the iSCSI CHAP authorized access record
+      # no_log: the create payload carries the CHAP secret. Idempotent by user
+      # match: a deliberate secret rotation is a separate, explicit operation
+      # (delete the record, converge) - this task never overwrites a secret.
+      ansible.builtin.shell:
+        cmd: |
+          midclt call iscsi.auth.create '{
+            "tag": 1,
+            "user": "{{ iscsi_chap_user }}",
+            "secret": "{{ iscsi_chap_secret }}"
+          }'
+      when: (iscsi_chap_record_tag.stdout | default('')) | trim | length == 0
+      register: iscsi_chap_created
+      changed_when: true
+      no_log: true
+
     - name: Get all initiator group IDs by comment
       # first(.id) keeps the lookup deterministic (a single id) even if
       # duplicate groups exist from runs predating the gating fix above.
@@ -365,6 +393,34 @@
       loop_control:
         index_var: idx
       when: item.target_name not in existing_targets.stdout_lines
+      changed_when: true
+
+    - name: Read iSCSI target auth state
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          midclt call iscsi.target.query | jq -r --arg n "{{ item.target_name }}" '(.[] | select(.name == $n)) | .groups | first | .authmethod // "NONE"'
+        executable: /bin/bash
+      loop: "{{ iscsi_zvols }}"
+      register: iscsi_target_auth_state
+      changed_when: false
+
+    - name: Require CHAP on the iSCSI target groups
+      # Rebuilds the live groups array with authmethod/auth added, so portal and
+      # initiator group ids stay whatever the appliance holds today. auth refers
+      # to the authorized-access TAG (1), not its record id. Targets created by
+      # the task above get this on their next converge as drift repair.
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          payload=$(midclt call iscsi.target.query | jq -c --arg n "{{ item.target_name }}" '(.[] | select(.name == $n)) | {id: .id, groups: [.groups[] | . + {authmethod: "CHAP", auth: 1}]}')
+          midclt call iscsi.target.update "$(echo "$payload" | jq -r .id)" "$(echo "$payload" | jq -c '{groups: .groups}')"
+        executable: /bin/bash
+      loop: "{{ iscsi_zvols }}"
+      loop_control:
+        index_var: idx
+      when: (iscsi_target_auth_state.results[idx].stdout | default('NONE')) | trim != 'CHAP'
+      register: iscsi_target_auth_updated
       changed_when: true
 
     - name: Get existing iSCSI extents
