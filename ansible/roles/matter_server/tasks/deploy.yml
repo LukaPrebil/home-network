@@ -1,13 +1,6 @@
 ---
 # Deploy Matter Server container
 
-- name: Assert Matter Server data path is an NFS mount
-  ansible.builtin.include_role:
-    name: common
-    tasks_from: assert_nfs_mount
-  vars:
-    common_nfs_mount_path: "{{ matter_server_base_dir }}"
-
 - name: Deploy Matter Server docker-compose.yml
   ansible.builtin.template:
     src: docker-compose.yml.j2
