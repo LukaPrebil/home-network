@@ -37,8 +37,10 @@ services:
       # Access logs (file-based for CrowdSec and log analysis)
       - {{ traefik_logs_dir }}:/var/log/traefik
 {% endif %}
+{% if traefik_docker_provider_enabled %}
       # Docker socket (read-only)
       - /var/run/docker.sock:/var/run/docker.sock:ro
+{% endif %}
     # Secrets (CF_DNS_API_TOKEN) live in the 0600 env_file, not inline here.
     env_file:
       - {{ traefik_base_dir }}/traefik.env
