@@ -43,14 +43,17 @@ monitoring_stack_cadvisor_port: 8080
 monitoring_stack_proxmox_exporter_version: "3.10.0"
 monitoring_stack_proxmox_exporter_port: 9221
 monitoring_stack_proxmox_api_url: "https://{{ hostvars['n5p']['ansible_host'] }}:8006"
-monitoring_stack_proxmox_api_verify_ssl: false
+# M-10: TLS verification against the pinned PVE cluster root CA (files/certs).
+monitoring_stack_proxmox_api_verify_ssl: true
 
 # Omada Exporter configuration
 monitoring_stack_omada_exporter_version: "0.13.1"
 monitoring_stack_omada_exporter_port: 9202
-monitoring_stack_omada_controller_url: "https://{{ hostvars['omada']['ansible_host'] }}:8043"
+# URL host must match the controller cert's SAN (DNS:Omada, case-insensitive in
+# Go) - the /etc/hosts entry the deploy task manages resolves it. M-10.
+monitoring_stack_omada_controller_url: "https://omada:8043"
+monitoring_stack_omada_insecure: false
 monitoring_stack_omada_site: "Home"
-
 # Upstream image uids - the containers run as these fixed non-root users and own
 # their data dirs / read their provisioning. Used to scope dir ownership + modes
 # instead of the old world-writable 0777.

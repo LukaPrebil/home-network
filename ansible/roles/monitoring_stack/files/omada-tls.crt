@@ -1,0 +1,53 @@
+-----BEGIN CERTIFICATE-----
+MIIFIzCCAwugAwIBAgIQcs77SSAmtFTsOQuoqQkgXzANBgkqhkiG9w0BAQsFADA4
+MRIwEAYDVQQDDAlsb2NhbGhvc3QxEDAOBgNVBAoMB1RQLUxpbmsxEDAOBgNVBAsM
+B1RQLUxpbmswHhcNMjUxMDE3MDgxNjU2WhcNMjgwMTIwMDkxNjU2WjA4MRIwEAYD
+VQQDDAlsb2NhbGhvc3QxEDAOBgNVBAoMB1RQLUxpbmsxEDAOBgNVBAsMB1RQLUxp
+bmswggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDHOfQXHPF7FsC5pwwj
+Jnb8z07v2RWioIrMh6YFPuDN4EsV7s7vBg0lfcl4/wkWf13HYHapC64aK8nTmapF
+KW8nMvV3k5Z0mXxtBO8/mJj6gBd6lL+AfNP43lANO0EYI8ACmlO/JAXBQVhXHNoZ
+ZvEAja6yN+pwGgcR/UrrxcoTDlkLsT3WUX+14vFcphqwnGSl32cJTonh5rFkfhwE
+xxih1/Ou6prtisBfI3cmhEyL0xCuzl5J6tT3oF7+ganyX+LlpeGU3ESV0KbEE/WU
+f3Apfz9dG8Np7OaEshKfbgF642KjtffQtwtceUb/bvd9UYLflSxf411U7P17MgyV
+iEvzRgUL77o94z+ZCn4J1Ox4hPLtV6KwZEyRDmBkZhCEF7/G2QC3GaTzkQQPaiVh
+Tkuzrw6JOmosVffaiUp/BS9MolxRZNWJIsvEk6CSyJMbCa+BJqq+VvfS9WJwWCc8
+y9U1DieZtE6a3AZQ+bFHIm8RrbiRURPNJjh5AlXWHx6fq6gxh4cGcOm6afQ1db8w
+e8IHRhgxeSSzd8gFwusT0T8GmXsgxHG0okwTWp4C60LKVfSFdtmSgjDeKReR+TOq
+INRmcWWCi2eSjXuHQxcDDYf3gucAYZwdlyUUDMmrnS163013Sn4f/zOmeZ4KX75k
+bDKeyo57spkbBgCiss4aTPmSBwIDAQABoykwJzATBgNVHSUEDDAKBggrBgEFBQcD
+ATAQBgNVHREECTAHggVPbWFkYTANBgkqhkiG9w0BAQsFAAOCAgEAdF2HXQcGso33
+iKb7kir+dLlaqcxbWuErYZ37cjFrEAmbqjv2JfgxFkpyS+qHAIOzXta16cSOGJyg
+NQF6It5a3sGQU4ZZHqXqtXKAOA6XWtEJa/8S0i+9b4Rufg0zzpIN/1Mf5mzpMoU3
+VGBcWIKg9CT9Dp3BSU+0evM8NEZaV6tBMugV9G+umIRpAUQ+RLK980pRfFG6Pj+n
+Q2i5+ByT2wvBM8PgIqZa34ZaOhDxvhG11Szu3w+JMAJhqFQ2vTl6qcRGcrjuSj+C
+99ZD9CVFJxAFje3iaXl3wRgjzJkLsG/N2gstugdSzNfM77msugv5v6DYTeiaptHQ
+jx8fTSAdmrrWaVdLgDR+baEqARrRo3a7pmRI3/lYJcSo4ZJ7w+2PjOTH1crY6DP2
+f8CLDxIKCQZi66OP02oVgUQsRShyGPcvB2ql24RD/63Jt0To4aZu8+r1fDnb1yCt
+MfqrySVE9oGSgWrPSuL+p660EitMiByGPj6URHBKX7wqylmj4Qf5fmUccGRSBVTf
+zMJBaTei1ciLT9eervq0LZXd+vigdzcVKEva1gm0Zd9C67iIi9nNnqwWGrd9G97F
+XJyIxcrGbwRyLhY1zmenuCDFI//lhTuyXbgACYT0QFW1bb5EWKFvmWJOy9ZnF6f3
+uo1hQcS6eGSQqzPbFxG/kh9OQfNHTc4=
+-----END CERTIFICATE-----
+---
+Server certificate
+subject=CN=localhost, O=TP-Link, OU=TP-Link
+issuer=CN=localhost, O=TP-Link, OU=TP-Link
+---
+No client certificate CA names sent
+Peer signing digest: SHA256
+Peer signature type: rsa_pss_rsae_sha256
+Peer Temp Key: X25519, 253 bits
+---
+SSL handshake has read 2101 bytes and written 1602 bytes
+Verification error: self-signed certificate
+---
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+Server public key is 4096 bit
+This TLS version forbids renegotiation.
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+Early data was not sent
+Verify return code: 18 (self-signed certificate)
+---

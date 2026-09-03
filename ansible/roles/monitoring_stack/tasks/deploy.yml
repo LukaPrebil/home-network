@@ -1,6 +1,36 @@
 ---
 # Deploy and manage monitoring stack with Docker Compose
 
+# Pinned backend certs (M-10): public material, verified out of band. The pve
+# exporter's REQUESTS_CA_BUNDLE and the omada exporter's SSL_CERT_FILE point at
+# these files via the compose mounts.
+- name: Copy pinned PVE root CA into the compose directory
+  ansible.builtin.copy:
+    src: pve-root-ca.crt
+    dest: "{{ monitoring_stack_compose_dir }}/pve-root-ca.crt"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy pinned Omada controller certificate into the compose directory
+  ansible.builtin.copy:
+    src: omada-tls.crt
+    dest: "{{ monitoring_stack_compose_dir }}/omada-tls.crt"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Resolve the omada controller hostname for the exporter
+  # The controller cert's SAN is DNS:Omada only, so the exporter URL must use
+  # the name; there is no DNS record for it (search domain home.local).
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '\s[Oo]mada(\s|$)'
+    line: "{{ hostvars['omada']['ansible_host'] }} omada"
+    owner: root
+    group: root
+    mode: '0644'
+
 - name: Pull monitoring stack Docker images
   community.docker.docker_compose_v2:
     project_src: "{{ monitoring_stack_compose_dir }}"

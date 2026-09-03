@@ -89,10 +89,16 @@ services:
     # Secrets (PVE_USER/TOKEN_NAME/TOKEN_VALUE) live in the 0600 env_file.
     env_file:
       - {{ monitoring_stack_compose_dir }}/monitoring.env
+    # Pinned PVE cluster root CA (M-10): PVE_VERIFY_SSL=true makes the Python
+    # requests stack verify the chain, and REQUESTS_CA_BUNDLE points it at the
+    # pinned CA (requests ignores the default certifi bundle when set).
+    volumes:
+      - {{ monitoring_stack_compose_dir }}/pve-root-ca.crt:/etc/ssl/pve-root-ca.crt:ro
     environment:
       - TZ={{ timezone | default('UTC') }}
       - PVE_URL={{ monitoring_stack_proxmox_api_url }}
       - PVE_VERIFY_SSL={{ monitoring_stack_proxmox_api_verify_ssl | string | lower }}
+      - REQUESTS_CA_BUNDLE=/etc/ssl/pve-root-ca.crt
 
   omada-exporter:
     image: chhaley/omada_exporter:{{ monitoring_stack_omada_exporter_version }}
@@ -105,11 +111,17 @@ services:
     # Secrets (OMADA_USER/OMADA_PASS) live in the 0600 env_file.
     env_file:
       - {{ monitoring_stack_compose_dir }}/monitoring.env
+    # Pinned TP-Link controller cert (M-10): OMADA_INSECURE=false keeps Go's
+    # default transport, whose root pool honors SSL_CERT_FILE. The URL host
+    # (omada) matches the cert's SAN DNS:Omada case-insensitively.
+    volumes:
+      - {{ monitoring_stack_compose_dir }}/omada-tls.crt:/etc/ssl/omada-tls.crt:ro
     environment:
       - TZ={{ timezone | default('UTC') }}
       - OMADA_HOST={{ monitoring_stack_omada_controller_url }}
       - OMADA_SITE={{ monitoring_stack_omada_site }}
-      - OMADA_INSECURE=true
+      - OMADA_INSECURE={{ monitoring_stack_omada_insecure | string | lower }}
+      - SSL_CERT_FILE=/etc/ssl/omada-tls.crt
 
   speedtest-exporter:
     image: billimek/prometheus-speedtest-exporter@{{ monitoring_stack_speedtest_exporter_digest }}
