@@ -20,17 +20,34 @@
     - vars/lxc.yml
 
   tasks:
-    - name: Check if the Ubuntu LXC template exists
-      ansible.builtin.stat:
-        path: "/var/lib/vz/template/cache/{{ lxc_template_ubuntu }}"
-      register: lxc_template_check
+    - name: Refresh the GPG-signed aplinfo index
+      # pveam download verifies the tarball sha512 against the record in this
+      # index. pveam update fetches the index plus its signature and verifies
+      # both with sqv against the trusted keyring, so even a stale cached
+      # index is trustworthy; refreshing here keeps the rebuild-day chain
+      # fresh (the host's own daily pveam-update timer covers steady state).
+      ansible.builtin.command:
+        cmd: /usr/bin/pveam update
+      changed_when: true
 
-    - name: Download the Ubuntu Proxmox LXC template
-      ansible.builtin.get_url:
-        url: "{{ lxc_template_url }}"
-        dest: "/var/lib/vz/template/cache/{{ lxc_template_ubuntu }}"
-        mode: '0644'
-      when: not lxc_template_check.stat.exists
+    - name: Download the Ubuntu Proxmox LXC template (pveam verifies sha512)
+      # Deliberately NO creates: guard: on every run pveam verifies the cached
+      # file's sha512 against the signed aplinfo index and no-ops on match,
+      # and downloads fresh when the file is absent. A creates-skip would
+      # leave a corrupted-but-present cache unverified forever. The URL behind
+      # the index stays http:// by Proxmox's design; the integrity comes from
+      # the GPG-signed index, not the transport.
+      # GOTCHA (verified live): on a hash mismatch pveam prints "checksum
+      # mismatch ... aborting" on STDERR from its worker but the CLI still
+      # exits 0, so rc alone cannot be trusted and the check must cover both
+      # streams. No-op success is marked by "no need to download" on stdout.
+      ansible.builtin.command:
+        cmd: /usr/bin/pveam download local {{ lxc_template_ubuntu }}
+      register: lxc_template_download
+      changed_when: "'no need to download' not in lxc_template_download.stdout"
+      failed_when: >-
+        'checksum mismatch' in (lxc_template_download.stdout + lxc_template_download.stderr)
+        or lxc_template_download.rc != 0
 
 - name: Check existing LXC containers and provision new ones
   hosts: proxmox_hosts
