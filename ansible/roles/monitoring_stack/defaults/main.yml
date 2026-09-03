@@ -43,14 +43,21 @@ monitoring_stack_cadvisor_port: 8080
 monitoring_stack_proxmox_exporter_version: "3.10.0"
 monitoring_stack_proxmox_exporter_port: 9221
 monitoring_stack_proxmox_api_url: "https://{{ hostvars['n5p']['ansible_host'] }}:8006"
+# Verification stays OFF (accepted risk, fix-list M-10): the exporter image's
+# Python 3.13+ enables strict X509 verification, and the legacy PVE cluster
+# root CA lacks the keyUsage extension strict mode requires - the chain can
+# never verify until PVE serves a cert from a compliant internal CA (M-33).
+# The PVEAuditor token is read-only; the omada exporter gets full verification.
 monitoring_stack_proxmox_api_verify_ssl: false
 
 # Omada Exporter configuration
 monitoring_stack_omada_exporter_version: "0.13.1"
 monitoring_stack_omada_exporter_port: 9202
-monitoring_stack_omada_controller_url: "https://{{ hostvars['omada']['ansible_host'] }}:8043"
+# URL host must match the controller cert's SAN (DNS:Omada, case-insensitive in
+# Go) - the /etc/hosts entry the deploy task manages resolves it. M-10.
+monitoring_stack_omada_controller_url: "https://omada:8043"
+monitoring_stack_omada_insecure: false
 monitoring_stack_omada_site: "Home"
-
 # Upstream image uids - the containers run as these fixed non-root users and own
 # their data dirs / read their provisioning. Used to scope dir ownership + modes
 # instead of the old world-writable 0777.

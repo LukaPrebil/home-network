@@ -89,6 +89,7 @@ services:
     # Secrets (PVE_USER/TOKEN_NAME/TOKEN_VALUE) live in the 0600 env_file.
     env_file:
       - {{ monitoring_stack_compose_dir }}/monitoring.env
+    # PVE verification is OFF - see the defaults comment (M-10/M-33).
     environment:
       - TZ={{ timezone | default('UTC') }}
       - PVE_URL={{ monitoring_stack_proxmox_api_url }}
@@ -105,11 +106,21 @@ services:
     # Secrets (OMADA_USER/OMADA_PASS) live in the 0600 env_file.
     env_file:
       - {{ monitoring_stack_compose_dir }}/monitoring.env
+    # Pinned TP-Link controller cert (M-10): OMADA_INSECURE=false keeps Go's
+    # default transport, whose root pool honors SSL_CERT_FILE. The URL host
+    # (omada) matches the cert's SAN DNS:Omada case-insensitively.
+    # extra_hosts, not the host's /etc/hosts: the exporter resolves the
+    # controller name inside the container (Docker DNS, 127.0.0.11).
+    extra_hosts:
+      - "omada:{{ hostvars['omada']['ansible_host'] }}"
+    volumes:
+      - {{ monitoring_stack_compose_dir }}/omada-tls.crt:/etc/ssl/omada-tls.crt:ro
     environment:
       - TZ={{ timezone | default('UTC') }}
       - OMADA_HOST={{ monitoring_stack_omada_controller_url }}
       - OMADA_SITE={{ monitoring_stack_omada_site }}
-      - OMADA_INSECURE=true
+      - OMADA_INSECURE={{ monitoring_stack_omada_insecure | string | lower }}
+      - SSL_CERT_FILE=/etc/ssl/omada-tls.crt
 
   speedtest-exporter:
     image: billimek/prometheus-speedtest-exporter@{{ monitoring_stack_speedtest_exporter_digest }}
