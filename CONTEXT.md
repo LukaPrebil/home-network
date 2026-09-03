@@ -281,6 +281,20 @@ _Avoid_: "known_hosts" unqualified - the control node has two: the repo-tracked 
 Trust on first use - accepting a host key at first contact with no out-of-band check. Every pin starts as one; the fleet accepts it only when the trust event is a deliberate, checkable step (a provision keyscan, the pre-seed fingerprint spot-check), never a silent moment mid-converge.
 _Avoid_: "verified" - a TOFU pin detects key change, not imposture at first contact.
 
+### Socket proxy
+
+**Socket proxy**:
+The digest-pinned wollomatic/socket-proxy container fronting the raw Docker socket on each Docker runtime host; the only container that touches the socket itself. Serves exactly the method+path pairs its **allowlist** permits, default-deny everything else.
+_Avoid_: "docker socket" (that is the raw socket the proxy exists to keep containers away from) and "socket-proxy network" for the container.
+
+**Socket proxy network**:
+The isolated Docker network that is the sole access boundary to the **socket proxy**; membership, not source IPs, decides who can call it. Consumers join it (autoheal everywhere, Uptime Kuma on the containers VM) and never mount the raw socket.
+_Avoid_: "the Docker network" (there are many) and "socket-proxy container" for the network.
+
+**Allowlist**:
+The per-method regex contract of the **socket proxy**, anchored so only the exact pairs listed pass. Deliberately excludes container inspect, which returns every env_file value as `Config.Env`; allowing it once let a Kuma compromise read PDS and Paperless secrets. Retired the Kuma docker-type monitors that required it.
+_Avoid_: "GET access" (the allowlist is per method+path, not per method).
+
 ### Service health
 
 **Respawned crash**:

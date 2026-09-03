@@ -36,8 +36,14 @@ docker_socket_proxy_uid: "65534"
 docker_socket_proxy_allowfrom: "0.0.0.0/0"
 
 # Method+path allowlists (anchored regex; every other method/path is denied).
-#   GET  : _ping/version/info, container list (autoheal + Kuma), container
-#          inspect (Kuma docker monitors)
+#   GET  : _ping/version/info, container list (autoheal + Kuma's docker-host test)
 #   POST : container restart only (autoheal) - NOT create/kill/stop/exec/etc.
-docker_socket_proxy_allow_get: "^(/v[0-9.]+)?/(_ping|version|info|containers/json|containers/[a-zA-Z0-9_.-]+/json)$"
+#
+# Container inspect (GET /containers/<name>/json) is deliberately NOT allowed:
+# inspect returns Config.Env, i.e. every value Compose loaded from env_files, so
+# allowing it let any container on the socket-proxy network read those secrets
+# (env_file 0600 modes do not apply once Compose has swallowed the values).
+# Kuma's docker-type monitors require inspect, so they were retired with this
+# change (fix-list M-04, 2026-09-03); autoheal needs only list + restart.
+docker_socket_proxy_allow_get: "^(/v[0-9.]+)?/(_ping|version|info|containers/json)$"
 docker_socket_proxy_allow_post: "^(/v[0-9.]+)?/containers/[a-zA-Z0-9_.-]+/restart$"
