@@ -1,6 +1,15 @@
 ---
 # Global variables for all hosts
 
+# SSH connection policy for every fleet connection (control node only). The
+# repo-tracked ansible/known_hosts pins each host by its ansible_host IP: a
+# changed key on a pinned IP fails the converge, a new IP pins on first
+# contact (accept-new). Provision playbooks refresh the pin for guests they
+# (re)build via refresh-pinned-host-key.yml. The path is made absolute with
+# playbook_dir because ssh_config(5) defines tilde, token and env expansion
+# for UserKnownHostsFile but no relative-path resolution.
+ansible_ssh_common_args: "-o UserKnownHostsFile={{ playbook_dir }}/known_hosts -o StrictHostKeyChecking=accept-new"
+
 # Network configuration
 domain: home.local
 dns_servers:

@@ -1,0 +1,16 @@
+# Fleet SSH host keys, pinned by the IP ansible connects to (ansible_host).
+# Refreshed by the provision playbooks keyscan hook (refresh-pinned-host-key.yml)
+# for guests they (re)build; re-scan manually after an OS reinstall outside provisioning.
+# Keys are public; the IPs are already published in inventory/hosts.yml.
+# Pre-seeded 2026-09-02 via ssh-keyscan -t ed25519.
+192.168.1.128 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBGAKfOBpBlpSIHGZ980Q4kExP7keqZYSr68pxaLBGn2
+192.168.1.150 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICzSqbmMloxF5H0Xm42vYFavmhuIYk68mIkqvshGN19i
+192.168.1.140 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA1wpdEsMansPrINK4yGwvUdY9ZLXpWKcSOHTW9/ctDX
+192.168.1.110 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH3g6f0WvNJ+sil8AicxqU1LqxeE30smLe23p1Q3JecD
+192.168.1.148 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ88BpgGZHHkeqHWPPy77jphllUg2pRHo6s3gzz5BXzZ
+192.168.1.142 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICdk3txMYyvT4Ujiarl6y346IIYNvcA+skOGJVvOnL57
+192.168.1.143 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHfjR6dcic0pp6yyakXmnR+ot3Rgm8DYGJJXdLNpeEsf
+192.168.1.145 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL9UbsI4r/EpxlgSnthSSmjj58TJqqA+P2fuR/E3Ygei
+192.168.1.146 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFqtB2MKd/rRGnLTw8lSBkdHIzLHdYbEcJJ7DKZVeO8m
+192.168.1.147 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFExq5v1GsDCbHFhCnVplrhIhAEAJxAaeg43iA4+5fZH
+192.168.1.141 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKijjrFKEBHw00EvkeYJyrutWBKEaQwUfr0ahVeVtOeq
