@@ -4,10 +4,12 @@
 #
 # Install once with: pre-commit install
 repos:
-  # Pinned to a release tag rather than a branch so an upstream change cannot
-  # silently alter what blocks a commit here.
+  # Pinned to a commit SHA (annotated with its release tag) rather than a tag
+  # or branch, so neither a re-pointed tag nor an upstream change can silently
+  # alter what blocks a commit here. Dependabot security updates bump the SHA
+  # via the version annotation.
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.30.1
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
     hooks:
       # Upstream entry is: gitleaks git --pre-commit --redact --staged --verbose
       # --redact matters locally: it keeps a detected secret out of terminal
