@@ -1,0 +1,82 @@
+---
+# Refresh the repo-tracked pinned SSH host key for one inventory host.
+#
+# Included by the provision playbooks: after a guest is (re)created (lxc, vms,
+# truenas) and as a pre-play before connecting to a host whose OS was re-flashed
+# (rpi4). A staged cutover lands the replacement on the predecessor's IP with a
+# fresh host key, so the pinned entry for that IP is stale until this runs.
+#
+# Sequence per host, control node only (delegate_to: localhost):
+#   1. ssh-keyscan -t ed25519 <ip>  - also proves sshd is answering; retries
+#   2. ssh-keygen -F <ip>           - read the current pin, rc 1 when unpinned
+#   3. skip everything below when the pin already matches the scanned key
+#   4. ssh-keygen -R <ip>           - drop stale lines for the IP (rebuild case)
+#   5. lineinfile the scanned line  - one entry per IP, no duplicates
+#   6. remove the known_hosts.old backup ssh-keygen -R leaves on removal
+#
+# Input: pinned_host - inventory_hostname whose ansible_host is scanned.
+#
+# The scan is TOFU at provision time (CONTEXT.md: Pinned host key): it pins
+# whatever answers at the IP. Provisioning is a hands-on-keyboard operator
+# event; ordinary converges never rewrite this file except via accept-new on
+# an unpinned IP.
+
+- name: Scan the SSH host key of {{ pinned_host }}
+  ansible.builtin.command:
+    cmd: ssh-keyscan -t ed25519 {{ hostvars[pinned_host].ansible_host }}
+  delegate_to: localhost
+  become: false
+  register: pinned_host_keyscan
+  # keyscan prefixes a banner comment ("# host:port SSH-2.0-..."); count and
+  # pin the key lines only. Exactly one ed25519 key line must come back.
+  until: pinned_host_keyscan.rc == 0 and pinned_host_keyscan.stdout_lines | reject('match', '^#') | list | length == 1
+  retries: 12
+  delay: 10
+  changed_when: false
+  check_mode: false
+
+- name: Extract the key line for {{ pinned_host }}
+  ansible.builtin.set_fact:
+    pinned_host_key_line: "{{ pinned_host_keyscan.stdout_lines | reject('match', '^#') | first }}"
+  changed_when: false
+
+- name: Read the current pinned host key for {{ pinned_host }}
+  ansible.builtin.command:
+    cmd: ssh-keygen -F {{ hostvars[pinned_host].ansible_host }} -f {{ playbook_dir }}/known_hosts
+  delegate_to: localhost
+  become: false
+  register: pinned_host_lookup
+  # rc 1 means the IP has no pinned entry yet - that is a state, not a failure.
+  failed_when: false
+  changed_when: false
+  check_mode: false
+
+- name: Refresh the pinned host key when missing or stale for {{ pinned_host }}
+  when: pinned_host_lookup.rc != 0 or pinned_host_key_line not in pinned_host_lookup.stdout
+  block:
+    - name: Drop stale pinned host key lines for {{ pinned_host }}
+      ansible.builtin.command:
+        cmd: ssh-keygen -R {{ hostvars[pinned_host].ansible_host }} -f {{ playbook_dir }}/known_hosts
+      delegate_to: localhost
+      become: false
+      register: pinned_host_keygen_r
+      # stdout carries "# Host <ip> found: line N" only when lines were removed;
+      # the nothing-found case prints to stderr and leaves stdout empty.
+      changed_when: "'found' in pinned_host_keygen_r.stdout"
+
+    - name: Pin the scanned host key of {{ pinned_host }}
+      ansible.builtin.lineinfile:
+        path: "{{ playbook_dir }}/known_hosts"
+        line: "{{ pinned_host_key_line }}"
+        state: present
+        create: true
+        mode: '0644'
+      delegate_to: localhost
+      become: false
+
+    - name: Remove the ssh-keygen backup file
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/known_hosts.old"
+        state: absent
+      delegate_to: localhost
+      become: false

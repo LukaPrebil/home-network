@@ -271,6 +271,16 @@ drift correction, which loops over declared guests only. An orphaned guest left 
 `onboot: 1` will be started by the boot-time reconciler on the next power event, colliding
 with its replacement on the same IP.
 
+### Fleet SSH access
+
+**Pinned host key**:
+An SSH server key recorded in the repo-tracked `ansible/known_hosts`, matched by the IP Ansible connects to. A converge refuses a changed key on a pinned IP and auto-pins a new IP on first contact (`accept-new`); provision playbooks refresh the pin for every guest they (re)build.
+_Avoid_: "known_hosts" unqualified - the control node has two: the repo-tracked `ansible/known_hosts` that fleet converges read, and the user's `~/.ssh/known_hosts`, which fleet connections no longer read.
+
+**TOFU**:
+Trust on first use - accepting a host key at first contact with no out-of-band check. Every pin starts as one; the fleet accepts it only when the trust event is a deliberate, checkable step (a provision keyscan, the pre-seed fingerprint spot-check), never a silent moment mid-converge.
+_Avoid_: "verified" - a TOFU pin detects key change, not imposture at first contact.
+
 ### Service health
 
 **Respawned crash**:

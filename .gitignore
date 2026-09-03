@@ -12,6 +12,11 @@
 id_rsa*
 id_ed25519*
 known_hosts
+# Except the fleet host-key pin: it is public keys only (see
+# docs/infrastructure/ansible-guide.md), and the IPs it pins are already
+# published in ansible/inventory/hosts.yml. Last matching rule wins, so the
+# negation must come after the unanchored known_hosts rule above.
+!ansible/known_hosts
 **/acme.json
 
 # Decryption material. Only encrypted payloads belong in the repo.

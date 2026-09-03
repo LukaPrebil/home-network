@@ -10,10 +10,22 @@
 # - rpi4 added to inventory
 #
 # This playbook:
-# 1. Applies common role (users, SSH hardening, timezone)
-# 2. Installs Docker and Docker Compose
-# 3. Prepares directory structure for services
-# 4. Does NOT start services (use configure-rpi4-services.yml for that)
+# 1. Refreshes the repo-tracked pinned host key for rpi4 (a re-flashed SD card
+#    ships a new host key; converging against the stale pin would fail hard)
+# 2. Applies common role (users, SSH hardening, timezone)
+# 3. Installs Docker and Docker Compose
+# 4. Prepares directory structure for services
+# 5. Does NOT start services (use configure-rpi4-services.yml for that)
+
+- name: Refresh the pinned host key for rpi4
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Pin host key for rpi4
+      ansible.builtin.include_tasks: refresh-pinned-host-key.yml
+      vars:
+        pinned_host: rpi4
 
 - name: Provision Raspberry Pi 4 platform
   hosts: rpi4
