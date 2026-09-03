@@ -31,9 +31,11 @@ placeholder in a `*.example` file, or a Jinja template variable that gets filled
 in at deploy time.
 
 Commits are scanned for secrets two ways: a gitleaks pre-commit hook on staged
-changes, and a full-history gitleaks and TruffleHog scan in CI. History is
-scanned rather than just the diff, because a secret removed from the working
-tree still ships to anyone who clones the repository.
+changes, and CI. In CI, TruffleHog scans full history on every run, and
+gitleaks scans each event's diff on push and pull request plus full history
+weekly (Sundays 05:00 UTC) and on manual dispatch. History is scanned rather
+than just the diff, because a secret removed from the working tree still ships
+to anyone who clones the repository.
 
 ## Reporting a vulnerability
 
