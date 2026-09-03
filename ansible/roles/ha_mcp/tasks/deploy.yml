@@ -34,8 +34,10 @@
 # MCP streamable-http rejects plain GET (needs POST + SSE Accept header), so
 # any HTTP status from the listed set proves the server is up and answering.
 - name: Wait for ha-mcp to be ready
+  # Probe the secret path, not /mcp: the MCP path is the credential and moves
+  # with MCP_SECRET_PATH. A GET on it returns the browser landing page (200).
   ansible.builtin.uri:
-    url: "http://{{ ansible_host }}:{{ ha_mcp_port }}/mcp"
+    url: "http://{{ ansible_host }}:{{ ha_mcp_port }}{{ ha_mcp_secret_path }}"
     method: GET
     status_code: [200, 400, 405, 406]
   register: ha_mcp_health
@@ -50,5 +52,6 @@
     msg:
       - "ha-mcp deployment complete!"
       - "State: {{ ha_mcp_service_state }}"
-      - "Access ha-mcp at: http://{{ ansible_host }}:{{ ha_mcp_port }}/mcp"
+      - "MCP endpoint: http://{{ ansible_host }}:{{ ha_mcp_port }} + MCP_SECRET_PATH"
+      - "The path is the credential and is deliberately not logged; read it from vault_ha_mcp_secret_path in group_vars/all/secrets.sops.yml."
   when: ha_mcp_service_state == 'started'

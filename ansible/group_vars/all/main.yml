@@ -10,6 +10,15 @@
 # for UserKnownHostsFile but no relative-path resolution.
 ansible_ssh_common_args: "-o UserKnownHostsFile={{ playbook_dir }}/known_hosts -o StrictHostKeyChecking=accept-new"
 
+# Home Assistant MCP contract (ha_mcp role on the containers VM; consumed ad
+# hoc by operator-spawned agents and, when rebuilt, by hermes). Declared here
+# rather than in the role because the consumer resolves the endpoint from
+# another host. MCP_SECRET_PATH is the credential - a high-entropy URL path
+# in SOPS - and gates both the MCP tool surface and the settings UI; until
+# the operator adds vault_ha_mcp_secret_path, converges fail on the missing
+# var (fail-fast on missing auth config, ADR 0001).
+ha_mcp_secret_path: "{{ vault_ha_mcp_secret_path }}"
+
 # Network configuration
 domain: home.local
 dns_servers:

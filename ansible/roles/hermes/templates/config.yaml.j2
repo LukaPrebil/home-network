@@ -31,7 +31,10 @@ gateway:
 # requests from Telegram. Empty `include`/`exclude` = all tools.
 mcp_servers:
   ha-mcp:
-    url: "http://{{ hostvars['containers']['ansible_host'] }}:8087/sse"
+    # Streamable HTTP at the ha-mcp secret path (the path is the credential,
+    # declared in group_vars/all alongside the port contract). ha-mcp-web
+    # serves no /sse endpoint; the former /sse URL here was a 404.
+    url: "http://{{ hostvars['containers']['ansible_host'] }}:8087{{ ha_mcp_secret_path }}"
     enabled: {{ hermes_enable_homeassistant | lower }}
     sampling:
       enabled: false  # Don't let the MCP server initiate LLM calls on our budget
