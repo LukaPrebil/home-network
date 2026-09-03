@@ -8,13 +8,6 @@
   vars:
     common_nfs_mount_path: "{{ paperless_ngx_nfs_mount_point }}"
 
-- name: Assert Docker volumes path is an NFS mount
-  ansible.builtin.include_role:
-    name: common
-    tasks_from: assert_nfs_mount
-  vars:
-    common_nfs_mount_path: "{{ paperless_ngx_base_dir }}"
-
 - name: Ensure traefik network exists
   community.docker.docker_network:
     name: "{{ paperless_ngx_docker_network }}"

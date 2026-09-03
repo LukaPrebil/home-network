@@ -7,7 +7,9 @@ paperless_ngx_redis_version: "8-alpine"
 paperless_ngx_postgres_version: "18-alpine"
 
 # Directories
-paperless_ngx_base_dir: "/srv/docker/paperless-ngx"
+# Local rootfs (M-09b): the env file and the postgres pgdata carry credentials
+# and must not sit on the LAN-readable NFS export; NFS keeps the bulk documents.
+paperless_ngx_base_dir: "/opt/paperless-ngx"
 paperless_ngx_compose_file: "{{ paperless_ngx_base_dir }}/docker-compose.yml"
 
 # Network
