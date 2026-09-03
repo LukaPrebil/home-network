@@ -5,9 +5,9 @@
 # LXC Template configuration
 # Ubuntu 26.04 LTS (25.04 Plucky is EOL). Confirm the exact build suffix on n5p
 # before provisioning - `pveam available --section system | grep ubuntu-26` -
-# and correct the filename below if it is not -1 (get_url 404s loudly if wrong).
+# and correct the filename below if it is not -1 (pveam download fails loudly
+# if the name is not in the aplinfo index).
 lxc_template_ubuntu: "ubuntu-26.04-standard_26.04-1_amd64.tar.zst"  # Ubuntu 26.04 LTS Proxmox template
-lxc_template_url: "http://download.proxmox.com/images/system/ubuntu-26.04-standard_26.04-1_amd64.tar.zst"
 
 lxc_containers:
   - name: immich
