@@ -326,6 +326,18 @@
         label: "{{ item.name }} ({{ item.ip }})"
       when: has_new_vms
 
+    - name: Pin host keys for newly created VMs
+      # Cloud-init clones boot with a fresh host key; refresh the repo-tracked
+      # pin before the first converge reaches the guest.
+      ansible.builtin.include_tasks: refresh-pinned-host-key.yml
+      vars:
+        pinned_host: "{{ pinned_host_entry.name }}"
+      loop: "{{ vms_to_provision }}"
+      loop_control:
+        loop_var: pinned_host_entry
+        label: "{{ pinned_host_entry.name }} ({{ hostvars[pinned_host_entry.name].ansible_host }})"
+      when: has_new_vms
+
     - name: Display readiness status
       ansible.builtin.debug:
         msg:

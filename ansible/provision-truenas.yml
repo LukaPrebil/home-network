@@ -529,6 +529,18 @@
       ansible.builtin.debug:
         msg: "{{ truenas_qm_config_final.stdout_lines }}"
 
+    - name: Pin the TrueNAS host key (existing-VM runs only)
+      # Skipped on first provision: that path ends while the guest still
+      # awaits manual installation at its temporary install IP, with no SSH
+      # yet, so there is nothing to scan. Existing-VM runs have just verified
+      # SSH up in the final verify, making this the safe point. A fresh
+      # install converges on an unpinned IP and accept-new pins it on first
+      # contact; a re-provisioned VM gets its refreshed key here.
+      ansible.builtin.include_tasks: refresh-pinned-host-key.yml
+      vars:
+        pinned_host: tn-storage
+      when: truenas_vm_exists | bool
+
   handlers:
     - name: Stop TrueNAS VM (graceful, via guest agent)
       listen: Restart TrueNAS VM

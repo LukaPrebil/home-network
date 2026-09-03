@@ -144,6 +144,18 @@
       loop: "{{ containers_to_create }}"
       when: containers_to_create | length > 0
 
+    - name: Pin host keys for newly created containers
+      # A fresh container answers its IP with a fresh host key; without this,
+      # the first converge after provision would fail on a changed key (or
+      # TOFU-pin mid-converge). Refresh the pin now, control-node side.
+      ansible.builtin.include_tasks: refresh-pinned-host-key.yml
+      vars:
+        pinned_host: "{{ pinned_host_entry.name }}"
+      loop: "{{ containers_to_create }}"
+      loop_control:
+        loop_var: pinned_host_entry
+        label: "{{ pinned_host_entry.name }} ({{ hostvars[pinned_host_entry.name].ansible_host }})"
+
     - name: Configure GPU passthrough for containers (if enabled)
       ansible.builtin.shell:
         cmd: |
