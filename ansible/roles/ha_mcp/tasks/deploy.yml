@@ -52,5 +52,6 @@
     msg:
       - "ha-mcp deployment complete!"
       - "State: {{ ha_mcp_service_state }}"
-      - "Access ha-mcp at: http://{{ ansible_host }}:{{ ha_mcp_port }}{{ ha_mcp_secret_path }} (this URL is the credential - keep it out of logs and screenshots)"
+      - "MCP endpoint: http://{{ ansible_host }}:{{ ha_mcp_port }} + MCP_SECRET_PATH"
+      - "The path is the credential and is deliberately not logged; read it from vault_ha_mcp_secret_path in group_vars/all/secrets.sops.yml."
   when: ha_mcp_service_state == 'started'
