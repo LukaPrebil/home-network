@@ -77,6 +77,48 @@
   changed_when: false
   failed_when: pds_iscsi_discovery.rc != 0
 
+- name: Check CHAP state on the iSCSI node record
+  # iscsiadm -o show prints node.session.auth.* including the password, so this
+  # task and everything downstream of it stay no_log. Runs after discovery so
+  # the node record exists, and before login so the login negotiates CHAP.
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ pds_iscsi_target_iqn }} --portal {{ pds_iscsi_target_ip }} -o show
+  register: pds_iscsi_node_params
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Require CHAP on the iSCSI node record
+  # Three one-flag updates: open-iscsi has no single set-auth command. Params
+  # live in the node DB and iscsid uses them for boot auto-login too; a live
+  # session is never logged out here (the zvol is mounted and in use).
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ pds_iscsi_target_iqn }} --portal {{ pds_iscsi_target_ip }} -o update -n node.session.auth.authmethod -v CHAP
+  register: pds_iscsi_chap_method
+  changed_when: pds_iscsi_chap_method.rc == 0
+  when:
+    - pds_iscsi_node_params.rc == 0
+    - "'node.session.auth.authmethod = CHAP' not in (pds_iscsi_node_params.stdout | default(''))"
+  no_log: true
+
+- name: Set CHAP user on the iSCSI node record
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ pds_iscsi_target_iqn }} --portal {{ pds_iscsi_target_ip }} -o update -n node.session.auth.username -v {{ iscsi_chap_user }}
+  when:
+    - pds_iscsi_node_params.rc == 0
+    - "'node.session.auth.authmethod = CHAP' not in (pds_iscsi_node_params.stdout | default(''))"
+  no_log: true
+  changed_when: true
+
+- name: Set CHAP secret on the iSCSI node record
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ pds_iscsi_target_iqn }} --portal {{ pds_iscsi_target_ip }} -o update -n node.session.auth.password -v {{ iscsi_chap_secret }}
+  when:
+    - pds_iscsi_node_params.rc == 0
+    - "'node.session.auth.authmethod = CHAP' not in (pds_iscsi_node_params.stdout | default(''))"
+  no_log: true
+  changed_when: true
+
 - name: Check if iSCSI session already exists
   ansible.builtin.command:
     cmd: iscsiadm -m session

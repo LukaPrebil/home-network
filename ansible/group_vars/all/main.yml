@@ -54,6 +54,13 @@ docker_socket_proxy_container_name: "docker-socket-proxy"
 docker_socket_proxy_port: 2375
 docker_socket_proxy_endpoint: "tcp://{{ docker_socket_proxy_container_name }}:{{ docker_socket_proxy_port }}"
 
+# iSCSI CHAP contract (M-08): the TrueNAS targets (pds, uptime-kuma) require
+# one-way CHAP at login; discovery stays unauthenticated by design (it reveals
+# only target names). The secret lives in SOPS; 12-16 chars, no spaces, no '#'
+# are TrueNAS middleware rules (plugins/iscsi_/auth.py _validate_secret).
+iscsi_chap_user: "{{ vault_iscsi_chap_user }}"
+iscsi_chap_secret: "{{ vault_iscsi_chap_secret }}"
+
 # MQTT broker contract (served by the mosquitto role on the containers VM;
 # consumed by the taptap_mqtt bridge on the same host and by Home Assistant on
 # another). Declared here rather than in the role because a consumer on a
