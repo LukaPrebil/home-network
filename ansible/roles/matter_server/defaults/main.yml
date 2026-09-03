@@ -8,8 +8,9 @@ matter_server_version: "1.4.0"
 # Container names
 matter_server_container_name: "matter-server"
 
-# Base directories (on rpi4 local storage or NFS)
-matter_server_base_dir: "/srv/docker/matter-server"
+# Base directories (local rootfs, M-09: the fabric keys in /data must not sit
+# on the LAN-readable NFS export)
+matter_server_base_dir: "/opt/matter-server"
 matter_server_compose_dir: "/opt/matter-server"
 
 # Data directories

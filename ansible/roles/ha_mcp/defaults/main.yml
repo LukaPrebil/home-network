@@ -1,7 +1,9 @@
 ---
 ha_mcp_version: "8.3.0"
 ha_mcp_image: "ghcr.io/homeassistant-ai/ha-mcp:{{ ha_mcp_version }}"
-ha_mcp_base_dir: "/srv/docker/ha-mcp"
+# On local rootfs (M-09): ha-mcp.env holds the Home Assistant admin token and
+# must not sit on the LAN-readable NFS export.
+ha_mcp_base_dir: "/opt/ha-mcp"
 ha_mcp_container_name: "ha-mcp"
 ha_mcp_port: 8087
 ha_mcp_homeassistant_url: "http://{{ hostvars['haos']['ansible_host'] }}:8123"

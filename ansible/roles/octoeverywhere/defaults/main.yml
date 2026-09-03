@@ -1,8 +1,8 @@
 ---
 # OctoEverywhere default configuration
 
-# Base directory for OctoEverywhere
-octoeverywhere_base_dir: "/srv/docker/octoeverywhere"
+# Base directory for OctoEverywhere (local rootfs, M-09: /data holds tokens)
+octoeverywhere_base_dir: "/opt/octoeverywhere"
 octoeverywhere_data_dir: "{{ octoeverywhere_base_dir }}/data"
 
 # Docker image
