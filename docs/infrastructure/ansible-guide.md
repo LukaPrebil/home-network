@@ -79,6 +79,14 @@ Key: `linux_servers` is the common role target. `monitoring_agents` gets node-ex
 
 **HAOS**: runs as a Proxmox VM (192.168.1.144), not SSH-managed. Managed via ha-mcp MCP tools, not Ansible.
 
+## SSH Host Keys
+
+Fleet host keys are pinned in the repo-tracked `ansible/known_hosts`, matched by the IP in `ansible_host`. The policy lives in `group_vars/all/main.yml` as `ansible_ssh_common_args`: a changed key on a pinned IP fails the converge; a new IP pins on first contact (`accept-new`) and the entry lands in `ansible/known_hosts` - commit it after such a run.
+
+- Provision playbooks refresh the pin for guests they (re)build via `refresh-pinned-host-key.yml` (keyscan, then `ssh-keygen -R`, then re-pin). `provision-rpi4.yml` runs the refresh as a pre-play for the re-flashed-SD-card case.
+- After an OS reinstall outside the provision playbooks, re-scan manually: `ssh-keyscan -t ed25519 <ip>` and replace that host's line in `ansible/known_hosts`.
+- Keys in the file are public keys, and the IPs are already published in `inventory/hosts.yml`; the tracked file adds no new exposure.
+
 ## Running Playbooks
 
 Vault password is read from `.vault_pass` via `ansible.cfg`. Never use `--ask-vault-pass`.
