@@ -413,8 +413,8 @@
       ansible.builtin.shell:
         cmd: |
           set -o pipefail
-          payload=$(midclt call iscsi.target.query | jq -c --arg n "{{ item.target_name }}" '(.[] | select(.name == $n)) | {id: .id, groups: [.groups[] | . + {authmethod: "CHAP", auth: 1}] | tojson}')
-          midclt call iscsi.target.update "$(echo "$payload" | jq -r .id)" "$(echo "$payload" | jq -r .groups)"
+          payload=$(midclt call iscsi.target.query | jq -c --arg n "{{ item.target_name }}" '(.[] | select(.name == $n)) | {id: .id, groups: [.groups[] | . + {authmethod: "CHAP", auth: 1}]}')
+          midclt call iscsi.target.update "$(echo "$payload" | jq -r .id)" "$(echo "$payload" | jq -c '{groups: .groups}')"
         executable: /bin/bash
       loop: "{{ iscsi_zvols }}"
       loop_control:

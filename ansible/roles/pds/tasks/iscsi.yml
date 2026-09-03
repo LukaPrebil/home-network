@@ -70,6 +70,29 @@
     state: restarted
   when: pds_iscsi_initiator_config is changed
 
+- name: Set iSCSI CHAP defaults in iscsid.conf
+  # sendtargets discovery rewrites node records from iscsid.conf defaults, so
+  # the CHAP params must live here: another role's later discovery in the same
+  # converge would otherwise wipe per-node auth params set moments earlier.
+  # Discovered node records inherit these three values on every re-discovery.
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/iscsid.conf
+    regexp: '^#?\s*node.session.auth.authmethod\s*=.*$'
+    line: 'node.session.auth.authmethod = CHAP'
+
+- name: Set iSCSI CHAP user default in iscsid.conf
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/iscsid.conf
+    regexp: '^#?\s*node.session.auth.username\s*=.*$'
+    line: 'node.session.auth.username = {{ iscsi_chap_user }}'
+
+- name: Set iSCSI CHAP secret default in iscsid.conf
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/iscsid.conf
+    regexp: '^#?\s*node.session.auth.password\s*=.*$'
+    line: 'node.session.auth.password = {{ iscsi_chap_secret }}'
+  no_log: true
+
 - name: Discover iSCSI targets on TrueNAS
   ansible.builtin.command:
     cmd: iscsiadm -m discovery -t sendtargets -p {{ pds_iscsi_target_ip }}
