@@ -1,17 +1,9 @@
 ---
 # Deploy and manage monitoring stack with Docker Compose
 
-# Pinned backend certs (M-10): public material, verified out of band. The pve
-# exporter's REQUESTS_CA_BUNDLE and the omada exporter's SSL_CERT_FILE point at
-# these files via the compose mounts.
-- name: Copy pinned PVE root CA into the compose directory
-  ansible.builtin.copy:
-    src: pve-root-ca.crt
-    dest: "{{ monitoring_stack_compose_dir }}/pve-root-ca.crt"
-    owner: root
-    group: root
-    mode: '0644'
-
+# Pinned backend cert (M-10): public material, verified out of band. The omada
+# exporter's SSL_CERT_FILE points at this file via the compose mount. The PVE
+# root CA pin was removed - see the defaults comment (M-10/M-33).
 - name: Copy pinned Omada controller certificate into the compose directory
   ansible.builtin.copy:
     src: omada-tls.crt

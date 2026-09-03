@@ -43,8 +43,12 @@ monitoring_stack_cadvisor_port: 8080
 monitoring_stack_proxmox_exporter_version: "3.10.0"
 monitoring_stack_proxmox_exporter_port: 9221
 monitoring_stack_proxmox_api_url: "https://{{ hostvars['n5p']['ansible_host'] }}:8006"
-# M-10: TLS verification against the pinned PVE cluster root CA (files/certs).
-monitoring_stack_proxmox_api_verify_ssl: true
+# Verification stays OFF (accepted risk, fix-list M-10): the exporter image's
+# Python 3.13+ enables strict X509 verification, and the legacy PVE cluster
+# root CA lacks the keyUsage extension strict mode requires - the chain can
+# never verify until PVE serves a cert from a compliant internal CA (M-33).
+# The PVEAuditor token is read-only; the omada exporter gets full verification.
+monitoring_stack_proxmox_api_verify_ssl: false
 
 # Omada Exporter configuration
 monitoring_stack_omada_exporter_version: "0.13.1"
