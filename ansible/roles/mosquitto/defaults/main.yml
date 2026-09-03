@@ -12,7 +12,7 @@
 # hashes must be this exact tag; secrets.example.yml says so.
 mosquitto_version: "2.1.2-alpine"
 mosquitto_image: "eclipse-mosquitto:{{ mosquitto_version }}"
-mosquitto_base_dir: "/srv/docker/mosquitto"
+mosquitto_base_dir: "/opt/mosquitto"
 
 # The image drops privileges to this uid/gid. The data directory and the
 # password file must be owned by it or the broker exits on start.

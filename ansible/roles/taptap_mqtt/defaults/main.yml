@@ -8,7 +8,7 @@
 taptap_mqtt_version: "0.3.4"
 taptap_mqtt_image: "ghcr.io/litinoveweedle/hassio-addon-taptap:{{ taptap_mqtt_version }}"
 taptap_mqtt_container_name: "taptap-mqtt"
-taptap_mqtt_base_dir: "/srv/docker/taptap-mqtt"
+taptap_mqtt_base_dir: "/opt/taptap-mqtt"
 
 # The tap bridge: an Elfin EE11A on the TIGO CCA's GW/TAP port, serving the bus
 # as a raw TCP stream. Read-only by construction - it drives the RS485

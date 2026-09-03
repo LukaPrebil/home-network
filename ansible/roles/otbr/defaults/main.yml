@@ -13,8 +13,9 @@ otbr_image_ref: "{{ otbr_image }}:{{ otbr_version }}{{ ('@' + otbr_image_digest)
 # Container names
 otbr_container_name: "otbr"
 
-# Base directories (using existing /srv/docker NFS mount)
-otbr_base_dir: "/srv/docker/otbr"
+# Base directories (local rootfs, M-09: the thread data carries the network
+# key and PSKc and must not sit on the LAN-readable NFS export)
+otbr_base_dir: "/opt/otbr"
 otbr_compose_dir: "/opt/otbr"
 
 # Data directories

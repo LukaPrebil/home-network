@@ -9,8 +9,9 @@ pds_image: "ghcr.io/bluesky-social/pds:{{ pds_version }}"
 pds_container_name: "pds"
 
 # Directories
-# Compose file and env file on NFS-backed /srv/docker (consistent with other services)
-pds_base_dir: "/srv/docker/pds"
+# Compose file and env file on local rootfs (M-09: the env file carries the PLC
+# rotation key and JWT secret, which must not sit on the LAN-readable NFS export)
+pds_base_dir: "/opt/pds"
 # Data directory on iSCSI mount (NOT NFS — PDS uses SQLite which requires POSIX file locking)
 pds_data_dir: "/mnt/pds"
 pds_blocks_dir: "{{ pds_data_dir }}/blocks"

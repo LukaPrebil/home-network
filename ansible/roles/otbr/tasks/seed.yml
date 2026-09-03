@@ -10,13 +10,6 @@
 # instead of needing a manual dataset copy. It NEVER overwrites a live dataset
 # (guarded on `disabled` + no committed dataset), so it is safe on every run.
 
-- name: Assert OTBR data dir is on an NFS mount before judging it empty
-  ansible.builtin.include_role:
-    name: common
-    tasks_from: assert_nfs_mount
-  vars:
-    common_nfs_mount_path: "{{ otbr_data_dir }}"
-
 - name: Wait for the ot-ctl control socket to respond
   ansible.builtin.command: docker exec {{ otbr_container_name }} ot-ctl state
   register: otbr_state_probe
