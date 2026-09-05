@@ -281,7 +281,7 @@ The network runs on a flat `192.168.1.0/24` subnet using the **Telekom Innbox (I
 - ✅ Media services (Jellyfin on media LXC)
 - ✅ *Arr suite (Sonarr, Radarr, Prowlarr on containers VM)
 - ✅ Immich (photo management with GPU acceleration)
-- ✅ Traefik Reverse Proxy (serving 8 public routes with Let's Encrypt, rate limiting on all routes)
+- ✅ Traefik Reverse Proxy (serving 8 public routes with Let's Encrypt, rate limiting on all public routes except Home Assistant, which has a login-flow-only limiter)
 - ✅ Omada SDN Controller (managing network infrastructure)
 - ✅ Monitoring Stack (Prometheus + Grafana + Loki)
 - ✅ ATProto PDS (self-hosted Bluesky PDS at pds.lukapg.dev, iSCSI storage from TrueNAS, Cloudflare-proxied, DNS TXT handle verification)
@@ -294,7 +294,7 @@ The network runs on a flat `192.168.1.0/24` subnet using the **Telekom Innbox (I
 - ✅ CrowdSec Traefik bouncer plugin (stream mode, blocks flagged IPs at reverse proxy)
 - ✅ CrowdSec community blocklists (Firehol Greensnow, web attacks, Tor exit nodes)
 - ✅ traefik-warp plugin (extracts real client IP from Cloudflare proxy headers)
-- ✅ Rate limiting on all public routes (100 req/min, 50 burst)
+- ✅ Rate limiting on all public routes except Home Assistant (100 req/min, 50 burst; HA login-flow POSTs: 10 req/min, burst 30, keyed on the verified X-Real-Ip)
 - ✅ Traefik dashboard removed from public exposure (LAN-only via traefik.lan:8080)
 - ✅ MFA (TOTP) on Home Assistant admin account
 
