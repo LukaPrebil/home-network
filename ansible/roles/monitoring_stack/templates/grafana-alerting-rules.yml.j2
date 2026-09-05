@@ -842,6 +842,129 @@ groups:
         labels:
           severity: warning
 
+      # 23. Normal Home Assistant traffic 429 - must never happen since the
+      # login-only limiter split. Router labels are enabled on the traefik
+      # host (traefik_metrics_add_routers_labels), so ha-secure@file has its
+      # own series. No client IP or path labels: bounded labels only.
+      - uid: alert-ha-route-429
+        title: Home Assistant Route 429
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(increase(traefik_router_requests_total{router="ha-secure@file",code="429"}[5m]))
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 5
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Traefik returned 429 on normal Home Assistant traffic"
+          description: |
+            More than 5 requests to ha-secure@file received 429 in 5 minutes.
+            Normal HA traffic (UI, API, token refresh, WebSocket) must never be
+            rate-limited by Traefik. First query in Prometheus:
+            sum by (method) (increase(traefik_router_requests_total{router="ha-secure@file",code="429"}[15m]))
+            then open the Traefik dashboard and check whether a rate-limit
+            middleware is attached to ha-secure@file again.
+        labels:
+          severity: critical
+
+      # 24. Home Assistant login-flow 429 - the login limiter is doing its job
+      # against abuse or against a legitimate user; the operator decides which.
+      - uid: alert-ha-login-429
+        title: Home Assistant Login 429
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum(increase(traefik_router_requests_total{router="ha-login-secure@file",code="429"}[5m]))
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Traefik rate-limited Home Assistant login submissions"
+          description: |
+            At least one POST to an HA login flow received 429 in 5 minutes.
+            Decide whether this is abuse or a legitimate user before acting:
+            first query in Prometheus
+            sum by (method) (increase(traefik_router_requests_total{router="ha-login-secure@file",code="429"}[15m])),
+            then review CrowdSec decisions. To unblock a legitimate user, disable
+            the limiter and reconverge:
+            ansible-playbook site.yml --tags traefik --limit traefik -e traefik_ha_login_rate_limit_enabled=false
+        labels:
+          severity: warning
+
   # ============================================================
   # CrowdSec Security
   # ============================================================

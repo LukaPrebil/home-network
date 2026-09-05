@@ -13,6 +13,13 @@
     state: present
   register: traefik_deploy
 
+# The static config template notifies Restart Traefik, but handlers normally
+# run at end of play - the /ping probe below would then check the OLD process
+# and a broken static config would surface only after the play "succeeded".
+# Flushing here applies the restart (if notified) before the readiness check.
+- name: Flush handlers so config changes are applied before the health check
+  ansible.builtin.meta: flush_handlers
+
 - name: Wait for Traefik to be ready
   ansible.builtin.uri:
     url: "http://localhost:{{ traefik_dashboard_port }}/ping"

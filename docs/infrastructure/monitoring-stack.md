@@ -58,6 +58,30 @@ ansible-playbook site.yml --tags monitoring-acl --limit n5p
 
 ---
 
+## Traefik Router Metrics and HA 429 Alerts
+
+The traefik host enables router-level Prometheus labels
+(`traefik_metrics_add_routers_labels: true` in `host_vars/traefik.yml`), so
+`traefik_router_requests_total` carries a `router` label such as
+`ha-secure@file`. Two Grafana alerts in the `Traefik & Network` group read it:
+
+| Alert | Fires when | Severity |
+| --- | --- | --- |
+| `Home Assistant Route 429` | more than 5 requests to `ha-secure@file` return 429 within 5 minutes | critical |
+| `Home Assistant Login 429` | any request to `ha-login-secure@file` returns 429 within 5 minutes | warning |
+
+Normal HA traffic must never be rate-limited by Traefik, so the first alert
+means the login-only limiter split has regressed: check whether a rate-limit
+middleware is attached to `ha-secure@file` again. The second alert means the
+login limiter rejected a password or MFA submission: distinguish abuse from
+a legitimate user before acting (both alert descriptions carry the first
+Prometheus query to run and the disable command).
+
+Both queries use bounded labels only (router, method, code). They never
+label client IPs, paths, query strings, tokens, or request bodies.
+
+---
+
 ## Log Aggregation (Loki + Alloy)
 
 Log collection is handled by **Grafana Alloy** (native binary), deployed via the `alloy` Ansible role on all hosts in the `monitoring_agents` group.

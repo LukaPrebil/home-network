@@ -57,6 +57,24 @@ traefik_metrics_add_services_labels: true
 traefik_cloudflare_real_ip_enabled: false  # Enable in host_vars for Cloudflare-proxied setups
 traefik_warp_version: "v1.1.5"
 
+# Pinned Cloudflare edge ranges (https://www.cloudflare.com/ips-v4 and /ips-v6).
+# Empty by default: a host enabling traefik_cloudflare_real_ip_enabled must pin
+# the current ranges in host_vars - the drift check in tasks/config.yml fails
+# the converge when a reachable official list differs from the pinned one.
+# Never set these from a fetched response; they are repository variables.
+traefik_cloudflare_ipv4_ranges: []
+traefik_cloudflare_ipv6_ranges: []
+
+# Home Assistant login-flow rate limit. Defaults to disabled: a normal HA
+# browser load consumes nearly the whole 100/minute shared limiter, so HA has
+# NO route-wide limiter and only login-flow POSTs may be limited. The limiter
+# keys on X-Real-Ip, which is the verified visitor IP on the Cloudflare path
+# and the direct socket address everywhere else.
+traefik_ha_login_rate_limit_enabled: false
+traefik_ha_login_rate_limit_average: 10
+traefik_ha_login_rate_limit_period: "1m"
+traefik_ha_login_rate_limit_burst: 30
+
 # CrowdSec bouncer plugin
 traefik_crowdsec_enabled: false  # Enable in host_vars alongside CrowdSec role
 traefik_crowdsec_bouncer_version: "v1.7.1"
