@@ -1,6 +1,101 @@
 ---
 # Deploy Traefik configuration files
 
+# The pinned Cloudflare ranges in host_vars feed the websecure forwardedHeaders
+# trust list and the CrowdSec bouncer proxy list, so they are drift-checked
+# against Cloudflare's published lists BEFORE any configuration is rendered.
+# A reachable official list that differs from the pinned one fails the converge;
+# an unreachable endpoint warns and continues on the pinned values. The pinned
+# lists are repository variables and are never rewritten from a fetch.
+
+- name: Fetch published Cloudflare IPv4 ranges
+  ansible.builtin.uri:
+    url: "https://www.cloudflare.com/ips-v4"
+    method: GET
+    return_content: true
+  check_mode: false  # the drift check must also run during --check runs
+  changed_when: false
+  failed_when: false  # a probe failure is handled below, not a task failure
+  register: traefik_cloudflare_v4_probe
+  when: traefik_cloudflare_real_ip_enabled | default(false) | bool
+
+- name: Fetch published Cloudflare IPv6 ranges
+  ansible.builtin.uri:
+    url: "https://www.cloudflare.com/ips-v6"
+    method: GET
+    return_content: true
+  check_mode: false
+  changed_when: false
+  failed_when: false
+  register: traefik_cloudflare_v6_probe
+  when: traefik_cloudflare_real_ip_enabled | default(false) | bool
+
+- name: Normalize published Cloudflare IPv4 ranges
+  ansible.builtin.set_fact:
+    traefik_cloudflare_v4_published: "{{ traefik_cloudflare_v4_probe.content.split('\n') | map('trim') | reject('equalto', '') | list }}"
+  when:
+    - traefik_cloudflare_real_ip_enabled | default(false) | bool
+    - traefik_cloudflare_v4_probe.status is defined
+    - traefik_cloudflare_v4_probe.status == 200
+
+- name: Normalize published Cloudflare IPv6 ranges
+  ansible.builtin.set_fact:
+    traefik_cloudflare_v6_published: "{{ traefik_cloudflare_v6_probe.content.split('\n') | map('trim') | reject('equalto', '') | list }}"
+  when:
+    - traefik_cloudflare_real_ip_enabled | default(false) | bool
+    - traefik_cloudflare_v6_probe.status is defined
+    - traefik_cloudflare_v6_probe.status == 200
+
+- name: Fail on Cloudflare IPv4 range drift
+  ansible.builtin.fail:
+    msg: |-
+      The pinned Cloudflare IPv4 ranges do not match the published list.
+      Only published: {{ traefik_cloudflare_v4_published | difference(traefik_cloudflare_ipv4_ranges) | join(', ') }}
+      Only pinned: {{ traefik_cloudflare_ipv4_ranges | difference(traefik_cloudflare_v4_published) | join(', ') }}
+      Update traefik_cloudflare_ipv4_ranges in host_vars/traefik.yml from
+      https://www.cloudflare.com/ips-v4 and re-run. The pinned list is a
+      repository variable and is never rewritten from the fetched response.
+  when:
+    - traefik_cloudflare_real_ip_enabled | default(false) | bool
+    - traefik_cloudflare_v4_published is defined
+    - traefik_cloudflare_v4_published | difference(traefik_cloudflare_ipv4_ranges) | length > 0
+      or traefik_cloudflare_ipv4_ranges | difference(traefik_cloudflare_v4_published) | length > 0
+
+- name: Fail on Cloudflare IPv6 range drift
+  ansible.builtin.fail:
+    msg: |-
+      The pinned Cloudflare IPv6 ranges do not match the published list.
+      Only published: {{ traefik_cloudflare_v6_published | difference(traefik_cloudflare_ipv6_ranges) | join(', ') }}
+      Only pinned: {{ traefik_cloudflare_ipv6_ranges | difference(traefik_cloudflare_v6_published) | join(', ') }}
+      Update traefik_cloudflare_ipv6_ranges in host_vars/traefik.yml from
+      https://www.cloudflare.com/ips-v6 and re-run. The pinned list is a
+      repository variable and is never rewritten from the fetched response.
+  when:
+    - traefik_cloudflare_real_ip_enabled | default(false) | bool
+    - traefik_cloudflare_v6_published is defined
+    - traefik_cloudflare_v6_published | difference(traefik_cloudflare_ipv6_ranges) | length > 0
+      or traefik_cloudflare_ipv6_ranges | difference(traefik_cloudflare_v6_published) | length > 0
+
+- name: Warn when the Cloudflare IPv4 range endpoint is unavailable
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: the published Cloudflare IPv4 ranges could not be fetched
+      (https://www.cloudflare.com/ips-v4); the pinned repository list is used
+      unverified. Check connectivity from this host before the next converge.
+  when:
+    - traefik_cloudflare_real_ip_enabled | default(false) | bool
+    - traefik_cloudflare_v4_published is not defined
+
+- name: Warn when the Cloudflare IPv6 range endpoint is unavailable
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: the published Cloudflare IPv6 ranges could not be fetched
+      (https://www.cloudflare.com/ips-v6); the pinned repository list is used
+      unverified. Check connectivity from this host before the next converge.
+  when:
+    - traefik_cloudflare_real_ip_enabled | default(false) | bool
+    - traefik_cloudflare_v6_published is not defined
+
 - name: Deploy Traefik static configuration
   ansible.builtin.template:
     src: traefik.yml.j2
@@ -38,6 +133,11 @@
     owner: root
     group: root
     mode: '0600'  # holds crowdsecLapiKey; traefik reads it as root in the container
+  # The rendered file embeds the CrowdSec LAPI key, so without no_log every
+  # --check --diff prints it into terminal output and logs (same treatment as
+  # traefik.env). Inspect rendered content on the host or via the dashboard
+  # API instead of the Ansible diff.
+  no_log: true
   # No notify: Traefik file provider watches this directory
   # (traefik_file_provider_watch=true) and applies dynamic config edits
   # without a container restart.

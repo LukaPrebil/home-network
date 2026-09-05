@@ -41,6 +41,20 @@ http:
         burst: 50
         period: 1m
 
+{% if traefik_ha_login_rate_limit_enabled | default(false) | bool %}
+    # Login-only limiter for Home Assistant auth flows - the only HA traffic
+    # that may ever see a Traefik 429. Keyed on X-Real-Ip: the warp-verified
+    # visitor IP on the Cloudflare path, the direct socket address everywhere
+    # else. Attached only to ha-login-secure while the enable flag is true.
+    ha-login-rate-limit:
+      rateLimit:
+        average: {{ traefik_ha_login_rate_limit_average }}
+        burst: {{ traefik_ha_login_rate_limit_burst }}
+        period: {{ traefik_ha_login_rate_limit_period }}
+        sourceCriterion:
+          requestHeaderName: X-Real-IP
+{% endif %}
+
     # LAN + tailnet-only allow-list, attached to internal-only routers.
     # Traefik 3.x: ipAllowList replaces deprecated ipWhiteList.
     # Tailnet CIDRs (100.64.0.0/10, fd7a:115c:a1e0::/48) are universal
@@ -63,16 +77,18 @@ http:
         scheme: https
         permanent: true
 
-{% if traefik_cloudflare_real_ip_enabled | default(false) %}
+{% if traefik_cloudflare_real_ip_enabled | default(false) | bool %}
     # Cloudflare real client IP extraction (traefik-warp plugin)
-    # Auto-fetches Cloudflare IP ranges and extracts real client IP
+    # provider: cloudflare auto-fetches the published Cloudflare ranges into
+    # its trust bucket. No trustIp additions: extra entries are merged into
+    # that bucket, and the old 192.168.1.0/24 entry made every LAN peer a
+    # "trusted edge" whose forged CF-Connecting-IP would be honored. With no
+    # additions, a non-Cloudflare peer gets its socket address as X-Real-Ip and
+    # any spoofed forwarding headers are stripped first.
     cloudflare-real-ip:
       plugin:
         traefikwarp:
           provider: cloudflare
-          trustIp:
-            cloudflare:
-              - "192.168.1.0/24"
 {% endif %}
 
 {% if traefik_crowdsec_enabled | default(false) %}
@@ -85,6 +101,22 @@ http:
           crowdsecLapiScheme: http
           crowdsecLapiHost: "crowdsec:8080"
           crowdsecLapiKey: "{{ traefik_crowdsec_bouncer_key }}"
+{% if traefik_cloudflare_real_ip_enabled | default(false) | bool %}
+          # Evaluate the same verified visitor identity as the limiter: X-Real-Ip
+          # is set by cloudflare-real-ip (warp) to CF-Connecting-IP on the
+          # Cloudflare path and to the direct socket address everywhere else.
+          # The pinned Cloudflare ranges are the trusted-proxy pool, so a
+          # header value that is itself an edge address falls through to the
+          # socket address instead of being taken as a client.
+          forwardedHeadersCustomName: "X-Real-IP"
+          forwardedHeadersTrustedIps:
+{% for cidr in traefik_cloudflare_ipv4_ranges %}
+            - "{{ cidr }}"
+{% endfor %}
+{% for cidr in traefik_cloudflare_ipv6_ranges %}
+            - "{{ cidr }}"
+{% endfor %}
+{% endif %}
 {% endif %}
 
 {# Build security middleware chain applied to all public routes #}
@@ -100,6 +132,12 @@ http:
   routers:
 {% if traefik_acme_enabled | default(false) %}
     # Home Assistant
+    # No rate-limit here: a single browser HA load consumes almost the whole
+    # 100/minute shared bucket (2026-09-05 incident: 50 accepted, 44 rejected
+    # 429s in one 15s interval while HA itself stayed healthy). Normal HA
+    # traffic - UI, API, token refresh, WebSocket - is unlimited at Traefik;
+    # Cloudflare, CrowdSec, HA auth and MFA remain the controls. Login-flow
+    # POSTs are limited separately on ha-login-secure below.
     ha-secure:
       rule: "Host(`ha.{{ traefik_domain | default('lukapg.dev') }}`)"
       entryPoints:
@@ -117,7 +155,33 @@ http:
 {% endfor %}
         - proxy-headers
         - security-headers
-        - rate-limit
+
+    # Home Assistant login flows (password + MFA submissions).
+    # Explicit priority above ha-secure so these POSTs take the narrower
+    # chain whose only addition is ha-login-rate-limit (when the enable flag
+    # is true). The router itself stays present when the limiter is disabled
+    # so router metrics can verify the split before it takes effect.
+    ha-login-secure:
+      rule: "Host(`ha.{{ traefik_domain | default('lukapg.dev') }}`) && Method(`POST`) && (Path(`/auth/login_flow`) || PathPrefix(`/auth/login_flow/`))"
+      priority: 100
+      entryPoints:
+        - websecure
+      service: homeassistant
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
+        - proxy-headers
+        - security-headers
+{% if traefik_ha_login_rate_limit_enabled | default(false) | bool %}
+        - ha-login-rate-limit
+{% endif %}
 
     # Uptime Kuma (kuma subdomain)
     kuma-secure:

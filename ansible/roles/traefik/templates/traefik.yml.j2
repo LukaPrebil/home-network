@@ -32,6 +32,21 @@ entryPoints:
 
   websecure:
     address: ":{{ traefik_https_port }}"
+{% if traefik_cloudflare_real_ip_enabled | default(false) | bool %}
+    # Trust forwarded headers only from Cloudflare's published edge ranges
+    # (pinned in host_vars, drift-checked before rendering). Every other peer
+    # (LAN, tailnet, direct WAN) keeps its socket address as identity: Traefik
+    # strips the X-Forwarded-*/X-Real-Ip headers a non-trusted client sends.
+    # Never set insecure: true here - that would trust any forwarded headers.
+    forwardedHeaders:
+      trustedIPs:
+{% for cidr in traefik_cloudflare_ipv4_ranges %}
+        - "{{ cidr }}"
+{% endfor %}
+{% for cidr in traefik_cloudflare_ipv6_ranges %}
+        - "{{ cidr }}"
+{% endfor %}
+{% endif %}
 {% if traefik_http3_enabled %}
     http3:
       advertisedPort: {{ traefik_http3_advertised_port }}
