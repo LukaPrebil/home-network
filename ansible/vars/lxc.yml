@@ -19,9 +19,15 @@ lxc_containers:
     gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
     netmask: 24
     cores: 4
-    memory: 8192  # 8GB cap. Working set ~3GB (postgres+ML+server idle); 8GB gives 2.5x
-    # headroom for ML re-indexing bursts. Earlier 16GB allocation was over-provisioned
-    # and locked up ~10GB of n5p RAM that never got used.
+    memory: 10240  # 10GB cap. Measured 2026-09-13: one ML session (upload one photo, three
+    # models load) peaked at 8128 MiB, which is exactly memory.high for an 8GB cap, because
+    # Proxmox sets high = max x 127/128. The old cap was clamping the burst, not meeting its
+    # demand, so the container reclaimed its own NFS page cache mid-load and re-read it. The
+    # host cost stays bounded because the excess is reclaimable cache: measured at 10GB, one
+    # session moves the host by ~5.3 GiB, of which ~3.9 GiB is anonymous memory (the models'
+    # own working set) and the rest is NFS page cache the kernel can take back.
+    # NOTE: provision-lxc.yml applies memory only at creation, so editing this value does not
+    # reach a running guest. The live apply is `pct set 210 --memory 10240 --swap 4096`.
     swap: 4096  # 4GB swap
     disk: 64  # 64GB root disk (for large Docker images, especially ROCm ML)
     storage: truenas-vms
