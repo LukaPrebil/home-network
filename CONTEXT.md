@@ -319,6 +319,83 @@ n5p plus rpi4 tailing a `/var/log/syslog` that Debian 13 never creates.
 _Avoid_: "log shipping is broken" - nothing is broken; the source is doing exactly what
 its empty target list asks of it.
 
+### Model residency (n5p)
+
+**On-demand model**:
+A model that loads on the first request and unloads after an idle **model TTL**, so it holds no
+host RAM between sessions.
+_Avoid_: "lazy load" (says nothing about the memory coming back)
+
+**Resident model**:
+A model kept loaded continuously; it does not survive memory pressure, because its pages are
+**reclaimable weights**, so it degrades into an **on-demand model** exactly when another workload
+needs the RAM.
+_Avoid_: "pinned", "always-on"
+
+**Model TTL**:
+The idle window measured from the last request before a model unloads - 30 minutes for the local
+LLM, 300 s (the Immich default) for the ML models.
+_Avoid_: "request timeout" (that bounds one call; this bounds idle time)
+
+**Cold start**:
+The load paid on the first request after an unload, about one second per GiB on n5p, because local
+disk and the TrueNAS share both read near 1 GB/s.
+_Avoid_: "warm-up"
+
+**Reclaimable weights**:
+Weights held as file-backed mmap pages, which the kernel may drop under pressure, so a model slows
+down instead of forcing swap or an OOM kill.
+_Avoid_: "shared memory"
+
+**Reclaim order**:
+Which pages the kernel drops first when the host is short - reclaimable file-backed pages before
+anonymous ones. It is an outcome of reclaimability, not a setting.
+_Avoid_: "priority", "preemption" (cgroup v2 offers neither between sibling groups)
+
+**Model artifact**:
+A read-only set of weight files. It lives on a TrueNAS share but is not **NFS-backed state**: being
+immutable, two guests may read it at once and rollback is deleting a file.
+_Avoid_: "model data" (that word collides with the **local-rootfs state** / **NFS-backed state** split)
+
+**ML burst**:
+One immich ML residency window: three models loaded, about 4.1 GiB of host RAM and 938 MB of GTT at
+peak, then everything freed 300 s after the last request.
+_Avoid_: "ML job" (a job is one queue task; the burst is the whole window)
+
+### Pi chat remote
+
+**Attach**:
+Connecting the phone to a pi session already running in a TUI at the Mac. One transcript, one writer; desk and phone see the same session by construction. v1 supports attach only.
+_Avoid_: "sync" (implies two transcripts being reconciled) and "open the session file" (attach targets a running process, not a file)
+
+**Spawn**:
+The bridge starting its own headless pi session instead of attaching. A second pi on the same project with a diverged session tree. Goal-state feature, not v1.
+_Avoid_: "new session" (ambiguous between a fresh attach and a spawn)
+
+**Bridge**:
+The always-on service that pi sessions dial into and the phone talks to. Runs as a Docker container on the containers VM, reachable over the tailnet; serves every host (Mac, dev VM) from one endpoint. Holds the session registry, auth, and notification dispatch.
+_Avoid_: "relay" (it owns registry and auth, not a dumb pass-through); "the server" (every component is a server; the name must say what it does)
+
+**Steer**:
+A message injected while the session is streaming. Pi delivers it after the current assistant turn's tool calls finish and before the next LLM call, so the agent adjusts course without the turn ending. Mechanism: `pi.sendUserMessage` with `deliverAs: "steer"`.
+_Avoid_: "interrupt" (tool calls already running still complete; only the next LLM call changes)
+
+**Follow-up**:
+A message delivered only once the agent has no more tool calls. The "when you are done" path for prompts sent mid-turn. Mechanism: `deliverAs: "followUp"`.
+_Avoid_: "queue" (pi has no single queue; steer lands at the next LLM call, follow-up lands at the end of the work)
+
+**Abort**:
+Ending the running turn from the phone. The session stays attached and keeps everything already in the transcript.
+_Avoid_: "kill the session" (abort ends a turn, not the session)
+
+**Dial-in**:
+The outbound WebSocket from a session's extension to the bridge, carrying the live event stream up and prompts down. Its presence is the session's online status; a drop while the session was working means an interrupted turn.
+_Avoid_: "connection to the session" (the direction is the point: sessions always dial out, nothing listens on the workstation)
+
+**Remote client**:
+The phone-side PWA served by the bridge. Installed to the home screen on the Galaxy S24+; compatible with iOS. Talks to the bridge over the tailnet.
+_Avoid_: "the app" (reads as a native app; v1 ships no native app)
+
 ## Relationships
 
 - A **Job** produces exactly one **Job end**, which is either **Finished** or **Cancelled/aborted**
@@ -341,6 +418,7 @@ its empty target list asks of it.
 - **NFS-backed state** survives a guest rebuild but forbids concurrency; **local-rootfs state** is the opposite on both counts, which is why the two demand different handling in a **staged cutover**
 - A guest's rebuild cost is set by its **local-rootfs state**, not by its disk size - the six 26.04 rebuild targets total 43.6 GB on disk but only ~10 GB of state that a converge cannot recreate
 - An **orphaned guest** is rollback only while it stays stopped; leaving it at `onboot: 1` converts the safety net into a duplicate-IP incident on the next power event
+- A **staged cutover** replaces a guest on the same IP with a fresh host key, so its **pinned host key** is stale until the provision playbook's keyscan hook refreshes it; converging against an un-refreshed pin fails hard rather than trusting the new key
 - A **respawned crash** is invisible to the container-restart alert by construction, so detecting one has to start from the container's logs, never from its restart count or health status
 - Where a guest's **local-rootfs state** is an index over its **NFS-backed state** - Immich's Postgres over the photo library - a **staged cutover** rollback desynchronises the two: anything written after cutover survives on NFS with no row in the restored index. Rollback value expires at the first write, not on a timer, which makes the **orphaned guest** worth far less here than for a guest whose state is self-contained
 - A **blind source** and a **respawned crash** fail identically from the outside: the evidence that would show a problem is absent rather than negative, so every liveness check reads green. Both are found only by asking a component to account for its own throughput - target count for the source, log lines for the supervisor - never by asking whether it is running
@@ -350,6 +428,12 @@ its empty target list asks of it.
 - **Whole-house ventilation** and **free cooling** read the same ARSO dew point and are opposite in stability: opening the utility window pulls that room toward outdoor and deeper inside its deadband, while opening house windows pulls the house average toward outdoor and out of the ventilation condition. Free cooling therefore settles on a bare deadband, and ventilation needs two thresholds
 - The **ventilation window** set excludes the one window **free cooling** drives, so the two decisions cannot silence each other
 - **Station wander** is why the ventilation comparison smooths ARSO to an hourly mean instead of widening its band: a deadband large enough to cover the wander would be large enough to miss the weather
+- A **resident model** buys less than it looks: under the pressure it exists to survive, its **reclaimable weights** are the first pages dropped, so it becomes an **on-demand model** paying a **cold start** at exactly the wrong moment
+- A **model TTL** counts idle time from the last request, not the length of a session, so a busy agent loop or an **ML burst** keeps a model loaded well past its nominal TTL
+- An **on-demand model** and the **ML burst** collide only if an LLM session is open when the burst starts; reclaim settles it in favour of ML, because the LLM is the side holding **reclaimable weights**
+- Weights are a **model artifact**, not **NFS-backed state**, so the ban on two guests sharing an NFS path does not reach them, and a **staged cutover** cannot desynchronise them from an index the way Immich's Postgres can
+- A guest's own `memory.high` must sit above its working set, or the cgroup reclaims the very pages a **model artifact** runs from; the soft limit is a floor under the model, never a lever against another workload
+- **Reclaim order** falls out of reclaimability rather than priority: **reclaimable weights** yield before the ML workload's anonymous GPU buffers, so ML wins the morning **ML burst** without being configured to win
 
 ## Example dialogue
 
