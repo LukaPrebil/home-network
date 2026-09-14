@@ -21,8 +21,8 @@ Proxmox n5p (192.168.1.128)
         ├── docker role        (Docker engine + compose plugin)
         ├── tailscale role     (apt repo install, tag:dev)
         └── dev_vm role        (apt packages, AWS CLI, SSH-key + GitHub
-                                auto-add, chezmoi, claude config tree,
-                                nvm + Node LTS, Claude Code, starship,
+                                auto-add, chezmoi, nvm + Node LTS,
+                                Claude Code, starship,
                                 rustup, tlrc, docker sudoers, UFW)
 ```
 
@@ -33,7 +33,7 @@ Proxmox n5p (192.168.1.128)
 | Inventory | `ansible/inventory/hosts.yml` (`dev_hosts`) | this repo |
 | User vars | `ansible/host_vars/dev.yml` | this repo |
 | Dotfiles | `git@github.com:LukaPrebil/dotfiles.git` (chezmoi) | external |
-| Claude config | `git@github.com:<dev_vm_claude_remote>/claude.git` + symlinks under `~/.claude/` | external |
+| Claude config | `git@github.com:LukaPrebil/harness-config.git`, linked into `~/.claude/` by its own `scripts/setup-hosts.sh` | external, not managed by Ansible |
 
 ## Software stack on the VM
 
@@ -55,15 +55,17 @@ Proxmox n5p (192.168.1.128)
 
 | Path | Address | When |
 |------|---------|------|
-| LAN | `192.168.1.148` | At home (any device on the home /24) |
+| LAN | `192.168.30.148` | At home, from the Management, Trusted or transitional VLAN 1 networks |
 | MagicDNS | `dev.lan` (if AdGuard rewrite added) or `dev.<tailnet>.ts.net` | Always |
 | Tailscale | `100.x.x.x` (visible in `tailscale status`) | Off-LAN |
 
-UFW posture: default deny in / allow out, allowlist `192.168.1.0/24` on
-22/tcp, allow all on `tailscale0`. Run `sudo ufw status verbose` on the VM
-to confirm. Tighten the allowlist to a smaller CIDR or specific /32s by
-editing `dev_vm_ssh_allow_cidrs` in `host_vars/dev.yml` and re-running
-the role.
+UFW posture: default deny in / allow out, 22/tcp from `dev_vm_ssh_allow_cidrs`
+(Management, Trusted, transitional VLAN 1), 9100/12345 from
+`dev_vm_metrics_allow_cidrs` (the same list plus the monitoring LXC), allow all
+on `tailscale0`. Run `sudo ufw status verbose` on the VM to confirm. Edit the
+lists in `host_vars/dev.yml` and re-run the role. The role only adds rules, so
+a CIDR dropped from a list stays open until removed by hand with
+`sudo ufw delete allow from <cidr> to any port <port> proto tcp`.
 
 ## How to re-run the role
 
