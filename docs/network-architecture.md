@@ -15,12 +15,13 @@ The network is designed around four core principles:
 
 ## 2. Hardware Overview
 
-> **Target design.** This table and the diagram below describe the intended end state. For what is actually deployed today, see Section 7. As of 2026-07 the network still runs behind the **Telekom Innbox (InnboxG93)** as router/gateway (PPPoE over GPON) - the Omada ER707-M2 is not yet deployed - and **1 of the 3 EAP650 access points** is live.
+> **Target design.** This table and the diagram below describe the intended end state (the diagram still predates the ES228GP switch decision - see Section 7). For what is actually deployed today, see Section 7. As of 2026-09-14 the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up, but every client still sits on the transitional VLAN 1 - and **1 of the 3 EAP650 access points** is live.
 
 | Role          | Device                           | Key Features                     |
 | :------------ | :------------------------------- | :------------------------------- |
-| **Router**    | Omada ER707-M2                   | Multi-WAN, VPN, Firewall         |
-| **Switch 1**  | YuanLey 4x2.5G PoE + 2x10G SFP+  | High-Speed & PoE Switch          |
+| **Router**    | Omada ER605                      | Multi-WAN, VPN, Firewall; gigabit ports only (deployed 2026-09-14 in place of the planned ER707-M2) |
+| **Switch 1**  | YuanLey 2.5G PoE (**unmanaged**) | Aggregation only - cannot carry tagged VLANs; verify exact port/SFP+ spec against the physical unit (handoff says 5-port 2.5G PoE, this table previously said 4x2.5G + 2x10G SFP+) |
+| **Switch 1a** (planned) | Omada ES228GP | Managed 24x1G PoE+ (250W) + 2x1G SFP - takes over AP/doorbell VLAN trunking |
 | **Switch 2**  | MikroTik CSS326-24G-2S+RM        | 24-Port Distribution Switch      |
 | **Server 1**  | Minisforum N5 Pro                | Proxmox Host, 1x 10GbE, 1x5GbE   |
 | **Server 2**  | Raspberry Pi 4                   | Docker Services + Secondary DNS  |
@@ -41,7 +42,7 @@ graph TD
     end
 
     subgraph "LAN (VLANs 10, 20, 30, 40, 50, 60, 99)"
-        router["<br>🛡️<br>Omada ER707-M2 Router<br><b>VLAN 10: Management</b><br>Firewall & Gateway"]
+        router["<br>🛡️<br>Omada ER605 Router<br><b>VLAN 10: Management</b><br>Firewall & Gateway"]
 
         subgraph Switches
             sw_yuanley["<br>⚡<br>YuanLey Switch<br><b>VLAN 10: Management</b><br>4x2.5G PoE | 2x10G SFP+"]
@@ -140,7 +141,7 @@ This section contains the specific details required for the automated setup and 
 
 ### Static IP Address Map
 
-The network currently runs on a flat `192.168.1.0/24` subnet. The VLAN architecture in Section 4 is the planned target - see "Planned" below.
+This map is the pre-migration flat `192.168.1.0/24` subnet, stranded since the ER605 migration began on 2026-09-14. It is kept as the historical record and as the source for the renumber plan in Section 7.
 
 | Device/Role | Hostname | IP Address |
 | :--- | :--- | :--- |
@@ -196,7 +197,75 @@ terminating the tap would degrade the CCA's own traffic. See
 
 ### Current Network State
 
-The network runs on a flat `192.168.1.0/24` subnet using the **Telekom Innbox (InnboxG93)** router/gateway at `192.168.1.1` (PPPoE over GPON; it is also the DHCP server and hands out itself as the client DNS server). All services are accessible on their assigned IPs listed in Section 6. The VLAN architecture defined in Section 4 is the planned target - migration will happen when the Omada ER707-M2 router is deployed.
+Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24` behind the Telekom Innbox (InnboxG93) at `192.168.1.1` (PPPoE over GPON, DHCP, and DNS proxy). Since then the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up; clients still sit on the transitional VLAN 1 (`192.168.254.0/24`). Details, decisions, the renumber plan, and sequencing live in **ER605 Migration** below.
+
+### ER605 Migration (started 2026-09-14)
+
+**Live state, verified on the device.** Telekom switched the Innbox G93T to bridge mode (the mode survives a factory reset). ISP side: internet = VLAN 3900 tagged, NEO TV = VLAN 3999 tagged; static public IPv4 kept; IPv6 available over PPPoE (deferred). The ER605 runs PPPoE with **WAN VLAN tagging off** - the bridged Innbox hands PPPoE untagged, so tagging must stay disabled. MTU/MRU 1492, DNS from PPPoE. IPTV runs in Custom mode on VLAN 3999 with dedicated IPTV-only LAN ports for the NEO box (**unverified** - the unmanaged YuanLey cannot carry tagged VLANs, so the box must plug straight into an IPTV port). IGMP Proxy (V2, WAN) is on as a stopgap; disable it once TV is confirmed, as it is redundant with IPTV Custom mode.
+
+**Transitional topology.** Every client actually sits on the default LAN (VLAN 1, `192.168.254.0/24`) because the YuanLey is unmanaged. The old flat `192.168.1.0/24` (Section 6 map) is stranded.
+
+**DNS incident (stopgap in place).** The two AdGuard servers lost their `192.168.1.x` addresses, and Tailscale global nameservers with override-on still pointed at `192.168.1.145`, which hung all DNS on Tailscale clients. Stopgap: the entries were removed from Tailscale DNS and clients resolve through the ER605 DNS proxy.
+
+**Decisions (2026-09-14).**
+- The gigabit-only ER605 replaces the planned ER707-M2. Inter-VLAN traffic hairpins the router at 1G - **accepted**; mainly affects desktop <-> TrueNAS bulk transfers.
+- VLAN 1 / `192.168.254.0/24` is adopted as the transitional landing net, to be tightened and retired during the switch migration.
+- ER605 and EAP650 will be **adopted into the existing Omada Controller LXC** once the controller is reachable on VLAN 30. Adoption re-pushes all config: WAN PPPoE and IPTV (VLAN 3999) must be recreated controller-side and TV re-verified.
+- Planned access switch: **Omada ES228GP** (managed; 24x1G PoE+ 250W, 2x1G SFP) to give the APs and doorbell the VLAN trunking the unmanaged YuanLey cannot. Caveat: its uplinks are 1G, so the 10G YuanLey<->MikroTik backbone does not survive this choice - accepted 2026-09-14, since decision 1 already caps cross-segment traffic at 1G; a 10G-capable managed PoE switch may replace it later.
+
+**Renumber plan.** Last octets are kept so existing references stay recognizable. Ansible inventory, `vars/lxc.yml`, `vars/vms.yml`, host_vars, `known_hosts` pins, role defaults, and the `resolv.conf` template all change together; host-key pins refresh through the provision keyscan / accept-new path.
+
+| Host | Old | New | VLAN |
+| :--- | :--- | :--- | :--- |
+| n5p (Proxmox) | `192.168.1.128` | `192.168.30.128` | 30 |
+| rpi4 | `192.168.1.110` | `192.168.30.110` | 30 |
+| containers | `192.168.1.140` | `192.168.30.140` | 30 |
+| immich | `192.168.1.141` | `192.168.30.141` | 30 |
+| traefik | `192.168.1.142` | `192.168.60.142` | 60 |
+| omada | `192.168.1.143` | `192.168.30.143` | 30 |
+| haos | `192.168.1.144` | `192.168.30.144` | 30 |
+| adguard | `192.168.1.145` | `192.168.30.145` | 30 |
+| monitoring | `192.168.1.146` | `192.168.30.146` | 30 |
+| media | `192.168.1.147` | `192.168.30.147` | 30 |
+| dev | `192.168.1.148` | `192.168.30.148` | 30 |
+| hermes | `192.168.1.149` | `192.168.30.149` | 30 |
+| tn-storage | `192.168.1.150` | `192.168.30.150` | 30 |
+| sofar-logger | `192.168.1.6` | `192.168.40.6` | 40 |
+| elfin-heatpump | `192.168.1.160` | `192.168.40.160` | 40 |
+| elfin-inverter | `192.168.1.161` | `192.168.40.161` | 40 |
+| elfin-tigo | `192.168.1.162` | `192.168.40.162` | 40 |
+| desktop-pc | DHCP | DHCP | 20 |
+
+**Target ACL matrix** (deny by default; entries govern the initiator, return traffic is stateful):
+
+| Source | Destination | Service | Verdict |
+| :--- | :--- | :--- | :--- |
+| Management (10) | any | any | allow |
+| any | Servers (30) `.145` / `.110` | UDP+TCP 53 | allow - shared DNS |
+| DMZ (60) | Servers (30) | backend ports | allow - Traefik proxies VLAN-30 backends |
+| Trusted (20) | Servers (30) | any | allow |
+| Trusted (20) | Cameras (50) | any | allow - direct Reolink viewing |
+| Servers (30) | IoT (40), Cameras (50) | any | allow - HA initiates; IoT never initiates inward |
+| Servers (30) | Internet | any | allow - updates, upstream DNS |
+| IoT (40), Cameras (50) | own gateway `.1` | UDP 123 | allow - NTP; no other clock source once internet is denied |
+| DMZ (60) | Internet | any | allow |
+| WAN | DMZ `.142` | TCP 80/443 | allow via NAT - Traefik |
+| Guest (99) | Internet | any | allow |
+| Guest (99), IoT (40), Cameras (50), DMZ (60) | other LAN VLANs | any | **deny** (beyond the allows above) |
+| any non-Management | Management (10) | any | **deny** |
+| VLAN 1 (254), transitional | Internet + DNS | - | allow until retired |
+
+**Sequencing.**
+1. This document (done 2026-09-14).
+2. Tag VLANs 30/60 on the MikroTik CSS326 server-facing ports so n5p (1G link) and rpi4 land on their target VLANs without new hardware. The CSS326 runs SwOS and is managed (per-port PVID, tagged/untagged, strict VLAN filtering) but ships unconfigured - VLAN mode is off and it has never had an IP, which is why it behaved like an unmanaged switch. Enable VLAN mode first; give it a management IP (later VLAN 10). The n5p-facing port is hybrid: **PVID 30 untagged + VLAN 60 tagged**, so the host address and Servers-VLAN guests ride untagged while Traefik's guest NIC carries the 60 tag - no Proxmox subinterface needed. The YuanLey stays unmanaged with clients on VLAN 1.
+3. Renumber the fleet per the table above.
+4. Re-home DNS: AdGuard at `192.168.30.145` / `192.168.30.110`; ER605 per-LAN DHCP hands them out; the "any -> Servers:53" ACL lands before the cut.
+5. Tailscale: rpi4 advertises `192.168.30.0/24` (dropping the dead `192.168.1.0/24`); override DNS points at the AdGuard units' **tailnet** IPs, not LAN IPs.
+6. Verify NEO TV, then disable IGMP Proxy.
+7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE + IPTV and re-verify TV.
+8. Install ES228GP; move APs/doorbell onto tagged PoE ports; SSID -> VLAN mapping via the controller; tighten VLAN 1 to internet+DNS or retire it.
+9. Apply the full ACL matrix.
+10. Later: IPv6 via DHCPv6-PD over PPPoE.
 
 ### Completed Tasks
 
@@ -301,14 +370,16 @@ The network runs on a flat `192.168.1.0/24` subnet using the **Telekom Innbox (I
 ### Planned
 
 #### Hardware
-- ⏳ Omada ER707-M2 Router (not yet deployed)
+- ⏳ Omada ES228GP managed PoE switch (planned - see the migration section)
+- ⏳ 2 more Omada EAP650 access points
 
-#### Network Migration (blocked on router deployment)
-- ⏳ Deploy Omada router
-- ⏳ Configure VLANs on router
-- ⏳ Migrate Proxmox host to VLAN 30
-- ⏳ Configure firewall rules
-- ⏳ Set up inter-VLAN routing
+#### Network Migration (tracker: ER605 Migration section above)
+- ✅ Deploy Omada router (ER605 instead of the planned ER707-M2, 2026-09-14)
+- ✅ Configure VLAN interfaces on router
+- ⏳ Migrate Proxmox host + guests to VLAN 30 (renumber plan)
+- ⏳ Adopt ER605 + EAP650 into the Omada Controller LXC
+- ⏳ Configure firewall rules (ACL matrix)
+- ⏳ Move clients onto real VLANs (ES228GP + SSID mapping)
 
 ---
 
