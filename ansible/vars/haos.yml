@@ -12,10 +12,10 @@ haos_vm:
   image_filename: "haos_ova-17.1.qcow2"
   image_url: "https://github.com/home-assistant/operating-system/releases/download/17.1/haos_ova-17.1.qcow2.xz"
 
-  # Network configuration (temporary flat network)
-  vlan_id: null  # No VLAN until router is deployed (flat network for now)
-  ip: 192.168.1.144  # Temporary IP (will migrate to 192.168.30.7 when VLANs are active)
-  gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+  # Network configuration (VLAN 30, Servers - via switch-port PVID, untagged)
+  vlan_id: null
+  ip: 192.168.30.144
+  gateway: 192.168.30.1
   netmask: 24
   network_bridge: vmbr0
 

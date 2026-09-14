@@ -49,9 +49,9 @@ vlan_config:
 # Network bridges to create
 proxmox_bridges:
   - name: vmbr0
-    address: 192.168.1.128/24  # Current network during setup
-    gateway: 192.168.1.1
-    comment: "Main bridge - will be VLAN-aware"
+    address: 192.168.30.128/24  # VLAN 30 (Servers) - n5p switch port PVID 30 untagged
+    gateway: 192.168.30.1
+    comment: "Main bridge - VLAN-aware; host address rides untagged PVID 30"
     vlan_aware: true
 
 # Storage configuration

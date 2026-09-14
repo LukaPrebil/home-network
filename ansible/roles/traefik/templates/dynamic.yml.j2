@@ -59,15 +59,19 @@ http:
     # Traefik 3.x: ipAllowList replaces deprecated ipWhiteList.
     # Tailnet CIDRs (100.64.0.0/10, fd7a:115c:a1e0::/48) are universal
     # across all Tailscale tailnets, not tailnet-specific.
-    # NOTE: When VLANs migrate (Mgmt 10, Trusted 20, Servers 30, DMZ 60),
-    # update sourceRange to enumerate the trusted VLAN CIDRs and exclude
-    # IoT/Cameras/Guest. Today's flat /24 means everyone-on-Wi-Fi can
-    # reach internal routes; tightening only meaningful after VLAN migration.
+    # VLAN subnets per the ACL matrix in docs/network-architecture.md:
+    # Management, Trusted and Servers may reach internal-only routes;
+    # IoT (40), Cameras (50) and Guest (99) may not. The transitional
+    # VLAN 1 landing net stays while the migration runs - remove it when
+    # VLAN 1 is retired.
     lan-only:
       ipAllowList:
         sourceRange:
           - "127.0.0.1/32"           # local probes / Traefik ping
-          - "192.168.1.0/24"         # current flat LAN
+          - "192.168.10.0/24"        # Management
+          - "192.168.20.0/24"        # Trusted
+          - "192.168.30.0/24"        # Servers
+          - "192.168.254.0/24"       # transitional VLAN 1 (retire)
           - "100.64.0.0/10"          # Tailscale CGNAT IPv4
           - "fd7a:115c:a1e0::/48"    # Tailscale CGNAT IPv6
 
@@ -81,7 +85,7 @@ http:
     # Cloudflare real client IP extraction (traefik-warp plugin)
     # provider: cloudflare auto-fetches the published Cloudflare ranges into
     # its trust bucket. No trustIp additions: extra entries are merged into
-    # that bucket, and the old 192.168.1.0/24 entry made every LAN peer a
+    # that bucket, and the old LAN-CIDR entry made every LAN peer a
     # "trusted edge" whose forged CF-Connecting-IP would be honored. With no
     # additions, a non-Cloudflare peer gets its socket address as X-Real-Ip and
     # any spoofed forwarding headers are stripped first.

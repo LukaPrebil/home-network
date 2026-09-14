@@ -22,14 +22,14 @@ ha_mcp_secret_path: "{{ vault_ha_mcp_secret_path }}"
 # Network configuration
 domain: home.local
 dns_servers:
-  - 192.168.1.145  # AdGuard Home (Primary - LXC on n5p)
-  - 192.168.1.110  # AdGuard Home (Secondary - Docker on rpi4)
+  - 192.168.30.145  # AdGuard Home (Primary - LXC on n5p, VLAN 30)
+  - 192.168.30.110  # AdGuard Home (Secondary - native on rpi4, VLAN 30)
   # Fallback to Cloudflare if both AdGuard servers are down
   - 1.1.1.1        # Cloudflare DNS (fallback)
   - 1.0.0.1        # Cloudflare DNS (fallback)
 
 # TrueNAS NFS configuration
-truenas_nfs_server: "192.168.1.150"  # Temporary IP (will migrate to 192.168.30.3)
+truenas_nfs_server: "192.168.30.150"  # VLAN 30 (Servers)
 truenas_docker_volumes_share: "/mnt/tank/docker-volumes"
 truenas_immich_photos_share: "/mnt/tank/immich-photos"
 truenas_external_data_share: "/mnt/tank/external-data"

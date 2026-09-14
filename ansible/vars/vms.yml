@@ -5,9 +5,9 @@
 vms_to_create:
   - name: containers
     vmid: 111  # Rebuilt onto 26.04 2026-08-21; predecessor 101 kept stopped as rollback
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.140  # Temporary IP (will migrate to 192.168.30.4 when VLANs are active)
-    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    vlan_id: null  # VLAN 30 via switch-port PVID (untagged)
+    ip: 192.168.30.140
+    gateway: 192.168.30.1
     cores: 4
     memory: 6144  # 6GB flat cap (no balloon). Working set ~2.6GB across 17 Docker
     # containers; 6GB leaves 3.4GB headroom for paperless OCR bursts and Arr scans.
@@ -31,9 +31,9 @@ vms_to_create:
 
   - name: dev
     vmid: 148
-    vlan_id: null  # Flat network until Omada router lands; will migrate to VLAN 20
-    ip: 192.168.1.148
-    gateway: 192.168.1.1
+    vlan_id: null  # VLAN 30 (Servers) via switch-port PVID
+    ip: 192.168.30.148
+    gateway: 192.168.30.1
     cores: 6
     memory: 12288  # 12GB cap. Working set ~5GB, 2x headroom. No ballooning
     # (tried floors of 4GB and 6GB: both OOM-killed chrome/dbus/Claude workers
@@ -48,8 +48,8 @@ vms_to_create:
     # secondary already gives two-server redundancy; if both are down DNS
     # legitimately fails.
     dns_servers:
-      - 192.168.1.145  # AdGuard Home (primary, LXC on n5p)
-      - 192.168.1.110  # AdGuard Home (secondary, Docker on rpi4)
+      - 192.168.30.145  # AdGuard Home (primary, LXC on n5p)
+      - 192.168.30.110  # AdGuard Home (secondary, native on rpi4)
     snapshot_weekly: true  # Picked up by the n5p weekly snapshot cron
     description: "Development VM - Ubuntu 26.04, web-dev environment, Tailscale"
 

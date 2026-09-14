@@ -9,14 +9,17 @@
 # if the name is not in the aplinfo index).
 lxc_template_ubuntu: "ubuntu-26.04-standard_26.04-1_amd64.tar.zst"  # Ubuntu 26.04 LTS Proxmox template
 
+# VLAN note (2026-09-14 renumber, docs/network-architecture.md section 7): n5p's
+# switch port is hybrid - VLAN 30 untagged (PVID 30) + VLAN 60 tagged - so
+# Servers-VLAN guests keep vlan_id: null and only DMZ guests carry a tag.
 lxc_containers:
   - name: immich
     vmid: 210  # Rebuilt onto 26.04 2026-08-22; predecessor 200 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.141  # Temporary IP (will migrate to 192.168.30.8 when VLANs are active)
-    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    vlan_id: null  # VLAN 30 via switch-port PVID (untagged)
+    ip: 192.168.30.141
+    gateway: 192.168.30.1
     netmask: 24
     cores: 4
     memory: 10240  # 10GB cap. Measured 2026-09-13: one ML session (upload one photo, three
@@ -52,9 +55,9 @@ lxc_containers:
     vmid: 211  # Rebuilt onto 26.04 2026-08-21; predecessor 201 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.142  # Temporary IP (will migrate to 192.168.60.2 when VLANs are active)
-    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.60.1)
+    vlan_id: 60  # DMZ - tagged on the n5p trunk port
+    ip: 192.168.60.142
+    gateway: 192.168.60.1
     netmask: 24
     cores: 2
     memory: 2048  # 2GB in MB
@@ -78,9 +81,9 @@ lxc_containers:
     vmid: 212  # Rebuilt onto 26.04 2026-08-21; predecessor 202 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.143  # Temporary IP (will migrate to 192.168.50.2 when VLANs are active)
-    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.50.1)
+    vlan_id: null  # VLAN 30 via switch-port PVID (untagged)
+    ip: 192.168.30.143
+    gateway: 192.168.30.1
     netmask: 24
     cores: 2
     memory: 4096  # 4GB in MB (Omada + MongoDB requires more memory)
@@ -104,9 +107,9 @@ lxc_containers:
     vmid: 213  # Rebuilt onto 26.04 2026-08-21; predecessor 203 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.145  # Temporary IP (will migrate to 192.168.30.9 when VLANs are active)
-    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    vlan_id: null  # VLAN 30 via switch-port PVID (untagged)
+    ip: 192.168.30.145
+    gateway: 192.168.30.1
     netmask: 24
     cores: 2
     memory: 1024  # 1GB in MB (DNS service is lightweight)
@@ -130,9 +133,9 @@ lxc_containers:
     vmid: 214  # Rebuilt onto 26.04 2026-08-21; predecessor 204 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.146  # Temporary IP (will migrate to 192.168.30.10 when VLANs are active)
-    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    vlan_id: null  # VLAN 30 via switch-port PVID (untagged)
+    ip: 192.168.30.146
+    gateway: 192.168.30.1
     netmask: 24
     cores: 4
     memory: 4096  # 4GB cap. Working set ~3.5GB (prom 447MB + loki 85MB + grafana 143MB +
@@ -162,9 +165,9 @@ lxc_containers:
     vmid: 215  # Rebuilt onto 26.04 2026-08-21; predecessor 205 kept stopped as rollback
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.147  # Temporary IP (will migrate to 192.168.30.11 when VLANs are active)
-    gateway: 192.168.1.1  # Temporary gateway (will migrate to 192.168.30.1)
+    vlan_id: null  # VLAN 30 via switch-port PVID (untagged)
+    ip: 192.168.30.147
+    gateway: 192.168.30.1
     netmask: 24
     cores: 4
     memory: 4096  # 4GB cap. Jellyfin idle at ~160MB, hardware-transcoded streams don't blow
@@ -195,9 +198,9 @@ lxc_containers:
     vmid: 206
     node: n5p
     ostemplate: "local:vztmpl/{{ lxc_template_ubuntu }}"
-    vlan_id: null  # No VLAN until router is deployed (flat network for now)
-    ip: 192.168.1.149  # Temporary IP (will migrate to 192.168.30.12 when VLANs are active)
-    gateway: 192.168.1.1
+    vlan_id: null  # VLAN 30 via switch-port PVID (untagged)
+    ip: 192.168.30.149
+    gateway: 192.168.30.1
     netmask: 24
     cores: 4
     memory: 6144  # 6GB cap. Baseline 0.5-1.5GB at idle, 2-4GB during streaming

@@ -3,7 +3,7 @@
 #
 # Hardware: Proxmox VM (4 cores, 8GB RAM)
 # Role: Docker host for containerized services
-# IP: 192.168.1.140 (temporary, will migrate to 192.168.30.4)
+# IP: 192.168.30.140 (VLAN 30, Servers)
 
 # iSCSI initiator identity for the pds / uptime_kuma zvol mounts. Declarative so
 # a VM rebuild keeps matching allowed_initiators in host_vars/tn-storage.yml
