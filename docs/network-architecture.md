@@ -129,10 +129,12 @@ graph TD
     * **AdGuard Home (Secondary):** Redundant DNS server for network resilience.
     * **Tailscale subnet router:** advertises `192.168.30.0/24` (Servers VLAN,
       approved 2026-09-14) to the `lukaprebil.github` tailnet (tag
-      `tag:subnet-router`) so off-LAN peers can reach VLAN-30 hosts. Traefik
-      moved to `192.168.60.142`, outside that route, and the tailnet-level
-      "Override local DNS" entry was removed during the migration; both are
-      open under Section 7, sequencing step 5.
+      `tag:subnet-router`) so off-LAN peers can reach VLAN-30 hosts, plus
+      `192.168.60.142/32` so they reach Traefik in the DMZ without exposing
+      the rest of VLAN 60. Tailnet DNS resolvers are `192.168.30.145`
+      (AdGuard LXC, via the subnet route) and `100.111.78.53` (AdGuard on
+      rpi4, over the tailnet). Devices that stay at home should turn off
+      "Use Tailscale subnets", or their server traffic hairpins through rpi4.
 
 ---
 
@@ -202,7 +204,7 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 
 ### ER605 Migration (started 2026-09-14)
 
-**Live state, verified on the device.** Telekom switched the Innbox G93T to bridge mode (the mode survives a factory reset). ISP side: internet = VLAN 3900 tagged, NEO TV = VLAN 3999 tagged; static public IPv4 kept; IPv6 available over PPPoE (deferred). The ER605 runs PPPoE with **WAN VLAN tagging off** - the bridged Innbox hands PPPoE untagged, so tagging must stay disabled. MTU/MRU 1492, DNS from PPPoE. IPTV runs in Custom mode on VLAN 3999 with dedicated IPTV-only LAN ports for the NEO box (**unverified** - the unmanaged YuanLey cannot carry tagged VLANs, so the box must plug straight into an IPTV port). IGMP Proxy (V2, WAN) is on as a stopgap; disable it once TV is confirmed, as it is redundant with IPTV Custom mode.
+**Live state, verified on the device.** Telekom switched the Innbox G93T to bridge mode (the mode survives a factory reset). ISP side: internet = VLAN 3900 tagged, NEO TV = VLAN 3999 tagged; static public IPv4 kept; IPv6 available over PPPoE (deferred). The ER605 runs PPPoE with **WAN VLAN tagging off** - the bridged Innbox hands PPPoE untagged, so tagging must stay disabled. MTU/MRU 1492, DNS from PPPoE. **NEO TV bypasses the ER605** (verified 2026-09-14): the box plugs into a LAN port on the Innbox itself, which in bridge mode serves TV on its own ports. The ER605 IPTV page was found in Bridge mode with port 4 as the IPTV port, not Custom 3999; the box got no address there or on a normal LAN port, and switching to Custom mode (IPTV VLAN 3999) took the internet down, so it was reverted. ER605 IPTV and IGMP Proxy (V2, WAN) are still enabled and no longer serve anything.
 
 **Transitional topology.** Servers are on their target VLANs since 2026-09-14 (renumber table below). Every client still sits on the default LAN (VLAN 1, `192.168.254.0/24`) because the YuanLey is unmanaged. The IoT bridges (Section 6 map) keep their stranded `192.168.1.x` statics until they move to VLAN 40.
 
@@ -213,7 +215,7 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 **Decisions (2026-09-14).**
 - The gigabit-only ER605 replaces the planned ER707-M2. Inter-VLAN traffic hairpins the router at 1G - **accepted**; mainly affects desktop <-> TrueNAS bulk transfers.
 - VLAN 1 / `192.168.254.0/24` is adopted as the transitional landing net, to be tightened and retired during the switch migration.
-- ER605 and EAP650 will be **adopted into the existing Omada Controller LXC** once the controller is reachable on VLAN 30. Adoption re-pushes all config: WAN PPPoE and IPTV (VLAN 3999) must be recreated controller-side and TV re-verified.
+- ER605 and EAP650 will be **adopted into the existing Omada Controller LXC** once the controller is reachable on VLAN 30. Adoption re-pushes all config: WAN PPPoE must be recreated controller-side (keep WAN tagging off); IPTV needs no router config because TV runs off the Innbox.
 - Planned access switch: **Omada ES228GP** (managed; 24x1G PoE+ 250W, 2x1G SFP) to give the APs and doorbell the VLAN trunking the unmanaged YuanLey cannot. Caveat: its uplinks are 1G, so the 10G YuanLey<->MikroTik backbone does not survive this choice - accepted 2026-09-14, since decision 1 already caps cross-segment traffic at 1G; a 10G-capable managed PoE switch may replace it later.
 
 **Renumber plan.** Last octets are kept so existing references stay recognizable. Ansible inventory, `vars/lxc.yml`, `vars/vms.yml`, host_vars, `known_hosts` pins, role defaults, and the `resolv.conf` template all change together; host-key pins refresh through the provision keyscan / accept-new path.
@@ -262,10 +264,10 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 1. This document (done 2026-09-14).
 2. Tag VLANs 30/60 on the MikroTik CSS326 server-facing ports so n5p (1G link) and rpi4 land on their target VLANs without new hardware. The CSS326 runs SwOS and is managed (per-port PVID, tagged/untagged, strict VLAN filtering) but ships unconfigured - VLAN mode is off and it has never had an IP, which is why it behaved like an unmanaged switch. Enable VLAN mode first; give it a management IP (later VLAN 10). The n5p-facing port is hybrid: **PVID 30 untagged + VLAN 60 tagged**, so the host address and Servers-VLAN guests ride untagged while Traefik's guest NIC carries the 60 tag - no Proxmox subinterface needed. The YuanLey stays unmanaged with clients on VLAN 1. (Done 2026-09-14; the n5p link runs at 1G.)
 3. Renumber the fleet per the table above. (Servers done 2026-09-14; the IoT bridges wait for VLAN 40 access.) The provision playbooks skip existing guests, so the renumber ran as `pct set` / `qm set` on stopped guests, `midclt` on TrueNAS and `ha network update` on HAOS, with the Proxmox NFS storage repointed while every guest was down.
-4. Re-home DNS: AdGuard at `192.168.30.145` / `192.168.30.110`; ER605 per-LAN DHCP hands them out; the "any -> Servers:53" ACL lands before the cut.
-5. Tailscale: rpi4 advertises `192.168.30.0/24` (dropping the dead `192.168.1.0/24`); override DNS points at the AdGuard units' **tailnet** IPs, not LAN IPs. (Route advertised and approved 2026-09-14. Open: Traefik at `192.168.60.142` is outside the advertised route, and the DNS override is not restored.)
-6. Verify NEO TV, then disable IGMP Proxy.
-7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE + IPTV and re-verify TV.
+4. Re-home DNS: AdGuard at `192.168.30.145` / `192.168.30.110`; ER605 per-LAN DHCP hands them out; the "any -> Servers:53" ACL lands before the cut. (Done 2026-09-14: all eight networks hand out both AdGuard servers; no ACLs exist yet, so none was needed.)
+5. Tailscale: rpi4 advertises `192.168.30.0/24` (dropping the dead `192.168.1.0/24`); override DNS points at the AdGuard units' **tailnet** IPs, not LAN IPs. (Done 2026-09-14: `192.168.30.0/24` and `192.168.60.142/32` advertised and approved; tailnet DNS resolvers are `192.168.30.145` and `100.111.78.53`.)
+6. Verify NEO TV, then disable IGMP Proxy. (TV verified 2026-09-14 on an Innbox LAN port; turning off ER605 IPTV and IGMP Proxy is still open.)
+7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE (TV stays on the Innbox and is unaffected).
 8. Install ES228GP; move APs/doorbell onto tagged PoE ports; SSID -> VLAN mapping via the controller; tighten VLAN 1 to internet+DNS or retire it.
 9. Apply the full ACL matrix.
 10. Later: IPv6 via DHCPv6-PD over PPPoE.
