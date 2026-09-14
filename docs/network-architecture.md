@@ -15,7 +15,7 @@ The network is designed around four core principles:
 
 ## 2. Hardware Overview
 
-> **Target design.** This table and the diagram below describe the intended end state (the diagram still predates the ES228GP switch decision - see Section 7). For what is actually deployed today, see Section 7. As of 2026-09-14 the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up, but every client still sits on the transitional VLAN 1 - and **1 of the 3 EAP650 access points** is live.
+> **Target design.** This table and the diagram below describe the intended end state (the diagram still predates the ES228GP switch decision - see Section 7). For what is actually deployed today, see Section 7. As of 2026-09-14 the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up. Servers run on VLANs 30 and 60, every client still sits on the transitional VLAN 1, and **1 of the 3 EAP650 access points** is live.
 
 | Role          | Device                           | Key Features                     |
 | :------------ | :------------------------------- | :------------------------------- |
@@ -127,11 +127,12 @@ graph TD
 * **Key Services:**
     * **Matter Server:** matterjs-server for Thread/Matter device commissioning.
     * **AdGuard Home (Secondary):** Redundant DNS server for network resilience.
-    * **Tailscale subnet router:** advertises `192.168.1.0/24` to the
-      `lukaprebil.github` tailnet (tag `tag:subnet-router`) so off-LAN peers
-      can reach internal `*.lukapg.dev` services through Traefik. Combined
-      with tailnet-level "Override local DNS" → AdGuard `192.168.1.145`,
-      this gives roaming clients the same UX as on-LAN.
+    * **Tailscale subnet router:** advertises `192.168.30.0/24` (Servers VLAN,
+      approved 2026-09-14) to the `lukaprebil.github` tailnet (tag
+      `tag:subnet-router`) so off-LAN peers can reach VLAN-30 hosts. Traefik
+      moved to `192.168.60.142`, outside that route, and the tailnet-level
+      "Override local DNS" entry was removed during the migration; both are
+      open under Section 7, sequencing step 5.
 
 ---
 
@@ -197,13 +198,15 @@ terminating the tap would degrade the CCA's own traffic. See
 
 ### Current Network State
 
-Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24` behind the Telekom Innbox (InnboxG93) at `192.168.1.1` (PPPoE over GPON, DHCP, and DNS proxy). Since then the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up; clients still sit on the transitional VLAN 1 (`192.168.254.0/24`). Details, decisions, the renumber plan, and sequencing live in **ER605 Migration** below.
+Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24` behind the Telekom Innbox (InnboxG93) at `192.168.1.1` (PPPoE over GPON, DHCP, and DNS proxy). Since then the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up; servers run on VLANs 30 and 60, and clients still sit on the transitional VLAN 1 (`192.168.254.0/24`). Details, decisions, the renumber plan, and sequencing live in **ER605 Migration** below.
 
 ### ER605 Migration (started 2026-09-14)
 
 **Live state, verified on the device.** Telekom switched the Innbox G93T to bridge mode (the mode survives a factory reset). ISP side: internet = VLAN 3900 tagged, NEO TV = VLAN 3999 tagged; static public IPv4 kept; IPv6 available over PPPoE (deferred). The ER605 runs PPPoE with **WAN VLAN tagging off** - the bridged Innbox hands PPPoE untagged, so tagging must stay disabled. MTU/MRU 1492, DNS from PPPoE. IPTV runs in Custom mode on VLAN 3999 with dedicated IPTV-only LAN ports for the NEO box (**unverified** - the unmanaged YuanLey cannot carry tagged VLANs, so the box must plug straight into an IPTV port). IGMP Proxy (V2, WAN) is on as a stopgap; disable it once TV is confirmed, as it is redundant with IPTV Custom mode.
 
-**Transitional topology.** Every client actually sits on the default LAN (VLAN 1, `192.168.254.0/24`) because the YuanLey is unmanaged. The old flat `192.168.1.0/24` (Section 6 map) is stranded.
+**Transitional topology.** Servers are on their target VLANs since 2026-09-14 (renumber table below). Every client still sits on the default LAN (VLAN 1, `192.168.254.0/24`) because the YuanLey is unmanaged. The IoT bridges (Section 6 map) keep their stranded `192.168.1.x` statics until they move to VLAN 40.
+
+**Switch and router state (2026-09-14).** CSS326 (SwOS, management `192.168.254.2`): VLAN 1 on every port; VLAN 30 on p1 (ER605), p2 (n5p) and p24 (rpi4); VLAN 60 on p1 and p2; p2 and p24 run VLAN mode `enabled` with PVID 30, all other ports stay `optional` on PVID 1. The ER605 LAN ports already carried every VLAN tagged, so it needed no port change. Servers DHCP pool narrowed to `.200-.254` so it cannot hand out the `.110-.150` statics; rpi4 has a reservation at `.110`; other VLAN pools still default to `.50-.254`. Virtual servers forward WAN TCP 80/443 to Traefik at `192.168.60.142`. Config backups from before the change are in the untracked `backups/` directory.
 
 **DNS incident (stopgap in place).** The two AdGuard servers lost their `192.168.1.x` addresses, and Tailscale global nameservers with override-on still pointed at `192.168.1.145`, which hung all DNS on Tailscale clients. Stopgap: the entries were removed from Tailscale DNS and clients resolve through the ER605 DNS proxy.
 
@@ -257,10 +260,10 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 
 **Sequencing.**
 1. This document (done 2026-09-14).
-2. Tag VLANs 30/60 on the MikroTik CSS326 server-facing ports so n5p (1G link) and rpi4 land on their target VLANs without new hardware. The CSS326 runs SwOS and is managed (per-port PVID, tagged/untagged, strict VLAN filtering) but ships unconfigured - VLAN mode is off and it has never had an IP, which is why it behaved like an unmanaged switch. Enable VLAN mode first; give it a management IP (later VLAN 10). The n5p-facing port is hybrid: **PVID 30 untagged + VLAN 60 tagged**, so the host address and Servers-VLAN guests ride untagged while Traefik's guest NIC carries the 60 tag - no Proxmox subinterface needed. The YuanLey stays unmanaged with clients on VLAN 1.
-3. Renumber the fleet per the table above.
+2. Tag VLANs 30/60 on the MikroTik CSS326 server-facing ports so n5p (1G link) and rpi4 land on their target VLANs without new hardware. The CSS326 runs SwOS and is managed (per-port PVID, tagged/untagged, strict VLAN filtering) but ships unconfigured - VLAN mode is off and it has never had an IP, which is why it behaved like an unmanaged switch. Enable VLAN mode first; give it a management IP (later VLAN 10). The n5p-facing port is hybrid: **PVID 30 untagged + VLAN 60 tagged**, so the host address and Servers-VLAN guests ride untagged while Traefik's guest NIC carries the 60 tag - no Proxmox subinterface needed. The YuanLey stays unmanaged with clients on VLAN 1. (Done 2026-09-14; the n5p link runs at 1G.)
+3. Renumber the fleet per the table above. (Servers done 2026-09-14; the IoT bridges wait for VLAN 40 access.) The provision playbooks skip existing guests, so the renumber ran as `pct set` / `qm set` on stopped guests, `midclt` on TrueNAS and `ha network update` on HAOS, with the Proxmox NFS storage repointed while every guest was down.
 4. Re-home DNS: AdGuard at `192.168.30.145` / `192.168.30.110`; ER605 per-LAN DHCP hands them out; the "any -> Servers:53" ACL lands before the cut.
-5. Tailscale: rpi4 advertises `192.168.30.0/24` (dropping the dead `192.168.1.0/24`); override DNS points at the AdGuard units' **tailnet** IPs, not LAN IPs.
+5. Tailscale: rpi4 advertises `192.168.30.0/24` (dropping the dead `192.168.1.0/24`); override DNS points at the AdGuard units' **tailnet** IPs, not LAN IPs. (Route advertised and approved 2026-09-14. Open: Traefik at `192.168.60.142` is outside the advertised route, and the DNS override is not restored.)
 6. Verify NEO TV, then disable IGMP Proxy.
 7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE + IPTV and re-verify TV.
 8. Install ES228GP; move APs/doorbell onto tagged PoE ports; SSID -> VLAN mapping via the controller; tighten VLAN 1 to internet+DNS or retire it.
@@ -330,15 +333,15 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 - ✅ Raspberry Pi 4 (Docker services + Secondary DNS)
 
 #### Virtual Machines & LXCs
-- ✅ TrueNAS Scale VM (192.168.1.150)
-- ✅ Home Assistant OS VM (192.168.1.144)
-- ✅ Docker Host VM (192.168.1.140)
-- ✅ Traefik LXC (192.168.1.142)
-- ✅ Immich LXC (192.168.1.141)
-- ✅ Omada Controller LXC (192.168.1.143)
-- ✅ AdGuard LXC (192.168.1.145, primary DNS)
-- ✅ Monitoring LXC (192.168.1.146)
-- ✅ Media LXC (192.168.1.147, Jellyfin)
+- ✅ TrueNAS Scale VM (192.168.30.150)
+- ✅ Home Assistant OS VM (192.168.30.144)
+- ✅ Docker Host VM (192.168.30.140)
+- ✅ Traefik LXC (192.168.60.142)
+- ✅ Immich LXC (192.168.30.141)
+- ✅ Omada Controller LXC (192.168.30.143)
+- ✅ AdGuard LXC (192.168.30.145, primary DNS)
+- ✅ Monitoring LXC (192.168.30.146)
+- ✅ Media LXC (192.168.30.147, Jellyfin)
 - ✅ Hermes LXC (192.168.1.149)
 - ✅ Dev VM (192.168.1.148)
 - ✅ Cloud-init template playbook
@@ -376,7 +379,7 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 #### Network Migration (tracker: ER605 Migration section above)
 - ✅ Deploy Omada router (ER605 instead of the planned ER707-M2, 2026-09-14)
 - ✅ Configure VLAN interfaces on router
-- ⏳ Migrate Proxmox host + guests to VLAN 30 (renumber plan)
+- ✅ Migrate Proxmox host + guests to VLANs 30/60 (2026-09-14)
 - ⏳ Adopt ER605 + EAP650 into the Omada Controller LXC
 - ⏳ Configure firewall rules (ACL matrix)
 - ⏳ Move clients onto real VLANs (ES228GP + SSID mapping)
