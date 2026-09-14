@@ -172,7 +172,7 @@
           - "Network Configuration (Target):"
           - "  Target IP: {{ haos_vm.ip }}"
           - "  Gateway: {{ haos_vm.gateway }}"
-          - "  Network: 192.168.1.0/{{ haos_vm.netmask }} (temporary flat network)"
+          - "  Network: 192.168.30.0/{{ haos_vm.netmask }} (VLAN 30, Servers)"
           - ""
           - "Resources:"
           - "  CPU Cores: {{ haos_vm.cores }}"
@@ -287,7 +287,7 @@
 
           STEP 1: Access Proxmox Web Console
           ────────────────────────────────────────────────────────────────────
-            • Open: https://192.168.1.128:8006
+            • Open: https://192.168.30.128:8006
             • Navigate to: VM 102 (haos) → Console
             • Wait for HAOS welcome screen (shows current DHCP IP)
 
@@ -324,7 +324,7 @@
           - ""
           - "Step 1: Stop the old Home Assistant container on rpi4"
           - "-------------------------------------------------------"
-          - "  ssh luka@192.168.1.110"
+          - "  ssh luka@192.168.30.110"
           - "  cd ~/docker  # or wherever your docker-compose.yml is"
           - "  docker compose stop homeassistant"
           - ""
@@ -341,7 +341,7 @@
           - "  The USB Zigbee stick needs to be passed through from Proxmox to the HAOS VM."
           - ""
           - "  On your local machine, SSH to Proxmox:"
-          - "    ssh ansible_user@192.168.1.128"
+          - "    ssh ansible_user@192.168.30.128"
           - ""
           - "  Find the USB device:"
           - "    lsusb"
@@ -369,7 +369,7 @@
           - "Step 5: Update mobile apps and clients"
           - "---------------------------------------"
           - "  Update the Home Assistant mobile app on your phone:"
-          - "    - Remove old connection (192.168.1.110:8123)"
+          - "    - Remove old connection (previous HAOS address)"
           - "    - Add new connection ({{ haos_vm.ip }}:8123)"
           - ""
           - "Step 6: Clean up old container (after 24h of stable operation)"

@@ -12,7 +12,7 @@ Installs the Tailscale apt repo + client and enrols the host on first run.
 | `tailscale_accept_routes` | `false` | Whether the host accepts tailnet-pushed subnet routes |
 | `tailscale_authkey` | `""` | Vault'd one-shot key; empty value skips `tailscale up` |
 | `tailscale_extra_args` | `[]` | Extra flags to pass to `tailscale up` |
-| `tailscale_advertise_routes` | `[]` | LAN subnets this host advertises (e.g. `["192.168.1.0/24"]`). Non-empty triggers IP-forwarding sysctl. |
+| `tailscale_advertise_routes` | `[]` | LAN subnets this host advertises (e.g. `["192.168.30.0/24"]`). Non-empty triggers IP-forwarding sysctl. |
 
 ## Outputs
 

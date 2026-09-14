@@ -3,8 +3,7 @@
 #
 # Hardware: Proxmox VM (6 cores, 16 GB RAM, 100 GB disk on truenas-vms)
 # Role:     Headless web-development VM (LAN SSH + Tailscale)
-# IP today: 192.168.1.148 (flat network)
-# IP later: 192.168.20.x once the Omada router lands and VLAN 20 is active
+# IP: 192.168.30.148 (VLAN 30, Servers - 2026-09-14 renumber plan)
 
 # Admin user. zsh from the start (no shell flip during bootstrap); the
 # common role's oh-my-zsh installer is suppressed via the flag below so
@@ -52,15 +51,17 @@ dev_vm_claude_path: "{{ dev_vm_user.home }}/code/{{ dev_vm_claude_remote }}/clau
 # AdGuard primary + secondary already gives two-server redundancy; if both are
 # down DNS legitimately fails rather than silently bypassing filtering.
 dns_servers:
-  - 192.168.1.145  # AdGuard Home (primary, LXC on n5p)
-  - 192.168.1.110  # AdGuard Home (secondary, Docker on rpi4)
+  - 192.168.30.145  # AdGuard Home (primary, LXC on n5p)
+  - 192.168.30.110  # AdGuard Home (secondary, native on rpi4)
 
-# SSH allowlist - whole home /24. The plan originally pinned this to a single
-# DHCP-reserved MacBook IP, but the reservation didn't stick and the convenience
-# of "any device on the home LAN can SSH" wins on a single-user homelab where
-# the LAN is already trusted (and where Tailscale is the off-LAN path).
+# SSH allowlist - trusted + management + transitional landing net. The plan
+# originally pinned this to a single DHCP-reserved MacBook IP, but the
+# reservation didn't stick and the convenience of "any home device can SSH"
+# wins on a single-user homelab (and where Tailscale is the off-LAN path).
 dev_vm_ssh_allow_cidrs:
-  - "192.168.1.0/24"
+  - "192.168.10.0/24"  # Management
+  - "192.168.20.0/24"  # Trusted
+  - "192.168.254.0/24" # Transitional VLAN 1 landing net (retire with it)
 
 # Tailscale (consumed by the standalone tailscale role)
 tailscale_hostname: dev

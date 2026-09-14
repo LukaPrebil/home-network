@@ -13,7 +13,7 @@ taptap_mqtt_base_dir: "/opt/taptap-mqtt"
 # The tap bridge: an Elfin EE11A on the TIGO CCA's GW/TAP port, serving the bus
 # as a raw TCP stream. Read-only by construction - it drives the RS485
 # transmitter only when a TCP client writes, and this bridge never does.
-taptap_mqtt_address: "192.168.1.162"
+taptap_mqtt_address: "192.168.40.162"  # TIGO CCA tap bridge (IoT VLAN 40)
 taptap_mqtt_port: 7160
 
 # How often module state is published, in seconds.

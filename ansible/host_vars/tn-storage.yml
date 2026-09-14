@@ -2,8 +2,8 @@
 # TrueNAS Storage VM configuration
 
 # Network
-ansible_host: 192.168.1.150  # Temporary DHCP IP
-truenas_ip_final: 192.168.30.3  # Final IP after VLAN migration
+ansible_host: 192.168.30.150  # VLAN 30 (Servers)
+truenas_ip_final: 192.168.30.150  # Same address since the 2026-09-14 renumber
 truenas_web_user: truenas_admin  # TrueNAS 25.04 uses admin user for web UI
 truenas_web_password: "{{ vault_truenas_root_password }}"  # Using vault password
 # For SSH access (if needed later)
@@ -79,8 +79,7 @@ nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/proxmox-vms"
     name: proxmox-vms
     allowed_networks:
-      - 192.168.1.0/24  # Current network
-      - 192.168.30.0/24  # Future VLAN
+      - 192.168.30.0/24  # Servers VLAN (sole consumer); add 192.168.20.0/24 (Trusted) per-share if a client ever mounts NFS
     ro: false
     maproot_user: root
     maproot_group: root
@@ -88,7 +87,6 @@ nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/proxmox-templates"
     name: proxmox-templates
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root
@@ -97,7 +95,6 @@ nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/docker-volumes"
     name: docker-volumes
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root
@@ -106,7 +103,6 @@ nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/media"
     name: media
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root
@@ -115,7 +111,6 @@ nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/backups"
     name: backups
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root
@@ -124,7 +119,6 @@ nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/immich-photos"
     name: immich-photos
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root
@@ -133,7 +127,6 @@ nfs_shares:
   - path: "/mnt/{{ zfs_pool_name }}/paperless"
     name: paperless
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root
@@ -145,7 +138,6 @@ nfs_shares:
     name: external-data
     comment: "Old photos and documents"
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     mapall_user: root
@@ -155,7 +147,6 @@ nfs_shares:
   - path: "/mnt/plex-apps"
     name: plex-apps
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root
@@ -165,7 +156,6 @@ nfs_shares:
   - path: "/mnt/plex-bulk"
     name: plex-bulk
     allowed_networks:
-      - 192.168.1.0/24
       - 192.168.30.0/24
     ro: false
     maproot_user: root

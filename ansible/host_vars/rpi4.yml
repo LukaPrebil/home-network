@@ -3,7 +3,7 @@
 #
 # Hardware: Raspberry Pi 4 Model B
 # Role: Secondary DNS server and IoT services
-# IP: 192.168.1.110
+# IP: 192.168.30.110 (VLAN 30, Servers)
 
 # AdGuard Home configuration for rpi4 (Secondary DNS).
 # Native binary with state on the local SD card (defaults: /opt/adguardhome +
@@ -23,15 +23,16 @@ matter_server_port: 5580
 matter_server_log_level: "info"
 
 # Tailscale (consumed by the standalone tailscale role).
-# rpi4 acts as the tailnet subnet router for the home LAN - peers
-# joining the tailnet from off-LAN can reach 192.168.1.0/24 IPs through
-# this host. Coupling note: rpi4 also runs Matter Server + AdGuard
-# secondary; if it goes offline, all three of those (plus off-LAN
-# tailnet access) become unreachable until it's back.
+# rpi4 acts as the tailnet subnet router for the Servers VLAN - peers
+# joining the tailnet from off-LAN can reach 192.168.30.0/24 through
+# this host (advertise or drop other VLANs deliberately). Coupling note:
+# rpi4 also runs Matter Server + AdGuard secondary; if it goes offline,
+# all three of those (plus off-LAN tailnet access) become unreachable
+# until it's back.
 tailscale_hostname: rpi4
 tailscale_advertise_tags: "tag:subnet-router"
 tailscale_accept_dns: false        # rpi4 is on the LAN; AdGuard is direct
 tailscale_accept_routes: false     # don't accept tailnet-pushed routes (no self-loop)
 tailscale_advertise_routes:
-  - "192.168.1.0/24"
+  - "192.168.30.0/24"
 tailscale_authkey: "{{ vault_tailscale_router_auth_key }}"

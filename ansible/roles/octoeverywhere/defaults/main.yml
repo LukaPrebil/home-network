@@ -11,7 +11,7 @@ octoeverywhere_container_name: "octoeverywhere"
 
 # OctoEverywhere configuration
 octoeverywhere_companion_mode: "elegoo"  # Companion mode for Elegoo Neptune printers
-octoeverywhere_printer_ip: "192.168.1.100"  # IP address of the 3D printer
+octoeverywhere_printer_ip: "192.168.40.100"  # 3D printer (IoT VLAN 40)
 
 # Service state (can be overridden during migration)
 octoeverywhere_service_state: "started"  # Options: started, stopped, present
