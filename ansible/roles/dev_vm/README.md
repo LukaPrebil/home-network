@@ -36,7 +36,8 @@ Layered on top of `common`, `docker`, and `tailscale`:
     -v /:/host` is still a one-liner root escape, which made the previous
     docker-only carve-out security theatre. SSH key-only auth and LAN /
     Tailscale-only ingress are the real perimeter.
-11. **UFW** - LAN allowlist (`dev_vm_ssh_allow_cidrs`) + tailscale0 allow,
+11. **UFW** - SSH allowlist (`dev_vm_ssh_allow_cidrs`), metrics allowlist for
+    9100/12345 (`dev_vm_metrics_allow_cidrs`, defaults to the SSH list) + tailscale0 allow,
     `flush_handlers` before policy mutation, default deny incoming.
 
 Patching is intentionally manual on this host. See

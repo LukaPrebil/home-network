@@ -11,6 +11,7 @@ dev_vm_apt_packages: []
 dev_vm_cargo_crates: []
 dev_vm_claude_symlinks: []
 dev_vm_ssh_allow_cidrs: []
+dev_vm_metrics_allow_cidrs: "{{ dev_vm_ssh_allow_cidrs }}"
 
 # Versions are caller-specified - no defaults so a misconfigured host_vars
 # fails loudly rather than silently using a stale pin.

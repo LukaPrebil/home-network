@@ -63,6 +63,10 @@ dev_vm_ssh_allow_cidrs:
   - "192.168.20.0/24"  # Trusted
   - "192.168.254.0/24" # Transitional VLAN 1 landing net (retire with it)
 
+# Metrics ports (node_exporter 9100, Alloy 12345) additionally admit the
+# monitoring LXC, which lives in the Servers VLAN outside the SSH allowlist.
+dev_vm_metrics_allow_cidrs: "{{ dev_vm_ssh_allow_cidrs + [hostvars['monitoring']['ansible_host'] ~ '/32'] }}"
+
 # Tailscale (consumed by the standalone tailscale role)
 tailscale_hostname: dev
 tailscale_advertise_tags: "tag:dev"
