@@ -5,8 +5,8 @@
 # changes policy could deny incoming traffic before the LAN allowlist
 # was reloaded into the active ruleset, with a brief unreachable-SSH window.
 #
-# First run note: this play must be reached over LAN (192.168.1.139 ->
-# 192.168.1.148), not Tailscale, because tailscale0 doesn't exist until the
+# First run note: this play must be reached over LAN (an allowlisted network
+# to 192.168.30.148), not Tailscale, because tailscale0 doesn't exist until the
 # tailscale role has run AND tailscaled has come up. Subsequent runs are
 # safe over either path.
 

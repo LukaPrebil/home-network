@@ -18,27 +18,24 @@ Layered on top of `common`, `docker`, and `tailscale`:
    propagation.
 5. **chezmoi** - official installer + `chezmoi init --apply` against the
    user's dotfiles repo. Diff-then-apply on re-runs.
-6. **Claude config tree** - clones the Claude config repo owned by
-   `dev_vm_claude_remote` and creates the symlink set under `~/.claude/` that
-   mirrors the macOS layout. Validates every symlink source exists pre-link.
-   `dev_vm_claude_remote` has no working default: the clone is symlinked into
-   `~/.claude/` as executable hooks and commands, so the operator must name an
-   owner they control.
-7. **nvm + Node LTS** - for web-dev work; Claude Code uses its own native
-   installer (#8).
-8. **Claude Code** - official native installer pinned to
+6. **nvm + Node LTS** - for web-dev work; Claude Code uses its own native
+   installer.
+7. **Claude Code** - official native installer pinned to
    `dev_vm_claude_code_version`. Auto-update is left enabled.
-9. **starship**, **rustup**, **tlrc** - tooling that's not in apt or that
+8. **starship**, **rustup**, **tlrc** - tooling that's not in apt or that
    the user prefers to track outside the distro release.
-10. **Sudoers** - full `NOPASSWD: ALL` for `luka`. The user is NOT in the
-    `docker` group (so a compromised npm dep can't silently mount the host
-    fs by joining a compromised process's namespace), but `sudo docker run
-    -v /:/host` is still a one-liner root escape, which made the previous
-    docker-only carve-out security theatre. SSH key-only auth and LAN /
-    Tailscale-only ingress are the real perimeter.
-11. **UFW** - SSH allowlist (`dev_vm_ssh_allow_cidrs`), metrics allowlist for
+9. **Sudoers** - full `NOPASSWD: ALL` for `luka`. The user is NOT in the
+   `docker` group (so a compromised npm dep can't silently mount the host
+   fs by joining a compromised process's namespace), but `sudo docker run
+   -v /:/host` is still a one-liner root escape, which made the previous
+   docker-only carve-out security theatre. SSH key-only auth and LAN /
+   Tailscale-only ingress are the real perimeter.
+10. **UFW** - SSH allowlist (`dev_vm_ssh_allow_cidrs`), metrics allowlist for
     9100/12345 (`dev_vm_metrics_allow_cidrs`, defaults to the SSH list) + tailscale0 allow,
     `flush_handlers` before policy mutation, default deny incoming.
+
+The role does not manage `~/.claude/`. The harness-config repo's own
+`scripts/setup-hosts.sh` clones itself and owns that symlink set.
 
 Patching is intentionally manual on this host. See
 `docs/infrastructure/dev-vm-setup.md` for the rationale and the
@@ -55,7 +52,7 @@ so the (revoked) auth key is never referenced after first enrolment.
 
 ## First-run requirement
 
-The first run must be invoked over LAN (`192.168.1.139` -> `192.168.1.148`),
+The first run must be invoked over LAN (from an allowlisted network to `192.168.30.148`),
 NOT over Tailscale. The `firewall.yml` task waits for `tailscale0` to come up
 before adding allow rules, but the rule additions and the default-deny policy
 are sequenced so the live ruleset goes through a brief moment where only the

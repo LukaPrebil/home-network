@@ -21,8 +21,8 @@ Proxmox n5p (192.168.1.128)
         ├── docker role        (Docker engine + compose plugin)
         ├── tailscale role     (apt repo install, tag:dev)
         └── dev_vm role        (apt packages, AWS CLI, SSH-key + GitHub
-                                auto-add, chezmoi, claude config tree,
-                                nvm + Node LTS, Claude Code, starship,
+                                auto-add, chezmoi, nvm + Node LTS,
+                                Claude Code, starship,
                                 rustup, tlrc, docker sudoers, UFW)
 ```
 
@@ -33,7 +33,7 @@ Proxmox n5p (192.168.1.128)
 | Inventory | `ansible/inventory/hosts.yml` (`dev_hosts`) | this repo |
 | User vars | `ansible/host_vars/dev.yml` | this repo |
 | Dotfiles | `git@github.com:LukaPrebil/dotfiles.git` (chezmoi) | external |
-| Claude config | `git@github.com:<dev_vm_claude_remote>/claude.git` + symlinks under `~/.claude/` | external |
+| Claude config | `git@github.com:LukaPrebil/harness-config.git`, linked into `~/.claude/` by its own `scripts/setup-hosts.sh` | external, not managed by Ansible |
 
 ## Software stack on the VM
 

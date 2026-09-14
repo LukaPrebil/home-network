@@ -18,10 +18,6 @@
   ansible.builtin.include_tasks: chezmoi.yml
   tags: dev-vm
 
-- name: Clone Claude config repo and create symlink set
-  ansible.builtin.include_tasks: claude_config.yml
-  tags: dev-vm
-
 - name: Install nvm + Node LTS
   ansible.builtin.include_tasks: nvm_node.yml
   tags: dev-vm
