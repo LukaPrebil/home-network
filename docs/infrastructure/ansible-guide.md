@@ -77,7 +77,7 @@ all
 
 Key: `linux_servers` is the common role target. `monitoring_agents` gets node-exporter + alloy.
 
-**HAOS**: runs as a Proxmox VM (192.168.1.144), not SSH-managed. Managed via ha-mcp MCP tools, not Ansible.
+**HAOS**: runs as a Proxmox VM (192.168.30.144), not SSH-managed. Managed via ha-mcp MCP tools, not Ansible.
 
 ## SSH Host Keys
 

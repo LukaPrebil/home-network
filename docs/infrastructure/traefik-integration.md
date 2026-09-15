@@ -250,7 +250,7 @@ labels:
 ### LAN-Only Services
 
 The Traefik dashboard is not publicly routed. It is accessible only via LAN:
-- Traefik dashboard: `http://traefik.lan:8080` (`192.168.1.142:8080`)
+- Traefik dashboard: `http://traefik.lan:8080` (`192.168.60.142:8080`)
 
 The `.lan` domain is configured as an AdGuard DNS rewrite in `roles/adguard/defaults/main.yml`.
 
@@ -260,7 +260,7 @@ Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reacha
 
 Pattern:
 
-1. **AdGuard split-DNS rewrite** (in `roles/adguard/defaults/main.yml`) points the name at Traefik's LAN IP (`192.168.1.142`).
+1. **AdGuard split-DNS rewrite** (in `roles/adguard/defaults/main.yml`) points the name at Traefik's LAN IP (`192.168.60.142`).
 2. **No Cloudflare A record** for the name. Public resolvers return NXDOMAIN.
 3. **Traefik router** in `dynamic.yml.j2` attaches the `lan-only` middleware (alongside `crowdsec`, `proxy-headers`, `security-headers`).
 4. **Self-signed HTTPS upstreams** (Proxmox, TrueNAS, Omada) reference per-router `serversTransport` blocks with `insecureSkipVerify: true`. AdGuard speaks plain HTTP and needs no transport block.
@@ -290,7 +290,7 @@ proxmox-secure:
 proxmox:
   loadBalancer:
     servers:
-      - url: "https://192.168.1.128:8006"
+      - url: "https://192.168.30.128:8006"
     passHostHeader: true
     serversTransport: proxmox-tls
 
@@ -300,7 +300,7 @@ serversTransports:
     insecureSkipVerify: true
 ```
 
-The `lan-only` middleware permits `127.0.0.1/32`, `192.168.1.0/24` (current flat LAN), `100.64.0.0/10` (Tailscale CGNAT IPv4), and `fd7a:115c:a1e0::/48` (Tailscale CGNAT IPv6). `cloudflare-real-ip` is intentionally omitted from internal routes (no Cloudflare in path) and `rate-limit` is omitted because admin SPAs poll fast enough to brush against the 100 req/min limit.
+The `lan-only` middleware permits `127.0.0.1/32`, the `192.168.10.0/24` (Management), `192.168.20.0/24` (Trusted) and `192.168.30.0/24` (Servers) VLAN subnets, `192.168.254.0/24` (transitional VLAN 1, removed when VLAN 1 is retired), `100.64.0.0/10` (Tailscale CGNAT IPv4), and `fd7a:115c:a1e0::/48` (Tailscale CGNAT IPv6). `cloudflare-real-ip` is intentionally omitted from internal routes (no Cloudflare in path) and `rate-limit` is omitted because admin SPAs poll fast enough to brush against the 100 req/min limit.
 
 ## Advanced: Static File Provider Routing (Non-Docker Services)
 
@@ -337,7 +337,7 @@ services:
   pds:
     loadBalancer:
       servers:
-        - url: "http://192.168.1.140:3000"
+        - url: "http://192.168.30.140:3000"
       passHostHeader: true  # Critical: PDS uses Host header for handle resolution
 ```
 
