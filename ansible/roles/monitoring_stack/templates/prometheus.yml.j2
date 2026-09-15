@@ -60,10 +60,12 @@ scrape_configs:
         labels:
           instance: 'monitoring-lxc'
 
-  # Node Exporter metrics from all hosts with monitoring agents
+  # Node Exporter metrics from all hosts with monitoring agents.
+  # unprovisioned_hosts (hermes) is subtracted: a declared-but-absent host must
+  # not render a scrape target that is permanently down.
   - job_name: 'node-exporter'
     static_configs:
-{% for host in groups['monitoring_agents'] %}
+{% for host in groups['monitoring_agents'] | difference(groups.get('unprovisioned_hosts', [])) %}
       - targets: ['{{ hostvars[host]['ansible_host'] }}:9100']
         labels:
           instance: '{{ host }}'
@@ -73,7 +75,7 @@ scrape_configs:
   # Alloy metrics from all hosts running Alloy
   - job_name: 'alloy'
     static_configs:
-{% for host in groups['monitoring_agents'] %}
+{% for host in groups['monitoring_agents'] | difference(groups.get('unprovisioned_hosts', [])) %}
       - targets: ['{{ hostvars[host]['ansible_host'] }}:12345']
         labels:
           instance: '{{ host }}'

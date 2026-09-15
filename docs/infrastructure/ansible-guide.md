@@ -71,11 +71,16 @@ all
 ├── arr_stack_hosts      → containers
 ├── monitoring_hosts     → monitoring
 ├── adguard_hosts        → adguard, rpi4
+├── hermes_hosts         → hermes (role ready, LXC not provisioned)
+├── unprovisioned_hosts  → hermes
 ├── linux_servers        → proxmox_hosts + truenas_hosts + docker_hosts + lxc_containers + adguard_hosts
 └── monitoring_agents    → proxmox_hosts + docker_hosts + lxc_containers
 ```
 
 Key: `linux_servers` is the common role target. `monitoring_agents` gets node-exporter + alloy.
+`unprovisioned_hosts` holds hosts that are declared in IaC but absent on n5p; the plays and the
+Prometheus target lists subtract that group, so a full converge skips hermes instead of failing on SSH.
+Move a host out of the group when `provision-lxc.yml` creates it.
 
 **HAOS**: runs as a Proxmox VM (192.168.30.144), not SSH-managed. Managed via ha-mcp MCP tools, not Ansible.
 
