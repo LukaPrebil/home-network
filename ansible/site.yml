@@ -26,7 +26,7 @@
 #   ansible-playbook site.yml --tags dev-vm-upgrade --limit dev     # Opt-in dev-VM apt upgrade
 
 - name: Configure all Linux servers with common settings
-  hosts: linux_servers
+  hosts: linux_servers:!unprovisioned_hosts
   become: true
   tags:
     - common
@@ -59,7 +59,7 @@
     - dev_vm
 
 - name: Deploy Node Exporter for metrics collection
-  hosts: monitoring_agents
+  hosts: monitoring_agents:!unprovisioned_hosts
   become: true
   tags:
     - node-exporter
@@ -83,7 +83,7 @@
 # built for the first time it would otherwise render no docker log block at all
 # and ship nothing under job="docker" until the next converge.
 - name: Deploy Grafana Alloy for metrics and log shipping
-  hosts: monitoring_agents
+  hosts: monitoring_agents:!unprovisioned_hosts
   become: true
   tags:
     - alloy
@@ -251,7 +251,9 @@
     - octoeverywhere
 
 - name: Deploy Hermes Agent
-  hosts: hermes_hosts
+  # Matches no host while hermes sits in unprovisioned_hosts; the play is
+  # skipped with a "no hosts matched" warning instead of failing on SSH.
+  hosts: hermes_hosts:!unprovisioned_hosts
   become: true
   tags:
     - hermes
@@ -262,7 +264,7 @@
 # TrueNAS (truenas_hosts) has no apt - exclude it from the group structurally
 # rather than relying on a --limit at the CLI.
 - name: OS-level package upgrade (opt-in)
-  hosts: linux_servers:!truenas_hosts
+  hosts: linux_servers:!truenas_hosts:!unprovisioned_hosts
   become: true
   tags:
     - apt-upgrade

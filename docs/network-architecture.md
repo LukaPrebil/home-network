@@ -344,7 +344,8 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 - ✅ AdGuard LXC (192.168.30.145, primary DNS)
 - ✅ Monitoring LXC (192.168.30.146)
 - ✅ Media LXC (192.168.30.147, Jellyfin)
-- ✅ Hermes LXC (192.168.1.149)
+- ⬜ Hermes LXC (declared in IaC and deliberately deferred - not provisioned on n5p, excluded from
+  the plays and the Prometheus targets via `unprovisioned_hosts`)
 - ✅ Dev VM (192.168.30.148)
 - ✅ Cloud-init template playbook
 - ✅ Docker Host VM provisioning playbook
