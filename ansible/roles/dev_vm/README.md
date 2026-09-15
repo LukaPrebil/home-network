@@ -20,8 +20,9 @@ Layered on top of `common`, `docker`, and `tailscale`:
    user's dotfiles repo. Diff-then-apply on re-runs.
 6. **nvm + Node LTS** - for web-dev work; Claude Code uses its own native
    installer.
-7. **Claude Code** - official native installer pinned to
-   `dev_vm_claude_code_version`. Auto-update is left enabled.
+7. **Claude Code** - official native installer, floor pinned by
+   `dev_vm_claude_code_version`. Auto-update is left enabled, so a version
+   ahead of the pin is kept; only a missing or older install re-installs.
 8. **starship**, **rustup**, **tlrc** - tooling that's not in apt or that
    the user prefers to track outside the distro release.
 9. **Sudoers** - full `NOPASSWD: ALL` for `luka`. The user is NOT in the

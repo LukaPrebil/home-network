@@ -45,8 +45,9 @@ Proxmox n5p (192.168.1.128)
   tmux, htop, tree.
 - **Container runtime**: Docker engine + compose plugin. `luka` invokes via
   `sudo docker` (passwordless, see "Docker access" below).
-- **Editor target**: Claude Code (official native installer, pinned via
-  `dev_vm_claude_code_version`).
+- **Editor target**: Claude Code (official native installer, floor pinned by
+  `dev_vm_claude_code_version`; the background auto-updater may run ahead of
+  the pin and that version is kept, never downgraded).
 - **Session multiplexer**: herdr (manual install, see "Known gotchas");
   attach from the Mac with `herdr --remote dev`.
 - **Remote access**: Tailscale (`tag:dev`).
