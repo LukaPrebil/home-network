@@ -11,7 +11,7 @@ runbook and the rationale.
 ## Topology
 
 - **OTBR** runs as a Docker container named `otbr` on the `containers` VM
-  (`192.168.1.140`), driving the USB SONOFF RCP radio. The Thread dataset is
+  (`192.168.30.140`), driving the USB SONOFF RCP radio. The Thread dataset is
   persisted in the container at `/var/lib/thread`, bind-mounted from
   `/srv/docker/otbr/data` on the host.
 - **matter-server** runs separately on `rpi4`. It is the Matter fabric
@@ -153,7 +153,7 @@ This is the one-time migration of the running OTBR from its legacy
 without changing the Thread network. The target is a byte-for-byte identical
 network so no Matter device needs re-commissioning.
 
-All commands run on the `containers` host (`192.168.1.140`) unless noted.
+All commands run on the `containers` host (`192.168.30.140`) unless noted.
 
 ### 0. Capture into vault
 
@@ -299,7 +299,7 @@ For a clean VM-level rollback, restore the Proxmox snapshot taken in step 1.
 
 - Role: `ansible/roles/otbr/`
 - Vault key: `vault_thread_active_dataset` (alias `otbr_thread_active_dataset`)
-- Live OTBR: container `otbr` on `containers` (`192.168.1.140`), data at
+- Live OTBR: container `otbr` on `containers` (`192.168.30.140`), data at
   `/srv/docker/otbr/data` mounted to `/var/lib/thread`.
 - matter-server: `rpi4`.
 - Network at capture time: Channel 15, PAN ID 0x1234, Ext PAN ID

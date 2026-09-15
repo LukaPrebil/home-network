@@ -14,7 +14,7 @@ clean.
 ## Architecture
 
 ```
-Proxmox n5p (192.168.1.128)
+Proxmox n5p (192.168.30.128)
 └── ubuntu-cloudinit-template (VMID 9000, 26.04, 10GB)
     └── dev (VMID 148, 6c / 16GB / 100GB on truenas-vms)
         ├── common role        (ansible_user, sudoers, sshd hardening)
@@ -45,8 +45,9 @@ Proxmox n5p (192.168.1.128)
   tmux, htop, tree.
 - **Container runtime**: Docker engine + compose plugin. `luka` invokes via
   `sudo docker` (passwordless, see "Docker access" below).
-- **Editor target**: Claude Code (official native installer, pinned via
-  `dev_vm_claude_code_version`).
+- **Editor target**: Claude Code (official native installer, floor pinned by
+  `dev_vm_claude_code_version`; the background auto-updater may run ahead of
+  the pin and that version is kept, never downgraded).
 - **Session multiplexer**: herdr (manual install, see "Known gotchas");
   attach from the Mac with `herdr --remote dev`.
 - **Remote access**: Tailscale (`tag:dev`).
@@ -86,7 +87,8 @@ fails loudly. To re-run with auth: mint a fresh 7-day fine-grained PAT
 ## First-run requirement (LAN, not Tailscale)
 
 The first role run **must** be invoked from the LAN
-(`192.168.1.139` -> `192.168.1.148`), not over Tailscale. The `firewall.yml`
+(a Management, Trusted or transitional VLAN 1 client -> `192.168.30.148`), not
+over Tailscale. The `firewall.yml`
 task adds the `tailscale0` allow rule before flipping to default-deny, but
 `tailscale0` only exists after the `tailscale` role has run AND `tailscaled`
 is up, which in turn requires DNS and apt to have come up first. Until that

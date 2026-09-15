@@ -2,7 +2,7 @@
 
 ## Overview
 
-The monitoring and logging stack runs on the `monitoring` LXC (192.168.1.146), deployed via Docker Compose and managed by the `monitoring-stack` Ansible role.
+The monitoring and logging stack runs on the `monitoring` LXC (192.168.30.146), deployed via Docker Compose and managed by the `monitoring-stack` Ansible role.
 
 **Components:**
 - **Grafana** - visualization dashboards (port 3000, exposed via Traefik)

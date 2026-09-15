@@ -11,7 +11,7 @@ the operator runbook.
 
 matter-server persists its entire fabric in its storage directory:
 
-- Path on `rpi4` (192.168.1.110): `/srv/docker/matter-server/data`
+- Path on `rpi4` (192.168.30.110): `/srv/docker/matter-server/data`
 - Backing storage: NFS from TrueNAS, dataset `tank/docker-volumes`
   (dataset-relative path `matter-server/data`)
 
@@ -72,7 +72,7 @@ crash-consistent.
 
 ### Pulling files out of a snapshot instead
 
-Snapshots are browsable read-only on TrueNAS (192.168.1.150) without any
+Snapshots are browsable read-only on TrueNAS (192.168.30.150) without any
 restore step:
 
 ```bash
@@ -102,7 +102,7 @@ Docker service, not just matter-server.
    Or from a snapshot, copying via the TrueNAS side:
 
    ```bash
-   # on tn-storage (192.168.1.150)
+   # on tn-storage (192.168.30.150)
    cp -a /mnt/tank/docker-volumes/.zfs/snapshot/<name>/matter-server/data \
          /mnt/tank/docker-volumes/matter-server/
    ```
@@ -149,7 +149,7 @@ Reference values for the live fabric:
      `compressed_fabric_id` `4941327263744875345`. Note the value it
      prints - step 7 compares against it.
 
-2. **Manual pre-migration snapshot** on TrueNAS (192.168.1.150):
+2. **Manual pre-migration snapshot** on TrueNAS (192.168.30.150):
 
    ```bash
    midclt call zfs.snapshot.create '{"dataset":"tank/docker-volumes","name":"pre-matterjs-migration"}'
@@ -240,7 +240,7 @@ Reference values for the live fabric:
 10. **On success:**
 
     - Spot-check Matter devices in Home Assistant.
-    - Add an Uptime Kuma TCP monitor for `192.168.1.110:5580` (manual UI
+    - Add an Uptime Kuma TCP monitor for `192.168.30.110:5580` (manual UI
       step, see Monitoring below).
 
 11. **Controller time sync is enabled** via `matter_server_time_sync`

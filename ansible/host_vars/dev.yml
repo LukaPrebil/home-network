@@ -71,11 +71,12 @@ dev_vm_github_user: LukaPrebil
 dev_vm_github_key_title: "{{ dev_vm_user.name }}@{{ inventory_hostname }} (homelab)"
 
 # Pinned versions. Bump deliberately by editing this file.
-# Claude Code: pinned to a specific release at install time via the official
-# installer (curl https://claude.ai/install.sh | bash -s <version>). The
-# Native installer auto-updates in the background once installed; the pin is
-# only the floor.
-dev_vm_claude_code_version: "2.1.126"
+# Claude Code: floor version, passed to the official installer
+# (curl https://claude.ai/install.sh | bash -s <version>) when the host has no
+# install or one older than this. The native installer auto-updates in the
+# background, so a newer installed version is left alone - never downgraded.
+# Current `/latest`: https://downloads.claude.ai/claude-code-releases/latest
+dev_vm_claude_code_version: "2.1.272"
 dev_vm_nvm_version: "v0.40.0"
 # tlrc: cargo install --locked --version <ver>
 dev_vm_tlrc_version: "1.13.0"

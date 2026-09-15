@@ -100,7 +100,7 @@ After the maintenance reboot, every check should match. Anything off
 | tn-storage | `cat /sys/module/virtio_net/parameters/napi_tx` | `N` |
 | tn-storage | `ethtool -l enp6s18 \| awk '/Combined/{print $2;exit}'` | `4` |
 | tn-storage | `ls /sys/class/net/enp6s18/queues` | `tx-0..3 rx-0..3` |
-| any client | `dig @192.168.1.145 google.com +short +time=2 +tries=1` | answer in <1 s |
+| any client | `dig @192.168.30.145 google.com +short +time=2 +tries=1` | answer in <1 s |
 
 The reconciler in `provision-truenas.yml` runs the same checks
 unconditionally at the end of every run (`Re-read ethtool` and
