@@ -36,7 +36,7 @@ One path. A wired Elfin EE11A on the inverter's Link0 monitoring bus.
 
 | Path | Use | Status |
 |---|---|---|
-| Elfin EE11A on the inverter's Link0 monitoring bus | Everything | Live at `192.168.1.161:502` since 2026-08-21 |
+| Elfin EE11A on the inverter's Link0 monitoring bus | Everything | Live since 2026-08-21; at `192.168.40.161:502` (IoT VLAN 40) since 2026-09-15 |
 | LSW-3 Wi-Fi logger stick, `192.168.1.6:8899` | Nothing. SofarCloud only | Ruled out, see findings |
 
 The stick was originally intended to carry monitoring while the wired bridge carried
@@ -81,8 +81,8 @@ flowchart LR
     end
 
     subgraph CAB["Solar control cabinet"]
-        EE1["Bridge 1, elfin-inverter<br/>192.168.1.161<br/>Modbus TCP gateway"]
-        EE2["Bridge 2, elfin-tigo<br/>192.168.1.162<br/>transparent, listen only"]
+        EE1["Bridge 1, elfin-inverter<br/>192.168.40.161<br/>Modbus TCP gateway"]
+        EE2["Bridge 2, elfin-tigo<br/>192.168.40.162<br/>transparent, listen only"]
         CCA["TIGO CCA<br/>GW/TAP"]
         DTSU["DTSU666<br/>A24 / B25 unused"]
         PSU2["24 V PSU, 15 W"]
@@ -377,7 +377,7 @@ start, because writes over this transport report honestly.
 port, using the second EE11A. No termination on this one. Per-panel visualisation via
 the Solar Panel Visualizer Lovelace card.
 
-The tap bridge went live on 2026-08-26 at `192.168.1.162`, serving the bus on port 7160.
+The tap bridge went live on 2026-08-26, serving the bus on port 7160; it moved to `192.168.40.162` (IoT VLAN 40) on 2026-09-15.
 The route into Home Assistant is settled in ADR 0013: `taptap-mqtt` behind a Mosquitto
 broker, both Ansible-managed on the containers VM, with the add-on image run as an
 ordinary container. The broker blocker recorded here previously is resolved.
