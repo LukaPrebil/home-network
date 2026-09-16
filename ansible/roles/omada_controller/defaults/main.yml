@@ -68,9 +68,17 @@ omada_controller_ui_allow_cidrs:
   - "192.168.254.0/24"   # TEMPORARY - transitional VLAN 1, delete at step 8
 
 # Omada device plane: discovery is device-initiated, so the controller must
-# accept it inbound. The router's own per-VLAN addresses are the sources it
-# uses toward the controller; 192.168.40.0/24 covers the IoT VLAN, where step 8
-# may place devices.
+# accept it inbound.
+#
+# VLAN 1 is allowed as a subnet rather than by host address because every
+# current Omada device sits on a DHCP pool there (the EAP650 draws from
+# `.2-.254` with no reservation), so a /32 would stop matching as soon as the
+# lease moves and the device would silently drop out of the controller. The
+# router's own per-VLAN addresses are listed individually because they are
+# static by design, and they are the source it uses toward the controller from
+# whichever interface it picks, including VLAN 30 after adoption.
+# 192.168.40.0/24 covers the IoT VLAN, where step 8 may place devices.
+# Remove the VLAN 1 entry when VLAN 1 is retired at step 8.
 omada_controller_device_udp_ports: ["29810", "27001"]
 omada_controller_device_tcp_ports:
   - "29811"
@@ -81,8 +89,8 @@ omada_controller_device_tcp_ports:
   - "29816"
   - "29817"
 omada_controller_device_allow_cidrs:
-  - "192.168.254.21/32"  # EAP650 Hallway upstairs (VLAN 1 pool address)
-  - "192.168.40.0/24"    # IoT VLAN
+  - "192.168.254.0/24"   # TEMPORARY - transitional VLAN 1, delete at step 8
+  - "192.168.40.0/24"    # IoT VLAN, where step 8 may place devices
   - "192.168.10.1/32"    # per-VLAN interface addresses of the router itself
   - "192.168.20.1/32"
   - "192.168.30.1/32"
