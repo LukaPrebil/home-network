@@ -200,7 +200,7 @@ terminating the tap would degrade the CCA's own traffic. See
 
 ### Current Network State
 
-Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24` behind the Telekom Innbox (InnboxG93) at `192.168.1.1` (PPPoE over GPON, DHCP, and DNS proxy). Since then the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up; servers run on VLANs 30 and 60, and clients still sit on the transitional VLAN 1 (`192.168.254.0/24`). Details, decisions, the renumber plan, and sequencing live in **ER605 Migration** below.
+Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24` behind the Telekom Innbox (InnboxG93) at `192.168.1.1` (PPPoE over GPON, DHCP, and DNS proxy). Since then the **Omada ER605** is the live router (PPPoE over the bridge-mode Innbox) with all Section 4 VLAN interfaces up; servers run on VLANs 30 and 60, and clients still sit on the transitional VLAN 1 (`192.168.254.0/24`). On 2026-09-16 the ER605 was **adopted into the Omada controller**, so the controller's Home site now owns the router's WAN, LAN networks, DHCP scopes and NAT rules. The site values were staged to match the router's live configuration before the adopt, and the public address is unchanged. Details, decisions, the renumber plan, and sequencing live in **ER605 Migration** below.
 
 ### ER605 Migration (started 2026-09-14)
 
@@ -208,7 +208,9 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 
 **Transitional topology.** Servers are on their target VLANs since 2026-09-14 (renumber table below). Every client still sits on the default LAN (VLAN 1, `192.168.254.0/24`) because the YuanLey is unmanaged. The two wired Elfin EE11A bridges moved to VLAN 40 on 2026-09-15; the Wi-Fi EW11 heat-pump bridge and the SOFAR logger stick keep their stranded `192.168.1.x` addresses until an IoT SSID exists (step 8).
 
-**Switch and router state (2026-09-14).** CSS326 (SwOS, management `192.168.254.2`): VLAN 1 on every port; VLAN 30 on p1 (ER605), p2 (n5p) and p24 (rpi4); VLAN 60 on p1 and p2; VLAN 40 on p1 and p15 (a small unmanaged switch in the PV box feeding both EE11A bridges); p2 and p24 run VLAN mode `enabled` with PVID 30, p15 runs `enabled` with PVID 40, all other ports stay `optional` on PVID 1. The ER605 LAN ports already carried every VLAN tagged, so it needed no port change. Servers DHCP pool narrowed to `.200-.254` so it cannot hand out the `.110-.150` statics; rpi4 has a reservation at `.110`; the IoT (40) pool is also `.200-.254`; other VLAN pools still default to `.50-.254`. Virtual servers forward WAN TCP 80/443 to Traefik at `192.168.60.142`. Config backups from before the change are in the untracked `backups/` directory.
+**Switch and router state (2026-09-14).** CSS326 (SwOS, management `192.168.254.2`): VLAN 1 on every port; VLAN 30 on p1 (ER605), p2 (n5p) and p24 (rpi4); VLAN 60 on p1 and p2; VLAN 40 on p1 and p15 (a small unmanaged switch in the PV box feeding both EE11A bridges); p2 and p24 run VLAN mode `enabled` with PVID 30, p15 runs `enabled` with PVID 40, all other ports stay `optional` on PVID 1. The ER605 LAN ports already carried every VLAN tagged, so it needed no port change. Port p3 was later set to untagged VLAN 30 access (VLAN mode enabled, PVID 30, a member of VLAN 30) as a wired recovery console that survives a routing failure; it is otherwise unused. p20 feeds the desktop PC.
+
+**Router state (2026-09-16).** The Omada controller's Home site is now the source of truth for the ER605, so the following are site values rather than router settings: the eight VLAN networks with their subnets, gateways, 120-minute leases and manual AdGuard DNS (`192.168.30.145`, `192.168.30.110`), each bound to all four gateway LAN ports; DHCP reservations for rpi4 `.110`, containers `.200` and dev `.201`; WAN TCP 80/443 virtual servers to Traefik at `192.168.60.142`; and WAN Settings Overrides carrying the PPPoE parameters (WAN VLAN tagging off, MTU/MRU 1492, and only the Innbox-facing port marked WAN). Servers (30) uses the `.200-.254` pool so it cannot hand out the `.110-.150` statics, IoT (40) matches it, the other VLANs run `.50-.254`, and VLAN 1 runs `.2-.254`. Config backups from before the change are in the untracked `backups/` directory.
 
 **DNS incident (stopgap in place).** The two AdGuard servers lost their `192.168.1.x` addresses, and Tailscale global nameservers with override-on still pointed at `192.168.1.145`, which hung all DNS on Tailscale clients. Stopgap: the entries were removed from Tailscale DNS and clients resolve through the ER605 DNS proxy.
 
@@ -264,10 +266,10 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 1. This document (done 2026-09-14).
 2. Tag VLANs 30/60 on the MikroTik CSS326 server-facing ports so n5p (1G link) and rpi4 land on their target VLANs without new hardware. The CSS326 runs SwOS and is managed (per-port PVID, tagged/untagged, strict VLAN filtering) but ships unconfigured - VLAN mode is off and it has never had an IP, which is why it behaved like an unmanaged switch. Enable VLAN mode first; give it a management IP (later VLAN 10). The n5p-facing port is hybrid: **PVID 30 untagged + VLAN 60 tagged**, so the host address and Servers-VLAN guests ride untagged while Traefik's guest NIC carries the 60 tag - no Proxmox subinterface needed. The YuanLey stays unmanaged with clients on VLAN 1. (Done 2026-09-14; the n5p link runs at 1G.)
 3. Renumber the fleet per the table above. (Servers done 2026-09-14; the wired EE11A bridges moved to VLAN 40 on 2026-09-15; the Wi-Fi EW11 and SOFAR stick wait for step 8.) The provision playbooks skip existing guests, so the renumber ran as `pct set` / `qm set` on stopped guests, `midclt` on TrueNAS and `ha network update` on HAOS, with the Proxmox NFS storage repointed while every guest was down.
-4. Re-home DNS: AdGuard at `192.168.30.145` / `192.168.30.110`; ER605 per-LAN DHCP hands them out; the "any -> Servers:53" ACL lands before the cut. (Done 2026-09-14: all eight networks hand out both AdGuard servers; no ACLs exist yet, so none was needed.)
+4. Re-home DNS: AdGuard at `192.168.30.145` / `192.168.30.110`; ER605 per-LAN DHCP hands them out; the "any -> Servers:53" ACL lands before the cut. (Done 2026-09-14: all eight networks hand out both AdGuard servers. No network ACLs are configured yet - the ACL matrix is step 9 - so no allow rule was needed, and the router's default-permit behaviour covers DNS until then.)
 5. Tailscale: rpi4 advertises `192.168.30.0/24` (dropping the dead `192.168.1.0/24`); override DNS points at the AdGuard units' **tailnet** IPs, not LAN IPs. (Done 2026-09-14: `192.168.30.0/24` and `192.168.60.142/32` advertised and approved; tailnet DNS resolvers are `192.168.30.145` and `100.111.78.53`.)
 6. Verify NEO TV, then disable IGMP Proxy. (TV verified 2026-09-14 on an Innbox LAN port; turning off ER605 IPTV and IGMP Proxy is still open.)
-7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE (TV stays on the Innbox and is unaffected).
+7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE (TV stays on the Innbox and is unaffected). (ER605 adopted 2026-09-16 with the site pre-staged and WAN Settings Overrides carrying PPPoE; the EAP650 is still in its ADOPTING loop and moves to step 8.)
 8. Install ES228GP; move APs/doorbell onto tagged PoE ports; SSID -> VLAN mapping via the controller; tighten VLAN 1 to internet+DNS or retire it.
 9. Apply the full ACL matrix.
 10. Later: IPv6 via DHCPv6-PD over PPPoE.
@@ -383,7 +385,8 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 - ✅ Deploy Omada router (ER605 instead of the planned ER707-M2, 2026-09-14)
 - ✅ Configure VLAN interfaces on router
 - ✅ Migrate Proxmox host + guests to VLANs 30/60 (2026-09-14)
-- ⏳ Adopt ER605 + EAP650 into the Omada Controller LXC
+- ✅ Adopt ER605 into the Omada Controller LXC (2026-09-16)
+- ⏳ Adopt EAP650 into the Omada Controller LXC (stuck in an ADOPTING loop; moved to step 8)
 - ⏳ Configure firewall rules (ACL matrix)
 - ⏳ Move clients onto real VLANs (ES228GP + SSID mapping)
 
