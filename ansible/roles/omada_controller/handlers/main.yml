@@ -9,3 +9,9 @@
     name: tpeap
     state: restarted
   listen: "Restart Omada Controller"
+
+# Used by the firewall tasks: rules are added, the handler reloads the active
+# ruleset, and only then does the play mutate the default policy.
+- name: Reload UFW
+  community.general.ufw:
+    state: reloaded

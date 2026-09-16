@@ -36,3 +36,63 @@ omada_controller_previous_version: "6.2.0.17"  # Track previous version for upgr
 omada_controller_restore_backup: false
 omada_controller_backup_source_dir: "{{ playbook_dir }}/../backups/omada"
 omada_controller_use_local_deb: true  # Use pre-downloaded .deb from backups folder
+
+# Firewall (UFW). The controller's admin plane was reachable from every VLAN,
+# the DMZ and the tailnet, so it was reachable without passing Traefik's lan-only
+# allowlist. Values below are the observed consumers of each port.
+omada_controller_ufw_enabled: true
+
+# SSH: Ansible runs from the operator Mac on VLAN 1. 192.168.30.90 is the wired
+# recovery address used during the gateway cutover.
+omada_controller_ssh_allow_cidrs:
+  - "192.168.10.0/24"   # Management
+  - "192.168.20.0/24"   # Trusted
+  - "192.168.254.0/24"  # transitional VLAN 1 landing net (retire with it)
+  - "192.168.30.90/32"  # wired recovery address on the operator Mac
+
+# Admin UI and client portal. 8043 also serves the API that the monitoring
+# stack's omada exporter polls, so the monitoring LXC must stay allowed.
+# 192.168.30.110 is rpi4, which SNATs tailnet clients into the LAN.
+#
+# 192.168.254.0/24 is TEMPORARY: the operator Mac's resolver sends *.lukapg.dev
+# to Cloudflare, so the LAN-only Traefik route is not usable from it and direct
+# access is what keeps the console reachable. Any VLAN 1 client can therefore
+# still skip the lan-only boundary. DELETE this entry when VLAN 1 is retired in
+# step 8 of the migration (docs/network-architecture.md section 7).
+omada_controller_ui_ports: ["8043", "8088", "8843"]
+omada_controller_ui_allow_cidrs:
+  - "192.168.60.142/32"  # Traefik (DMZ), the omada-secure router
+  - "192.168.30.146/32"  # monitoring LXC, omada exporter
+  - "192.168.30.110/32"  # rpi4, tailnet subnet router
+  - "192.168.30.90/32"   # wired recovery address on the operator Mac
+  - "192.168.254.0/24"   # TEMPORARY - transitional VLAN 1, delete at step 8
+
+# Omada device plane: discovery is device-initiated, so the controller must
+# accept it inbound. The router's own per-VLAN addresses are the sources it
+# uses toward the controller; 192.168.40.0/24 covers the IoT VLAN, where step 8
+# may place devices.
+omada_controller_device_udp_ports: ["29810", "27001"]
+omada_controller_device_tcp_ports:
+  - "29811"
+  - "29812"
+  - "29813"
+  - "29814"
+  - "29815"
+  - "29816"
+  - "29817"
+omada_controller_device_allow_cidrs:
+  - "192.168.254.21/32"  # EAP650 Hallway upstairs (VLAN 1 pool address)
+  - "192.168.40.0/24"    # IoT VLAN
+  - "192.168.10.1/32"    # per-VLAN interface addresses of the router itself
+  - "192.168.20.1/32"
+  - "192.168.30.1/32"
+  - "192.168.40.1/32"
+  - "192.168.50.1/32"
+  - "192.168.60.1/32"
+  - "192.168.99.1/32"
+  - "192.168.254.1/32"
+
+# Scrapes by the monitoring stack: node_exporter and Alloy run on this LXC.
+omada_controller_metrics_tcp_ports: ["9100", "12345"]
+omada_controller_metrics_allow_cidrs:
+  - "192.168.30.146/32"  # monitoring LXC

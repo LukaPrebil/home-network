@@ -1,0 +1,109 @@
+---
+# UFW for the controller host. Order is critical and follows the dev_vm role:
+# add rules, flush handlers so the additions are committed, then mutate the
+# default policy. Without the flush, a re-run that changes policy can deny
+# incoming traffic before the allowlist is live, and the LXC is unreachable
+# over SSH.
+#
+# Why this exists: the controller's admin plane was reachable from every VLAN,
+# from the DMZ and from the tailnet, so it was reachable without passing
+# Traefik's lan-only allowlist. The allowlists below are the observed
+# consumers, not guesses:
+#   - SSH: Ansible runs from the operator Mac on VLAN 1.
+#   - UI/API 8043: Traefik (the omada-secure router) and the monitoring LXC,
+#     whose omada exporter polls the API. 8088/8843 are the HTTP and portal
+#     equivalents.
+#   - UDP 29810/27001 and TCP 29811-29817: the Omada device plane. Discovery is
+#     device-initiated, so the controller must accept it inbound.
+#   - TCP 9100/12345: node_exporter and Alloy, scraped by the monitoring host.
+# The controller also listens on TCP 9098, whose purpose is unidentified; it is
+# deliberately not opened until something needs it.
+#
+# Access paths after this change: the admin UI is reached through Traefik at
+# https://omada.<domain> (lan-only middleware), from the wired recovery address
+# during the gateway cutover, and - temporarily - directly from transitional
+# VLAN 1 clients. That last entry exists because the operator Mac's resolver
+# sends *.lukapg.dev to Cloudflare, so it cannot use the LAN-only route; it is
+# marked for deletion when VLAN 1 is retired. What this change does close is the
+# DMZ-to-admin and tailnet-to-admin shortcuts, and every port that is not on an
+# allowlist below.
+#
+# Recovery if this locks the host out - run on n5p:
+#   pct exec 212 -- ufw disable
+
+- name: Ensure UFW is installed
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: UFW allow SSH from the admin allowlist
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    src: "{{ item }}"
+  loop: "{{ omada_controller_ssh_allow_cidrs }}"
+  notify: Reload UFW
+
+- name: UFW allow the admin UI and portal from the admin allowlist
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    proto: tcp
+    src: "{{ item.1 }}"
+  loop: "{{ omada_controller_ui_ports | product(omada_controller_ui_allow_cidrs) | list }}"
+  loop_control:
+    label: "port {{ item.0 }} from {{ item.1 }}"
+  notify: Reload UFW
+
+- name: UFW allow Omada device discovery over UDP from the device allowlist
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    proto: udp
+    src: "{{ item.1 }}"
+  loop: "{{ omada_controller_device_udp_ports | product(omada_controller_device_allow_cidrs) | list }}"
+  loop_control:
+    label: "udp {{ item.0 }} from {{ item.1 }}"
+  notify: Reload UFW
+
+- name: UFW allow Omada device management over TCP from the device allowlist
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    proto: tcp
+    src: "{{ item.1 }}"
+  loop: "{{ omada_controller_device_tcp_ports | product(omada_controller_device_allow_cidrs) | list }}"
+  loop_control:
+    label: "tcp {{ item.0 }} from {{ item.1 }}"
+  notify: Reload UFW
+
+- name: UFW allow monitoring scrapes from the monitoring host
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    proto: tcp
+    src: "{{ item.1 }}"
+  loop: "{{ omada_controller_metrics_tcp_ports | product(omada_controller_metrics_allow_cidrs) | list }}"
+  loop_control:
+    label: "port {{ item.0 }} from {{ item.1 }}"
+  notify: Reload UFW
+
+- name: Flush UFW handlers - commit the rule set before the policy change
+  ansible.builtin.meta: flush_handlers
+
+- name: UFW default allow outgoing
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+  notify: Reload UFW
+
+- name: UFW default deny incoming
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+  notify: Reload UFW
+
+- name: UFW enable
+  community.general.ufw:
+    state: enabled
