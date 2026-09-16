@@ -24,3 +24,9 @@
   ansible.builtin.import_tasks: service.yml
   when: not (omada_controller_upgrade_mode | bool)
   tags: [omada, service]
+
+# Last: the controller should be up before its admin plane is closed down.
+- name: Include UFW firewall tasks
+  ansible.builtin.import_tasks: firewall.yml
+  when: omada_controller_ufw_enabled | bool
+  tags: [omada, omada-firewall]
