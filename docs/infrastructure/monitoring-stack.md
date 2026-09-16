@@ -35,6 +35,8 @@ Configured via Ansible template (`prometheus.yml.j2`). All API keys/passwords so
 
 **Note:** `node_exporter` targets are dynamically generated from the `monitoring_agents` inventory group via Jinja2 templating.
 
+**Note:** the Omada exporter reports per-device metrics (`omada_device_*`: CPU, memory, uptime, tx/rx) for every device the controller manages, so the router appears under it once adopted. The ER605 was adopted on 2026-09-16 and now shows alongside the EAP650; no scrape target or Prometheus job changed.
+
 ### Proxmox exporter credentials
 
 The exporter authenticates as the `root@pam!monitoring` API token. The token is created with
