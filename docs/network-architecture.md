@@ -269,8 +269,8 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 4. Re-home DNS: AdGuard at `192.168.30.145` / `192.168.30.110`; ER605 per-LAN DHCP hands them out; the "any -> Servers:53" ACL lands before the cut. (Done 2026-09-14: all eight networks hand out both AdGuard servers. No network ACLs are configured yet - the ACL matrix is step 9 - so no allow rule was needed, and the router's default-permit behaviour covers DNS until then.)
 5. Tailscale: rpi4 advertises `192.168.30.0/24` (dropping the dead `192.168.1.0/24`); override DNS points at the AdGuard units' **tailnet** IPs, not LAN IPs. (Done 2026-09-14: `192.168.30.0/24` and `192.168.60.142/32` advertised and approved; tailnet DNS resolvers are `192.168.30.145` and `100.111.78.53`.)
 6. Verify NEO TV, then disable IGMP Proxy. (TV verified 2026-09-14 on an Innbox LAN port. Done 2026-09-16: IPTV and IGMP Proxy are both off, confirmed in the controller after adoption replaced the router's config.)
-7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE (TV stays on the Innbox and is unaffected). (ER605 adopted 2026-09-16 with the site pre-staged and WAN Settings Overrides carrying PPPoE; the EAP650 is still in its ADOPTING loop and moves to step 8.)
-8. Install ES228GP; move APs/doorbell onto tagged PoE ports; SSID -> VLAN mapping via the controller; tighten VLAN 1 to internet+DNS or retire it.
+7. Controller reachable at `192.168.30.143` -> adopt ER605 and EAP650; recreate PPPoE (TV stays on the Innbox and is unaffected). (ER605 adopted 2026-09-16 with the site pre-staged and WAN Settings Overrides carrying PPPoE; EAP650 adopted 2026-09-16 via DHCP option 138 on the VLAN 1 LAN scope, which hands a cross-subnet EAP the controller address - see step 8's note.)
+8. Install ES228GP; move APs/doorbell onto tagged PoE ports; SSID -> VLAN mapping via the controller; tighten VLAN 1 to internet+DNS or retire it. (EAP650 #1 adopted 2026-09-16. DHCP option 138 on the VLAN 1 LAN network now points Omada devices at the controller; it must stay in place so APs re-learn the controller address at every lease renewal and for the two remaining EAP650s.)
 9. Apply the full ACL matrix.
 10. Later: IPv6 via DHCPv6-PD over PPPoE.
 
@@ -386,7 +386,7 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 - ✅ Configure VLAN interfaces on router
 - ✅ Migrate Proxmox host + guests to VLANs 30/60 (2026-09-14)
 - ✅ Adopt ER605 into the Omada Controller LXC (2026-09-16)
-- ⏳ Adopt EAP650 into the Omada Controller LXC (stuck in an ADOPTING loop; moved to step 8)
+- ✅ Adopt EAP650 into the Omada Controller LXC (2026-09-16, via DHCP option 138)
 - ⏳ Configure firewall rules (ACL matrix)
 - ⏳ Move clients onto real VLANs (ES228GP + SSID mapping)
 
