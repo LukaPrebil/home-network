@@ -3,10 +3,12 @@
 # Source: roles/hermes/templates/config.yaml.j2
 
 # ── Model / inference ────────────────────────────────────────────────
-# Auth is via CLAUDE_CODE_OAUTH_TOKEN in ~/.hermes/.env. The Anthropic
-# provider plugin picks it up automatically.
+# Brain provider + model come from role defaults; auth is the matching
+# API key block in .env (OLLAMA_API_KEY for ollama-cloud, etc.). Switching
+# brains = change hermes_model_provider/hermes_model_default + paste key.
 model:
-  default: "anthropic:claude-opus-4-7"
+  provider: "{{ hermes_model_provider }}"
+  default: "{{ hermes_model_default }}"
 
 # ── Security gate ────────────────────────────────────────────────────
 approvals:

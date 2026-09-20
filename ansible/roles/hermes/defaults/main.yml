@@ -5,8 +5,9 @@
 # upstream curl one-liner into a per-user uv-managed venv. We run it as a
 # dedicated `hermes` user under systemd, with state under ~hermes/.hermes/.
 #
-# The agent reaches Anthropic via OAuth (CLAUDE_CODE_OAUTH_TOKEN), talks to
-# Home Assistant over the WS API, and surfaces a Telegram bot.
+# The agent's brain is a first-class model provider (Ollama Cloud today,
+# switchable by vars), it talks to Home Assistant over the WS API, and
+# surfaces a Telegram bot.
 
 # ── Local user and install paths ─────────────────────────────────────
 hermes_user: hermes
@@ -20,6 +21,14 @@ hermes_install_dir: "{{ hermes_home }}/hermes-agent"    # uv venv + checkout
 # Hermes release here. `hermes update` is the supported upgrade path. Re-running
 # this role does NOT auto-upgrade — the install task is gated on binary presence.
 hermes_installer_url: "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
+
+# ── Model / brain ────────────────────────────────────────────────────
+# The brain is a vars edit away: switch provider + model here, and set the
+# matching API key in SOPS (templates/env.j2 carries one key block per
+# supported provider; empty = unset). Supported set: ollama-cloud,
+# opencode-go, deepseek. Model:tag notation is preserved for ollama-cloud.
+hermes_model_provider: "ollama-cloud"
+hermes_model_default: "deepseek-v4.1-flash:cloud"
 
 # ── Gateway platforms ────────────────────────────────────────────────
 # Telegram is the primary messaging surface. Home Assistant gateway is enabled

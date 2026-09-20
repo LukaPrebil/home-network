@@ -4,6 +4,36 @@ Single-operator homelab: Ansible-managed infrastructure plus a Home Assistant es
 
 ## Language
 
+### WiFi estate
+
+**House AP**:
+The primary indoor access point serving the living space; the only tri-band (6 GHz) unit in
+the fleet. Resolved 2026-09-16: the EAP772 (BE9300 EU, ~€185, 2.5G port, 802.3at), mounted
+on the top-floor ceiling of a wood-frame house with screed floors.
+_Avoid_: "wifi 7 AP" (the requirement is the 6 GHz band for the ~4-5 capable personal
+clients; Omada's EU lineup has no 6E ceiling AP, so 6 GHz arrives only via WiFi 7 hardware)
+_Avoid_: the EAP723 - it is dual-band WiFi 7 with no 6 GHz radio, so it cannot decongest 5 GHz
+
+**Utility AP**:
+The relocated EAP650 (indoor, AX3000) in the utility room, serving the driveway and shed
+through the exterior walls. No purchase; it changes coverage zones, not hardware.
+
+**Balcony AP**:
+The EAP610-Outdoor (AX1800, IP68, ~€85) wall-mounted ~3 m above the balcony, serving the
+20x20 m yard: phones/laptops outdoors, the Luba mower (2.4 GHz), and future outdoor IoT.
+Resolved 2026-09-16: 160 MHz on 5 GHz was judged worthless outdoors, so the EAP650-Outdoor
+was dropped for the cheaper model with an identical 2.4 GHz radio.
+_Avoid_: "outdoor AP" for the Utility AP - it stays indoors and radiates through walls.
+Note: the sheet-metal porch roof RF-shadows the porch itself; the AP's pattern should point
+outward over the yard, not down into the metal sheet.
+
+**Access switch**:
+The single collapsed switch (ES228GP, 24x1G PoE+ / 26 RJ45 / 2x1G SFP, ~€230) that absorbs
+both the CSS326 and the YuanLey. Every wired thing lands here; no second switch remains.
+_Avoid_: "core switch" (there is no distribution below it to be the core of) and "the 10G
+backbone" (retired with the YuanLey - n5p runs 1G, same as today, and 10G returns only as a
+separate SFP+ switch if it is ever wanted)
+
 ### Mammotion Luba (mower)
 
 **Device-level entity**:
@@ -361,6 +391,17 @@ _Avoid_: "model data" (that word collides with the **local-rootfs state** / **NF
 One immich ML residency window: three models loaded, about 4.1 GiB of host RAM and 938 MB of GTT at
 peak, then everything freed 300 s after the last request.
 _Avoid_: "ML job" (a job is one queue task; the burst is the whole window)
+
+### Hermes agent
+
+**Agent brain**:
+The provider and model serving the hermes gateway's main chat loop, wired through
+`model.provider` / `model.default` plus one API key in `.env`. Switching brains is a vars edit and
+a converge, never an install or a rebuild; the local-model track swaps it in the same way when its
+gate clears.
+_Avoid_: "the model" (collides with the local-model plan's llama-server and with **model
+artifact** - those are weights, this is a subscription), "provider setup" (the interactive
+`hermes model` wizard is exactly what the Ansible role exists to bypass)
 
 ### Pi chat remote
 
