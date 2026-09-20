@@ -81,6 +81,18 @@ scrape_configs:
           instance: '{{ host }}'
 {% endfor %}
 
+  # TIGO optimiser telemetry freshness. The bridge republishes its state topic
+  # every 10 s whether or not the bus produced anything and stamps it with its
+  # own clock, so no transport-level signal can see a silent optimiser bus - not
+  # the topic, not the container's health, not its socket. The watchdog sidecar
+  # reads the optimisers' own report timestamps out of that payload and exports
+  # the newest one.
+  - job_name: 'taptap-watchdog'
+    static_configs:
+      - targets: ['{{ hostvars['containers']['ansible_host'] }}:{{ taptap_watchdog_port }}']
+        labels:
+          instance: 'containers'
+
   # Traefik reverse proxy metrics
   - job_name: 'traefik'
     static_configs:

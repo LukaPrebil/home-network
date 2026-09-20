@@ -31,6 +31,7 @@ Configured via Ansible template (`prometheus.yml.j2`). All API keys/passwords so
 | Traefik Proxy | Built-in | traefik LXC | `<traefik_ip>:8082` |
 | Grafana Alloy agents | Built-in | Each target host (native binary) | `<host_ip>:12345` |
 | Internet Bandwidth | `speedtest-exporter` | monitoring LXC (Docker) | `speedtest-exporter:9469` |
+| TIGO optimiser telemetry freshness | `taptap-mqtt-watchdog` | containers VM (Docker) | `<containers>:9102` |
 | TrueNAS (`tn-storage`) | Built-in | TrueNAS (enable in UI) | *Not yet enabled* |
 
 **Note:** `node_exporter` targets are dynamically generated from the `monitoring_agents` inventory group via Jinja2 templating.
@@ -137,6 +138,26 @@ full 30-day retention window while every signal read green:
   than a zero one, which a plain `== 0` would never match.
 
 To check by hand: `curl -s localhost:12345/metrics | grep loki_source_journal`.
+
+### Proving the TIGO optimiser bus is reporting
+
+The same trap in a different shape, found 2026-09-20 after three days of silent PV telemetry. The
+taptap bridge's liveness signals are all real and all useless for this: its heartbeat file is touched
+on every loop pass, the container healthcheck reads that file, the MQTT session stays connected so the
+LWT never fires, and the `taptap/tigo/state` topic is **republished every 10 s whether or not the bus
+produced anything**, stamped with the bridge's own clock. Reading message arrival would have watched
+the outage happen.
+
+The value that moves with the plant is the optimisers' own last-report time, `nodes[*].tmstp`, inside
+that payload. The `taptap-mqtt-watchdog` sidecar (deployed by the `taptap_mqtt` role, scraped as job
+`taptap-watchdog`) exports it as `taptap_mqtt_last_report_timestamp_seconds`, plus
+`taptap_mqtt_report_age_seconds`, `taptap_mqtt_modules_online` and `taptap_mqtt_modules_total`.
+
+The `TIGO Optimiser Telemetry Stalled` alert (Monitoring Health group) fires when no optimiser report
+has arrived for 10 minutes. Its `noDataState` is `Alerting` rather than `OK`, which is the opposite of
+the alloy rule above and deliberate: the watchdog sidecar is the only thing keeping that series alive,
+so its disappearance is the fault the rule exists to report. All 427 `sensor.tigo_*` entities in Home
+Assistant go unavailable 180 s after the last report, and nothing used to alert on that.
 
 ### Alerting on log content
 

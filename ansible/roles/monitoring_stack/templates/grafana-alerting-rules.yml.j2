@@ -1456,3 +1456,67 @@ groups:
           description: "Alloy on {{ '{{' }} $labels.instance {{ '}}' }} has read no journal lines in 2 hours. Host logs from it are not reaching Loki, so Error Log Spike, Service Crash Detected and Authentication Failure Spike are all blind for that host."
         labels:
           severity: warning
+
+      # 25. The TIGO optimiser bus stopped producing anything
+      - uid: alert-taptap-stale
+        title: TIGO Optimiser Telemetry Stalled
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              # Reads the optimisers' own newest report time, never the arrival
+              # time of a message. The bridge republishes its state topic every
+              # 10 s whether or not the bus produced anything and stamps it with
+              # its own clock, so the topic - and the container, and its socket,
+              # and the heartbeat file - all stay fresh while every value goes
+              # stale. On 2026-09-17 the bus was silent for three days and the
+              # first four all read green.
+              #
+              # noDataState is Alerting on purpose: the watchdog sidecar is the
+              # only thing keeping this series alive, so its absence is itself
+              # the fault this rule exists to report.
+              expr: time() - taptap_mqtt_last_report_timestamp_seconds
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 600
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "No TIGO optimiser report in over 10 minutes"
+          description: "The per-panel plant view is stale. All 427 sensor.tigo_* entities in Home Assistant go unavailable 180 s after the last report, and nothing has alerted on that until now. First check the bridge's own socket, which is the failure this has been seen as: a read-only connect to 192.168.40.162:7160 that returns bytes means the bus is fine and the bridge's TCP client is black-holed, which `ansible-playbook site.yml --tags tigo --limit containers` repairs by reconnecting. A connect that returns nothing means the fault is upstream: CCA or TAP radio power, then the switch in the PV enclosure."
+        labels:
+          severity: warning
