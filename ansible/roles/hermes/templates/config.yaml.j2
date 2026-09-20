@@ -3,10 +3,12 @@
 # Source: roles/hermes/templates/config.yaml.j2
 
 # ── Model / inference ────────────────────────────────────────────────
-# Auth is via CLAUDE_CODE_OAUTH_TOKEN in ~/.hermes/.env. The Anthropic
-# provider plugin picks it up automatically.
+# Brain provider + model come from role defaults; auth is the matching
+# API key block in .env (OLLAMA_API_KEY for ollama-cloud, etc.). Switching
+# brains = change hermes_model_provider/hermes_model_default + paste key.
 model:
-  default: "anthropic:claude-opus-4-7"
+  provider: "{{ hermes_model_provider }}"
+  default: "{{ hermes_model_default }}"
 
 # ── Security gate ────────────────────────────────────────────────────
 approvals:
@@ -17,24 +19,29 @@ terminal:
   backend: "{{ hermes_terminal_backend }}"
 
 # ── Gateway / platforms ──────────────────────────────────────────────
-# Each platform is enabled via its env vars in .env. Listing here is
-# advisory — the gateway reads the env directly. Disabling a platform
-# is done by leaving its token unset.
-gateway:
-  dashboard:
-    host: "{{ hermes_dashboard_bind }}"
-    port: {{ hermes_dashboard_port }}
+# Platforms are enabled via their env vars in .env (TELEGRAM_BOT_TOKEN etc.);
+# listing here is advisory — the gateway reads the env directly. Disabling a
+# platform is done by leaving its token unset. The dashboard is a separate
+# process (`hermes dashboard`, own systemd unit) bound in that unit's args.
 
 # ── MCP servers ──────────────────────────────────────────────────────
 # Home Assistant MCP is bridged from the containers VM. It exposes HA
 # device control as tools — useful for "turn off the heat pump" style
-# requests from Telegram. Empty `include`/`exclude` = all tools.
+# requests from Telegram. tools.include is a whitelist (empty = nothing
+# registered); the list lives in role defaults, one entry per tool.
 mcp_servers:
   ha-mcp:
     # Streamable HTTP at the ha-mcp secret path (the path is the credential,
     # declared in group_vars/all alongside the port contract). ha-mcp-web
     # serves no /sse endpoint; the former /sse URL here was a 404.
     url: "http://{{ hostvars['containers']['ansible_host'] }}:8087{{ ha_mcp_secret_path }}"
-    enabled: {{ hermes_enable_homeassistant | lower }}
+    enabled: {{ hermes_enable_hamcp | lower }}
+    # tools.include is the HA privilege boundary: read + service-call only,
+    # no automation/script/helper authoring (see role defaults for why).
+    tools:
+      include:
+{% for tool in hermes_hamcp_include_tools %}
+        - {{ tool }}
+{% endfor %}
     sampling:
       enabled: false  # Don't let the MCP server initiate LLM calls on our budget

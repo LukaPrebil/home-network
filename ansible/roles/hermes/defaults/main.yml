@@ -5,8 +5,9 @@
 # upstream curl one-liner into a per-user uv-managed venv. We run it as a
 # dedicated `hermes` user under systemd, with state under ~hermes/.hermes/.
 #
-# The agent reaches Anthropic via OAuth (CLAUDE_CODE_OAUTH_TOKEN), talks to
-# Home Assistant over the WS API, and surfaces a Telegram bot.
+# The agent's brain is a first-class model provider (Ollama Cloud today,
+# switchable by vars), it talks to Home Assistant over the WS API, and
+# surfaces a Telegram bot.
 
 # ── Local user and install paths ─────────────────────────────────────
 hermes_user: hermes
@@ -21,12 +22,28 @@ hermes_install_dir: "{{ hermes_home }}/hermes-agent"    # uv venv + checkout
 # this role does NOT auto-upgrade — the install task is gated on binary presence.
 hermes_installer_url: "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
 
+# ── Model / brain ────────────────────────────────────────────────────
+# The brain is a vars edit away: switch provider + model here, and set the
+# matching API key in SOPS (templates/env.j2 carries one key block per
+# supported provider; empty = unset). Supported set: ollama-cloud,
+# opencode-go, deepseek. Model:tag notation is preserved for ollama-cloud.
+hermes_model_provider: "ollama-cloud"
+hermes_model_default: "deepseek-v4.1-flash:cloud"
+
 # ── Gateway platforms ────────────────────────────────────────────────
-# Telegram is the primary messaging surface. Home Assistant gateway is enabled
-# so HA state_changed events can wake the agent (event-driven incident response).
-# Other platforms left disabled — flip to true and supply secrets to enable.
+# Telegram is the only human surface for the first deployment (approvals
+# land in the same chat). The Home Assistant gateway platform stays OFF:
+# hermes is pull-only — it reaches HA through the ha-mcp MCP tools when
+# asked, and nothing wakes it on house events (each wake costs brain
+# tokens). Flip this to true later together with a narrow watch_entities
+# list once event-driven incident response is wanted.
 hermes_enable_telegram: true
-hermes_enable_homeassistant: true
+hermes_enable_homeassistant: false
+
+# The ha-mcp MCP tool surface is separate from the gateway platform above:
+# pull-only house access (read + service-call whitelist below) stays ON
+# while the event-driven wake stays OFF.
+hermes_enable_hamcp: true
 hermes_enable_discord: false
 hermes_enable_slack: false
 hermes_enable_signal: false
@@ -36,10 +53,42 @@ hermes_enable_signal: false
 hermes_hass_url: "http://{{ hostvars['haos']['ansible_host'] }}:8123"
 
 # ── Security ─────────────────────────────────────────────────────────
-# approvals.mode "on" requires the operator to confirm dangerous commands
-# (terminal writes, network ops, etc.) before execution. Single-tenant trust
-# model is already loose; this is the load-bearing security gate.
-hermes_approvals_mode: "on"
+# approvals.mode "manual": every dangerous terminal command becomes a
+# propose-wait prompt in the Telegram chat; cron/webhook contexts fail
+# closed (upstream defaults: cron_mode/single_query_mode/unattended_mode
+# deny). Valid upstream modes are smart | manual | off — NOT "on".
+# Tier-1 "act then notify" can come later via command_allowlist mining.
+hermes_approvals_mode: "manual"
+
+# ── Home Assistant tool surface (ha-mcp) ──────────────────────────────
+# Whitelist of ha-mcp tools hermes may call: read + service-call only.
+# The agent must not author automations/scripts/helpers (operator decision,
+# 2026-09-13 house-AI discussion), and approvals do NOT gate MCP tool calls,
+# so this include list IS the HA privilege boundary. New upstream tools
+# default to hidden; additions need a deliberate change here.
+hermes_hamcp_include_tools:
+  - ha_get_overview
+  - ha_get_state
+  - ha_get_entity
+  - ha_search
+  - ha_search_tools
+  - ha_list_services
+  - ha_call_service
+  - ha_bulk_control
+  - ha_get_history
+  - ha_list_floors_areas
+  - ha_get_zone
+  - ha_get_device
+  - ha_get_integration
+  - ha_get_system_health
+  - ha_get_operation_status
+  - ha_error_code
+  - ha_version
+  - ha_get_automation_traces
+  - ha_config_get_automation
+  - ha_config_get_script
+  - ha_config_get_scene
+  - ha_get_camera_image
 
 # Terminal backend: local execution inside this LXC. The LXC IS the sandbox.
 # Use "docker" instead if we ever stand up MCP servers that need container
@@ -53,5 +102,6 @@ hermes_dashboard_port: 9119
 
 # ── systemd ──────────────────────────────────────────────────────────
 hermes_service_name: "hermes-gateway"
+hermes_dashboard_service_name: "hermes-dashboard"
 hermes_service_state: "started"  # started | stopped | restarted
 hermes_service_enabled: true
