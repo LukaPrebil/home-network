@@ -31,14 +31,28 @@ hermes_model_provider: "ollama-cloud"
 hermes_model_default: "deepseek-v4.1-flash:cloud"
 
 # ── Gateway platforms ────────────────────────────────────────────────
-# Telegram is the only human surface for the first deployment (approvals
-# land in the same chat). The Home Assistant gateway platform stays OFF:
-# hermes is pull-only — it reaches HA through the ha-mcp MCP tools when
-# asked, and nothing wakes it on house events (each wake costs brain
-# tokens). Flip this to true later together with a narrow watch_entities
-# list once event-driven incident response is wanted.
+# Telegram is the human surface (approvals land in the same chat). The Home
+# Assistant gateway platform is ON and event-driven: the adapter subscribes
+# over WebSocket and wakes the agent for the entities in
+# hermes_ha_watch_entities, and for nothing else. It needs
+# vault_hermes_hass_token; with the token unset the platform does not load and
+# the wake silently does nothing, which is what the deploy health check is for.
 hermes_enable_telegram: true
-hermes_enable_homeassistant: false
+hermes_enable_homeassistant: true
+
+# The chat hermes sends unsolicited messages to: event wakes, cron results,
+# startup notices. Telegram's home channel is normally set by running /sethome
+# in the chat, but that only writes into config.yaml - which this role owns and
+# rewrites wholesale - so it is declared here and rendered into .env instead
+# (upstream reads TELEGRAM_HOME_CHANNEL at load time).
+#
+# Derived from the allowed-users list so no Telegram id is committed to the
+# repository. Override this var if the home chat should differ from the first
+# entry in the allowlist. Empty allowlist = no home channel and therefore no
+# unsolicited messages.
+hermes_telegram_home_channel: "{{ (vault_hermes_telegram_allowed_users | default('')) | string | split(',') | first | trim }}"
+# Forum topic the home channel lives in; empty means the channel itself.
+hermes_telegram_home_channel_thread_id: ""
 
 # The ha-mcp MCP tool surface is separate from the gateway platform above:
 # pull-only house access (read + service-call whitelist below) stays ON
@@ -49,8 +63,64 @@ hermes_enable_slack: false
 hermes_enable_signal: false
 
 # ── Home Assistant ───────────────────────────────────────────────────
-# Pulls the HAOS host's address from inventory rather than hardcoding.
-hermes_hass_url: "http://{{ hostvars['haos']['ansible_host'] }}:8123"
+# Pulls the HAOS host's address from inventory rather than hardcoding. The port
+# is separate because the readiness check below filters on it.
+hermes_hass_port: 8123
+hermes_hass_url: "http://{{ hostvars['haos']['ansible_host'] }}:{{ hermes_hass_port }}"
+
+# Event-driven wake, and the only thing that can start an agent turn on its
+# own. Deliberately narrow: watching every state change costs roughly
+# 700-800k wakes/day, while this list is budgeted at 10-25 wakes/day. Every
+# entry must pass the watch-decision gate, recorded with the plan at
+# .claude/state/plans/2026-09-20-hermes-ha-wake-and-doorbell.md:
+#   1. name an action no existing automation takes;
+#   2. no duplication with an existing automation's trigger or notify;
+#   3. under 5 events/day sustained over 7d, else watch a derived helper or
+#      accept the cooldown;
+#   4. watch absence-of-signal through a synthetic *_alive helper, never the
+#      raw feed, because a dead feed and a healthy one look identical;
+#   5. device-level entities only, never map-derived or progress entities;
+#   6. ship the reason inline with the entry;
+#   7. prune monthly - a wake that did nothing gets removed.
+#
+# Two planned entries are blocked on helpers that do not exist yet (the
+# Tigo-bridge-alive helper and the inverter-bridge heartbeat helper). Add them
+# only once the helpers land and the heartbeat pattern is settled.
+hermes_ha_watch_entities:
+  # Mower job ends and faults. sensor.vrt_luba_progress is deliberately absent:
+  # gate rule 5 excludes progress state, and a job end is read from the state
+  # change plus sensor.vrt_luba_last_error_time.
+  - lawn_mower.vrt_luba
+  - sensor.vrt_luba_last_error_time
+  # Doorbell ring - the trigger for the visitor flow (plan decision 4).
+  - binary_sensor.zvonec_zunaj_visitor
+  # ARSO severe-weather warning going active for the Ljubljana airport region.
+  - binary_sensor.arso_opozorila_letalisce_jozeta_pucnika_ljubljana_aktivno_opozorilo
+  # Nightly automatic backup, and new Home Assistant repair issues.
+  - event.backup_automatic_backup
+  - event.repair
+
+# Upstream default is 30s between events for the same entity. Spelled out so
+# the value is reviewable whenever an entry is added.
+hermes_ha_cooldown_seconds: 30
+
+# What the agent is told when it wakes on an event. Injected as a per-channel
+# system prompt (platforms.<name>.channel_overrides.<chat_id>.system_prompt,
+# which upstream resolves by chat_id, then thread_id, then parent_id), so it
+# applies to the Home Assistant channel and nothing else.
+#
+# The platform answers its own channel as an HA persistent notification, which
+# nobody reads away from a browser, so the agent is told to report on Telegram
+# instead. `send_message` is NOT an LLM tool in this build (the module never
+# calls registry.register and no toolset lists it), so the route is the
+# `hermes send` CLI, which needs no running gateway and no agent loop. It is
+# also the only route that can attach a picture, which the doorbell flow needs.
+hermes_ha_channel_prompt: >-
+  You were woken by a Home Assistant event, not by a person, and nothing reads
+  this channel. Report to the operator on Telegram with:
+  hermes send -t telegram '<text>'. Put MEDIA:<path> in the text to attach a
+  picture. Send one short message, only when the event is worth reporting;
+  otherwise stay silent.
 
 # ── Security ─────────────────────────────────────────────────────────
 # approvals.mode "manual": every dangerous terminal command becomes a
@@ -89,6 +159,16 @@ hermes_hamcp_include_tools:
   - ha_config_get_script
   - ha_config_get_scene
   - ha_get_camera_image
+
+# Setting HASS_TOKEN turns on upstream's built-in `homeassistant` toolset by
+# itself (ha_list_entities, ha_get_state, ha_list_services, ha_call_service):
+# a second HA service-call path that the whitelist above does not govern.
+# Disabled so ha-mcp stays the single HA tool surface - one privilege
+# boundary, one result shape, no duplicate read tools. agent.disabled_toolsets
+# is a global suppression list that upstream applies last, after every
+# per-platform toolset list.
+hermes_disabled_toolsets:
+  - homeassistant
 
 # Terminal backend: local execution inside this LXC. The LXC IS the sandbox.
 # Use "docker" instead if we ever stand up MCP servers that need container

@@ -405,11 +405,21 @@ _Avoid_: "the model" (collides with the local-model plan's llama-server and with
 artifact** - those are weights, this is a subscription), "provider setup" (the interactive
 `hermes model` wizard is exactly what the Ansible role exists to bypass)
 
+**Event wake**:
+A house event starting an agent turn on its own, through the Home Assistant gateway
+platform's WebSocket subscription. Bounded by two things: the entity allowlist in the
+role's `hermes_ha_watch_entities`, because upstream forwards nothing without one, and the
+per-entity cooldown. Every wake spends brain tokens, so an entry has to pass the
+watch-decision gate and gets pruned monthly.
+_Avoid_: "trigger" (that is the HA-side concept, not the agent turn), "subscription" (says
+nothing about who pays)
+
 **Pull-only**:
-Hermes acting on the house only when a human asks. The ha-mcp include whitelist is the HA
-privilege boundary (approvals gate terminal commands, not MCP tool calls), and with HASS_TOKEN
-unset there are no built-in REST tools and no event-driven wake, so nothing in the house can
-start an agent turn.
+Hermes acting on the house because a human asked, over Telegram. This is one of two
+initiators, not the whole posture: see **Event wake** for the house-initiated path. The
+ha-mcp include whitelist is the HA privilege boundary (approvals gate terminal commands,
+not MCP tool calls), and the four built-in Home Assistant REST tools that `HASS_TOKEN`
+also enables are suppressed so the whitelist stays the only tool surface.
 _Avoid_: "passive" (says nothing about who initiates), "read-only" (service calls still act -
 they just need a human to ask first)
 
@@ -485,6 +495,7 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - Weights are a **model artifact**, not **NFS-backed state**, so the ban on two guests sharing an NFS path does not reach them, and a **staged cutover** cannot desynchronise them from an index the way Immich's Postgres can
 - A guest's own `memory.high` must sit above its working set, or the cgroup reclaims the very pages a **model artifact** runs from; the soft limit is a floor under the model, never a lever against another workload
 - **Reclaim order** falls out of reclaimability rather than priority: **reclaimable weights** yield before the ML workload's anonymous GPU buffers, so ML wins the morning **ML burst** without being configured to win
+- A **Pull-only** turn and an **Event wake** are the same agent with different initiators, so the wake list has to be a token budget rather than a mirror of what the house reports
 
 ## Example dialogue
 

@@ -51,3 +51,48 @@
   delay: 5
   changed_when: false
   when: hermes_service_state != 'stopped'
+
+# The dashboard serves the last state the gateway published, so a restart leaves a
+# window of a few seconds in which it still reports the previous process as
+# connected. Reading state alone would pass there, which is exactly the failure this
+# check exists to catch. A socket cannot outlive its process, so requiring the
+# gateway to be holding the Home Assistant WebSocket right now closes that window.
+- name: Assert the running gateway holds the Home Assistant WebSocket
+  ansible.builtin.shell: |
+    set -o pipefail
+    ss -tnp state established "( dport = :{{ hermes_hass_port }} )" \
+      | grep -c 'hermes",pid=' || true
+  args:
+    executable: /bin/bash
+  register: hermes_ha_socket
+  until: hermes_ha_socket.stdout | trim | int > 0
+  retries: 30
+  delay: 5
+  changed_when: false
+  when:
+    - not ansible_check_mode  # check mode restarts nothing, so it proves nothing
+    - hermes_service_state != 'stopped'
+    - hermes_enable_homeassistant
+
+# Proves the event wake is armed, which the rendered config alone does not: with
+# vault_hermes_hass_token empty the Home Assistant platform never loads and the
+# watch list is inert. The dashboard reports each gateway platform's live state,
+# which is the only application-level view of it - the adapter logs its connect
+# at INFO, below the gateway's WARNING log level, so the journal never carries it.
+- name: Assert the gateway connected to Home Assistant
+  ansible.builtin.uri:
+    url: "http://{{ hermes_dashboard_bind }}:{{ hermes_dashboard_port }}/api/status"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: hermes_status
+  until: >-
+    (hermes_status.json.gateway_platforms | default({}))
+    .get('homeassistant', {}).get('state') == 'connected'
+  retries: 30
+  delay: 5
+  changed_when: false
+  when:
+    - not ansible_check_mode  # a check run restarts nothing, so it proves nothing
+    - hermes_service_state != 'stopped'
+    - hermes_enable_homeassistant
