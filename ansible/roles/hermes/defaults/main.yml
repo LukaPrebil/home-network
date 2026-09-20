@@ -102,5 +102,6 @@ hermes_dashboard_port: 9119
 
 # ── systemd ──────────────────────────────────────────────────────────
 hermes_service_name: "hermes-gateway"
+hermes_dashboard_service_name: "hermes-dashboard"
 hermes_service_state: "started"  # started | stopped | restarted
 hermes_service_enabled: true

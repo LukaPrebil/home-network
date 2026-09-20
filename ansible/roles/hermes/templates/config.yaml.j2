@@ -19,13 +19,10 @@ terminal:
   backend: "{{ hermes_terminal_backend }}"
 
 # ── Gateway / platforms ──────────────────────────────────────────────
-# Each platform is enabled via its env vars in .env. Listing here is
-# advisory — the gateway reads the env directly. Disabling a platform
-# is done by leaving its token unset.
-gateway:
-  dashboard:
-    host: "{{ hermes_dashboard_bind }}"
-    port: {{ hermes_dashboard_port }}
+# Platforms are enabled via their env vars in .env (TELEGRAM_BOT_TOKEN etc.);
+# listing here is advisory — the gateway reads the env directly. Disabling a
+# platform is done by leaving its token unset. The dashboard is a separate
+# process (`hermes dashboard`, own systemd unit) bound in that unit's args.
 
 # ── MCP servers ──────────────────────────────────────────────────────
 # Home Assistant MCP is bridged from the containers VM. It exposes HA

@@ -1,7 +1,7 @@
 [Unit]
-Description=Hermes Agent gateway
+Description=Hermes Agent dashboard (web UI)
 Documentation=https://hermes-agent.nousresearch.com/docs/
-After=network-online.target
+After=network-online.target {{ hermes_service_name }}.service
 Wants=network-online.target
 # StartLimitIntervalSec lives in [Unit], not [Service] (systemd 257 rejects it there).
 StartLimitIntervalSec=0
@@ -15,14 +15,15 @@ Environment=HOME={{ hermes_user_home }}
 Environment=HERMES_HOME={{ hermes_home }}
 EnvironmentFile={{ hermes_home }}/.env
 
-ExecStart={{ hermes_install_dir }}/venv/bin/hermes gateway run --replace
+# Break-glass admin surface: loopback bind only, reach via SSH tunnel or
+# Tailscale. First start builds the web UI (npm) and can take ~2 minutes;
+# later starts serve the built dist directly.
+ExecStart={{ hermes_install_dir }}/venv/bin/hermes dashboard --host {{ hermes_dashboard_bind }} --port {{ hermes_dashboard_port }} --no-open
 
 Restart=on-failure
 RestartSec=10
 
-# Hardening — restrict the agent's filesystem reach to its own state dir.
-# Operator-level secrets in ~hermes/.hermes/.env are still in-scope; this
-# just stops the agent from clobbering /etc or peeking at other users.
+# Hardening — same profile as the gateway unit.
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=tmpfs

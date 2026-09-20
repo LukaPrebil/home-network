@@ -1,14 +1,22 @@
 ---
-# Systemd unit for hermes gateway.
-#
-# `hermes gateway start` blocks until the gateway exits, which makes it a
-# clean systemd Type=simple unit. The unit runs as the hermes user, with
-# HERMES_HOME pointed at the state directory.
+# systemd units: hermes-gateway (messaging platforms + cron) and
+# hermes-dashboard (web UI, loopback only). ExecStart uses the foreground
+# verb `gateway run`; see the gateway unit template for why `gateway start`
+# is wrong inside its own unit.
 
 - name: Template hermes-gateway systemd unit
   ansible.builtin.template:
     src: hermes-gateway.service.j2
     dest: "/etc/systemd/system/{{ hermes_service_name }}.service"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Template hermes-dashboard systemd unit
+  ansible.builtin.template:
+    src: hermes-dashboard.service.j2
+    dest: "/etc/systemd/system/{{ hermes_dashboard_service_name }}.service"
     owner: root
     group: root
     mode: '0644'
@@ -23,7 +31,15 @@
     state: "{{ hermes_service_state }}"
     enabled: "{{ hermes_service_enabled }}"
 
+- name: Manage hermes-dashboard service
+  ansible.builtin.systemd:
+    name: "{{ hermes_dashboard_service_name }}"
+    state: "{{ hermes_service_state }}"
+    enabled: "{{ hermes_service_enabled }}"
+
 # Dashboard binds 127.0.0.1 only; this runs on the target host, so it reaches it.
+# The FIRST start builds the web UI (npm), which can take ~2 minutes, hence 60
+# retries x 5s; later starts serve the prebuilt dist immediately.
 - name: Wait for hermes dashboard to be ready
   ansible.builtin.uri:
     url: "http://{{ hermes_dashboard_bind }}:{{ hermes_dashboard_port }}/"
@@ -31,7 +47,7 @@
     status_code: 200
   register: hermes_health
   until: hermes_health.status == 200
-  retries: 30
+  retries: 60
   delay: 5
   changed_when: false
   when: hermes_service_state != 'stopped'
