@@ -107,6 +107,14 @@ consistent with that move. Published guidance about SolarMan stick firmware 1.09
 1.11, and about inverter firmware thresholds like V110051, is written for a different
 versioning scheme and does not map onto these strings.
 
+The tap bridge has one failure mode worth knowing before debugging anything here: it can stop
+feeding a TCP client that is already connected without ever closing the socket. The bus keeps
+reporting behind it, so a fresh read-only connection returns data immediately, but the held
+connection sees nothing and no error. That happened on 2026-09-17 and cost three days of
+per-panel telemetry. The watchdog sidecar in the `taptap_mqtt` role reads the optimisers' own
+report timestamps for this reason; the bridge's own heartbeat cannot see it. The full record is
+in `.claude/state/known-issues.md`.
+
 **The stick is not a local data source.** Port 8899 is open but answers no protocol
 that can be spoken to it, so all Home Assistant telemetry will come from the wired
 bridges instead. See [`sofar-modbus-findings.md`](sofar-modbus-findings.md) for the

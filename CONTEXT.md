@@ -145,9 +145,11 @@ _Avoid_: "wired bridge" - both EE11A units are wired, so that name stopped ident
 anything once the second one was installed.
 
 **Tap bridge**:
-The Elfin EE11A at `192.168.1.162` on the TIGO CCA's GW/TAP port, serving the bus as a
+The Elfin EE11A at `192.168.40.162` on the TIGO CCA's GW/TAP port, serving the bus as a
 TCP stream on port 7160. Read-only by construction: it drives the RS485 transmitter
-only when a TCP client writes, and nothing ever does.
+only when a TCP client writes, and nothing ever does. It can also stop feeding a client
+it has already accepted without ever closing that socket, and nothing on the bridge side
+will say so.
 _Avoid_: adding termination to it. It is a passive parallel tap on a bus already
 terminated at the CCA and at the furthest TAP; a third resistor degrades the CCA's own
 traffic.
@@ -471,7 +473,7 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - A **respawned crash** is invisible to the container-restart alert by construction, so detecting one has to start from the container's logs, never from its restart count or health status
 - Where a guest's **local-rootfs state** is an index over its **NFS-backed state** - Immich's Postgres over the photo library - a **staged cutover** rollback desynchronises the two: anything written after cutover survives on NFS with no row in the restored index. Rollback value expires at the first write, not on a timer, which makes the **orphaned guest** worth far less here than for a guest whose state is self-contained
 - A **blind source** and a **respawned crash** fail identically from the outside: the evidence that would show a problem is absent rather than negative, so every liveness check reads green. Both are found only by asking a component to account for its own throughput - target count for the source, log lines for the supervisor - never by asking whether it is running
-- The taptap bridge is a **blind source** by default: if the **tap bridge** or the CCA goes quiet it keeps running and keeps its MQTT connection open, so its LWT never fires and a container-running probe stays green. Its heartbeat file is the only thing that accounts for its own throughput
+- The taptap bridge is a **blind source** by default: if the **tap bridge** or the CCA goes quiet it keeps running and keeps its MQTT connection open, so its LWT never fires and a container-running probe stays green. Neither its heartbeat file nor its MQTT topic accounts for its own throughput: the heartbeat counts loop passes, and the topic is republished on a timer carrying the bridge's own clock, so both stay fresh while the data inside them goes stale. The optimisers' own last-report time inside the payload is the only value that moves with the plant
 - A **blind source** silently disables every alert reading its stream, so the alert going quiet is the symptom; on `job="system"` that is Error Log Spike, Service Crash Detected and Authentication Failure Spike at once
 - A **room-air sensor** enters the house averages by label; an **apparatus sensor** never does, whatever room its machine stands in
 - **Whole-house ventilation** and **free cooling** read the same ARSO dew point and are opposite in stability: opening the utility window pulls that room toward outdoor and deeper inside its deadband, while opening house windows pulls the house average toward outdoor and out of the ventilation condition. Free cooling therefore settles on a bare deadband, and ventilation needs two thresholds

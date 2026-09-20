@@ -9,3 +9,14 @@
     project_src: "{{ taptap_mqtt_base_dir }}"
     state: restarted
   when: not ansible_check_mode
+
+# Restarts the freshness exporter alone. Its script is bind-mounted into its own
+# container, so compose cannot see it change either, but the bridge has no reason
+# to be bounced for it.
+- name: Restart taptap-mqtt watchdog
+  community.docker.docker_compose_v2:
+    project_src: "{{ taptap_mqtt_base_dir }}"
+    services:
+      - "{{ taptap_mqtt_watchdog_container_name }}"
+    state: restarted
+  when: not ansible_check_mode

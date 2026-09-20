@@ -29,8 +29,9 @@ services:
       - {{ taptap_mqtt_base_dir }}/run:/state
     # Proves the loop is turning, nothing more. The bridge touches this file on
     # every pass whether or not the bus produced data, so a stale file means a
-    # wedged or dead process; a silent bus shows up as HA entities going
-    # unavailable after TIMEOUT instead.
+    # wedged or dead process. A silent bus keeps this file fresh, which is why
+    # the watchdog sidecar below exists and why the alert reads it rather than
+    # this healthcheck.
     #
     # The doubled $$ are compose escapes. A single $( is not valid interpolation
     # syntax and compose rejects the file outright.
@@ -42,3 +43,28 @@ services:
       start_period: 60s
     labels:
       - "autoheal=true"
+
+  # Accounts for the bridge's throughput, which nothing else does. Everything
+  # about the service above can read healthy while the optimiser bus is silent,
+  # so the alert has to read a value out of the payload rather than the health of
+  # the transport carrying it. See the script's header for the long version.
+  #
+  # The bridge's own MQTT credential is reused with a distinct client id: this is
+  # a read-only subscriber for the same bridge on the same host, and the broker's
+  # log still names the connection, so a second credential would buy only another
+  # secret to rotate.
+  taptap-mqtt-watchdog:
+    image: {{ taptap_mqtt_image }}
+    container_name: {{ taptap_mqtt_watchdog_container_name }}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: []
+    command: ["/usr/bin/python3", "/usr/local/bin/taptap_watchdog.py"]
+    environment:
+      WATCHDOG_PORT: "{{ taptap_mqtt_watchdog_port }}"
+    ports:
+      - "{{ ansible_host }}:{{ taptap_mqtt_watchdog_port }}:{{ taptap_mqtt_watchdog_port }}"
+    volumes:
+      - {{ taptap_mqtt_base_dir }}/config.ini:/etc/taptap/config.ini:ro
+      - {{ taptap_mqtt_base_dir }}/taptap_watchdog.py:/usr/local/bin/taptap_watchdog.py:ro
