@@ -77,6 +77,16 @@ mosquitto_endpoint: "{{ mosquitto_host }}:{{ mosquitto_port }}"
 mosquitto_bridge_username: "taptap"
 mosquitto_ha_username: "homeassistant"
 
+# TIGO telemetry freshness contract. The taptap_mqtt role runs a watchdog
+# sidecar that exports the optimisers' newest report timestamp; the
+# monitoring_stack role scrapes that endpoint and alerts on it. Declared here
+# because the consumer is on another host, like the broker contract above.
+#
+# The bridge cannot report this itself: it republishes its state topic every
+# 10 s whether or not the bus produced anything, and stamps it with its own
+# clock, so the topic stays fresh while every value in it goes stale.
+taptap_watchdog_port: 9102
+
 # Timezone
 timezone: Europe/Ljubljana
 

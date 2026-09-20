@@ -38,6 +38,25 @@ taptap_mqtt_max_error: 15
 # already generous.
 taptap_mqtt_heartbeat_max_age: 60
 
+# The watchdog sidecar (files/taptap_watchdog.py) exports the newest optimiser
+# report timestamp for Prometheus. It reuses the bridge image, so it costs no
+# extra pull, and the bridge's config.ini for the broker credential.
+taptap_mqtt_watchdog_container_name: "taptap-mqtt-watchdog"
+taptap_mqtt_watchdog_port: "{{ taptap_watchdog_port }}"
+
+# How old the newest optimiser report may be before a converge treats the bus as
+# silent and reconnects the bridge, in seconds. A healthy bus reports every few
+# seconds across 30 modules, and the bridge's own per-module TIMEOUT is 180, so
+# this is loose enough not to trip on a quiet moment and tight enough to catch a
+# black-holed socket inside a converge.
+taptap_mqtt_report_max_age: 300
+
+# Sentinel for "the watchdog has never seen an optimiser report". It has to exceed
+# any threshold, so an unreadable or absent metric lands in the stale branch
+# rather than passing as fresh. The watchdog exports the same value as an age in
+# that case.
+taptap_mqtt_report_age_never: 1000000000
+
 taptap_mqtt_service_state: "started"
 
 # Number of optimizers declared in vault_tigo_modules, used to judge whether

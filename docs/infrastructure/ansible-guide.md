@@ -126,6 +126,8 @@ Role structure: `tasks/main.yml` includes subtasks (`directories.yml`, `deploy.y
 
 **iSCSI storage** (instead of NFS): For services that use SQLite or require POSIX file locking, use iSCSI zvols from TrueNAS instead of NFS. The PDS and Uptime Kuma roles demonstrate this pattern - zvol defined in `host_vars/tn-storage.yml`, iSCSI target created via `configure-truenas.yml`, client setup in `roles/<service>/tasks/iscsi.yml`, data mounted at `/mnt/<service>`. Compose files stay on NFS at `/srv/docker/<service>/`.
 
+**Blind sources** (a service that can keep every liveness signal green while delivering nothing): give the role a throughput check, not another liveness probe. `taptap_mqtt` is the worked example - a watchdog sidecar exports a value read out of the payload, and the deploy reconnects once and then fails with an upstream diagnosis. The reasoning, and the four earlier cases, are in `docs/infrastructure/monitoring-stack.md`.
+
 ## Secrets
 
 All secrets in `secrets.yml`, encrypted with Ansible Vault. Variable naming: `vault_` prefix.

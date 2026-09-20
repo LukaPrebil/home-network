@@ -13,6 +13,18 @@
   no_log: true  # don't print the rendered secret under --check --diff
   notify: Restart taptap-mqtt
 
+# Bind-mounted INTO the watchdog container, so compose cannot see it change
+# either. It restarts only the sidecar: a watchdog change is no reason to bounce
+# the bridge, which costs a reconnect and a re-enumeration.
+- name: Deploy the taptap-mqtt watchdog script
+  ansible.builtin.copy:
+    src: taptap_watchdog.py
+    dest: "{{ taptap_mqtt_base_dir }}/taptap_watchdog.py"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: Restart taptap-mqtt watchdog
+
 - name: Deploy taptap-mqtt Docker Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2
@@ -159,6 +171,105 @@
              if not taptap_mqtt_topology.stat.exists
              else 'all bound to their barcodes' }}
       when: taptap_mqtt_service_state == 'started'
+
+    # Throughput, not liveness.
+    #
+    # Every check above can read green while the optimiser bus is silent, which
+    # is how 2026-09-17 went unnoticed for three days. The Elfin stopped feeding
+    # the socket the bridge already held; the socket stayed ESTABLISHED and kept
+    # ACKing keepalives, so nothing looked wrong from either end; the bridge
+    # logged nothing; and the heartbeat stayed fresh because the bridge touches
+    # it on every pass whether or not data arrived.
+    #
+    # The MQTT state topic does not close that gap either. The bridge republishes
+    # it every UPDATE seconds regardless of the bus, stamped with its own clock,
+    # so the topic stays fresh while every value inside it goes stale. The one
+    # number that stops moving is the optimisers' own newest report time, which
+    # is what the watchdog sidecar exports.
+    - name: Wait for the watchdog to consume a state message
+      # Gates the watchdog itself. No message means the sidecar is not wired to
+      # the broker, which the converge should report as such rather than reading
+      # an absent metric as a silent bus.
+      #
+      # Checked on the host's own address, not loopback: the sidecar publishes
+      # its port bound to that address, the same way the broker does, so a
+      # loopback request is refused by design.
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ taptap_mqtt_watchdog_port }}/metrics"
+        return_content: true
+      register: taptap_mqtt_freshness
+      until: >-
+        (taptap_mqtt_freshness.content | regex_findall('taptap_mqtt_state_messages_total ([0-9]+)') | map('int') | first | default(0)) > 0
+      retries: 12
+      delay: 5
+      changed_when: false
+      when: taptap_mqtt_service_state == 'started'
+
+    - name: Work out how long ago the newest optimiser report arrived
+      # The age comes from the watchdog rather than from a clock read here. A
+      # reference read once goes stale across the retries below, which makes a
+      # silent bus look fresher than it is - the one direction this check must
+      # never be wrong in. An absent metric line reads as the never-reported
+      # sentinel and so lands in the stale branch.
+      ansible.builtin.set_fact:
+        taptap_mqtt_report_age: >-
+          {{ taptap_mqtt_freshness.content | regex_findall('taptap_mqtt_report_age_seconds ([0-9.]+)') | map('float') | first | default(taptap_mqtt_report_age_never) }}
+      when: taptap_mqtt_service_state == 'started'
+
+    - name: Reconnect taptap-mqtt when the optimiser bus is silent
+      # The sanctioned repair for this failure: the bridge's own TCP client is
+      # black-holed, so a fresh connection is all it needs. The tap bridge is
+      # read-only by construction and is never written to, so reconnecting
+      # cannot disturb the bus behind it.
+      community.docker.docker_compose_v2:
+        project_src: "{{ taptap_mqtt_base_dir }}"
+        services:
+          - taptap-mqtt
+        state: restarted
+      when:
+        - taptap_mqtt_service_state == 'started'
+        - (taptap_mqtt_report_age | float) >= (taptap_mqtt_report_max_age | int)
+
+    - name: Wait for the optimiser bus to report after the reconnect
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ taptap_mqtt_watchdog_port }}/metrics"
+        return_content: true
+      register: taptap_mqtt_freshness_after
+      until: >-
+        taptap_mqtt_report_age_after | float < (taptap_mqtt_report_max_age | int)
+      vars:
+        taptap_mqtt_report_age_after: >-
+          {{ taptap_mqtt_freshness_after.content | regex_findall('taptap_mqtt_report_age_seconds ([0-9.]+)') | map('float') | first | default(taptap_mqtt_report_age_never) }}
+      retries: 12
+      delay: 5
+      changed_when: false
+      # The assertion below owns the failure message: it can name the upstream
+      # causes, which an exhausted retry loop cannot.
+      failed_when: false
+      when:
+        - taptap_mqtt_service_state == 'started'
+        - (taptap_mqtt_report_age | float) >= (taptap_mqtt_report_max_age | int)
+
+    - name: Fail when the optimiser bus is still silent after a reconnect
+      ansible.builtin.assert:
+        that:
+          - >-
+            taptap_mqtt_freshness_after.content | regex_findall('taptap_mqtt_report_age_seconds ([0-9.]+)') | map('float') | first | default(taptap_mqtt_report_age_never)
+            < (taptap_mqtt_report_max_age | int)
+        fail_msg: >-
+          The optimiser bus is not delivering. The newest optimiser report is
+          still older than {{ taptap_mqtt_report_max_age }}s after reconnecting
+          the bridge, so the bridge's own socket is not what is broken - look
+          upstream. In order: CCA and TAP radio power (the TAP radios are fed at
+          the array), the unmanaged switch in the PV enclosure, then the Elfin
+          EE11A at {{ taptap_mqtt_address }} (it should answer ping and accept a
+          read-only connect on port {{ taptap_mqtt_port }}). Do not add
+          termination to that bridge and never write to it.
+        success_msg: "The optimiser bus is reporting again."
+      when:
+        - taptap_mqtt_service_state == 'started'
+        - (taptap_mqtt_report_age | float) >= (taptap_mqtt_report_max_age | int)
+
     - name: Display taptap-mqtt deployment status
       ansible.builtin.debug:
         msg:
