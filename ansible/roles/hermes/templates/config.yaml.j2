@@ -19,10 +19,46 @@ terminal:
   backend: "{{ hermes_terminal_backend }}"
 
 # ── Gateway / platforms ──────────────────────────────────────────────
-# Platforms are enabled via their env vars in .env (TELEGRAM_BOT_TOKEN etc.);
-# listing here is advisory — the gateway reads the env directly. Disabling a
-# platform is done by leaving its token unset. The dashboard is a separate
-# process (`hermes dashboard`, own systemd unit) bound in that unit's args.
+# A platform is enabled by its token in .env (TELEGRAM_BOT_TOKEN etc.); the
+# gateway reads the env directly, so listing a platform here is not what turns
+# it on. Disabling one is done by leaving its token unset. The dashboard is a
+# separate process (`hermes dashboard`, own systemd unit) bound in that unit's
+# args.
+#
+# Home Assistant is the exception: its `extra` block carries the event filters,
+# which have no env equivalent. Upstream is closed by default - with none of
+# watch_domains/watch_entities/watch_all set it logs a startup warning and drops
+# every state change, so an empty list here is a silent no-op rather than an
+# error.
+{% if hermes_enable_homeassistant %}
+platforms:
+  homeassistant:
+    extra:
+      watch_entities:
+{% for entity in hermes_ha_watch_entities %}
+        - {{ entity }}
+{% endfor %}
+      cooldown_seconds: {{ hermes_ha_cooldown_seconds }}
+    # The wake turn answers this channel as an HA persistent notification, which
+    # nobody reads away from a browser, so the agent is redirected to Telegram.
+    # Upstream resolves this override by chat_id; the adapter hardcodes
+    # "ha_events" as the chat id for every state-change event.
+    channel_overrides:
+      ha_events:
+        system_prompt: {{ hermes_ha_channel_prompt | to_json }}
+{% endif %}
+
+# ── Tool surface ─────────────────────────────────────────────────────
+# agent.disabled_toolsets is a global suppression list that upstream applies
+# last, overriding per-platform toolset lists. See the role defaults for why
+# the built-in Home Assistant toolset is suppressed.
+{% if hermes_disabled_toolsets %}
+agent:
+  disabled_toolsets:
+{% for toolset in hermes_disabled_toolsets %}
+    - {{ toolset }}
+{% endfor %}
+{% endif %}
 
 # ── MCP servers ──────────────────────────────────────────────────────
 # Home Assistant MCP is bridged from the containers VM. It exposes HA
