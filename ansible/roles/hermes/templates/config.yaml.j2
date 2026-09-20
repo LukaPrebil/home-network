@@ -30,13 +30,21 @@ gateway:
 # ── MCP servers ──────────────────────────────────────────────────────
 # Home Assistant MCP is bridged from the containers VM. It exposes HA
 # device control as tools — useful for "turn off the heat pump" style
-# requests from Telegram. Empty `include`/`exclude` = all tools.
+# requests from Telegram. tools.include is a whitelist (empty = nothing
+# registered); the list lives in role defaults, one entry per tool.
 mcp_servers:
   ha-mcp:
     # Streamable HTTP at the ha-mcp secret path (the path is the credential,
     # declared in group_vars/all alongside the port contract). ha-mcp-web
     # serves no /sse endpoint; the former /sse URL here was a 404.
     url: "http://{{ hostvars['containers']['ansible_host'] }}:8087{{ ha_mcp_secret_path }}"
-    enabled: {{ hermes_enable_homeassistant | lower }}
+    enabled: {{ hermes_enable_hamcp | lower }}
+    # tools.include is the HA privilege boundary: read + service-call only,
+    # no automation/script/helper authoring (see role defaults for why).
+    tools:
+      include:
+{% for tool in hermes_hamcp_include_tools %}
+        - {{ tool }}
+{% endfor %}
     sampling:
       enabled: false  # Don't let the MCP server initiate LLM calls on our budget

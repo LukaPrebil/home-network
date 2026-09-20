@@ -403,6 +403,14 @@ _Avoid_: "the model" (collides with the local-model plan's llama-server and with
 artifact** - those are weights, this is a subscription), "provider setup" (the interactive
 `hermes model` wizard is exactly what the Ansible role exists to bypass)
 
+**Pull-only**:
+Hermes acting on the house only when a human asks. The ha-mcp include whitelist is the HA
+privilege boundary (approvals gate terminal commands, not MCP tool calls), and with HASS_TOKEN
+unset there are no built-in REST tools and no event-driven wake, so nothing in the house can
+start an agent turn.
+_Avoid_: "passive" (says nothing about who initiates), "read-only" (service calls still act -
+they just need a human to ask first)
+
 ### Pi chat remote
 
 **Attach**:
