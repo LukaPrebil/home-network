@@ -8,7 +8,7 @@
     name: ssh
     state: restarted
 
-- name: Restart systemd-timesyncd
+- name: Restart chrony
   ansible.builtin.systemd:
-    name: systemd-timesyncd
+    name: chrony
     state: restarted

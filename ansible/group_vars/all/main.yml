@@ -90,13 +90,16 @@ taptap_watchdog_port: 9102
 # Timezone
 timezone: Europe/Ljubljana
 
-# NTP servers for managed systemd-timesyncd on docker hosts. This list is the
-# single seam for a future local stratum-1 time server (rpi2+GPS) - repoint here.
+# Time sources for the Ansible-managed chrony on chrony_hosts. ntp_servers is
+# the seam for a future local stratum-1 time server: add it first in the list.
+# ARNES runs both servers as public stratum 1 for use in Slovenia.
 ntp_servers:
-  - 0.debian.pool.ntp.org
-  - 1.debian.pool.ntp.org
-  - 2.debian.pool.ntp.org
-  - 3.debian.pool.ntp.org
+  - ntp1.arnes.si
+  - ntp2.arnes.si
+# Pool members add votes so chrony can reject one bad ARNES server.
+ntp_pools:
+  - si.pool.ntp.org
+ntp_pool_maxsources: 2
 
 # Common packages
 common_packages:
