@@ -1,54 +1,75 @@
 ---
-# Managed NTP via systemd-timesyncd.
+# Managed NTP via chrony on chrony_hosts (n5p, containers, rpi4, dev).
 #
-# Applied only to docker_hosts (rpi4, containers): matter-server's upcoming
-# time-push feature propagates the host clock to Matter devices unguarded,
-# so clock discipline on these hosts must be asserted IaC, not left to the
-# unmanaged distro default. Other hosts keep their existing time setup.
+# matter-server on rpi4 pushes the host clock to Matter devices unguarded, so
+# clock discipline there must be asserted in IaC. chrony combines several
+# sources and can outvote a bad one, which systemd-timesyncd cannot.
 #
-# Guarded by group membership only: docker_hosts are Debian-family by
-# construction, and narrow --tags runs gather no facts, so an
+# Guarded by group membership only: narrow --tags runs gather no facts, so an
 # ansible_os_family condition would hit an undefined variable.
 
-- name: Ensure systemd-timesyncd is installed
+- name: Install chrony
   ansible.builtin.apt:
-    name: systemd-timesyncd
+    name: chrony
     state: present
   when:
-    - "'docker_hosts' in group_names"
+    - "'chrony_hosts' in group_names"
 
-- name: Create timesyncd drop-in directory
-  ansible.builtin.file:
-    path: /etc/systemd/timesyncd.conf.d
-    state: directory
-    mode: '0755'
-  when:
-    - "'docker_hosts' in group_names"
-
-- name: Configure NTP servers for timesyncd
-  ansible.builtin.template:
-    src: timesyncd.conf.j2
-    dest: /etc/systemd/timesyncd.conf.d/10-ansible.conf
-    mode: '0644'
-  notify: Restart systemd-timesyncd
-  when:
-    - "'docker_hosts' in group_names"
-
-- name: Enable and start systemd-timesyncd
-  ansible.builtin.systemd:
+- name: Remove systemd-timesyncd
+  ansible.builtin.apt:
     name: systemd-timesyncd
+    state: absent
+  when:
+    - "'chrony_hosts' in group_names"
+
+- name: Remove the stale timesyncd drop-in
+  ansible.builtin.file:
+    path: /etc/systemd/timesyncd.conf.d/10-ansible.conf
+    state: absent
+  when:
+    - "'chrony_hosts' in group_names"
+
+# In check mode chrony is not installed yet on hosts that ran timesyncd, so
+# the config and service tasks below would fail against a missing /etc/chrony.
+- name: Check for the chrony config directory
+  ansible.builtin.stat:
+    path: /etc/chrony
+  register: common_chrony_dir
+  check_mode: false
+  changed_when: false
+  when:
+    - "'chrony_hosts' in group_names"
+
+- name: Configure chrony time sources
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    mode: '0644'
+    backup: true
+  notify: Restart chrony
+  when:
+    - "'chrony_hosts' in group_names"
+    - not ansible_check_mode or common_chrony_dir.stat.exists
+
+- name: Enable and start chrony
+  ansible.builtin.systemd:
+    name: chrony
     enabled: true
     state: started
   when:
-    - "'docker_hosts' in group_names"
+    - "'chrony_hosts' in group_names"
+    - not ansible_check_mode or common_chrony_dir.stat.exists
+
+- name: Apply the chrony restart before verifying sync
+  ansible.builtin.meta: flush_handlers
 
 - name: Verify NTP synchronization is active
   ansible.builtin.command: timedatectl show -p NTPSynchronized --value
   register: common_ntp_sync_check
   until: common_ntp_sync_check.stdout == "yes"
-  retries: 12
+  retries: 24
   delay: 5
   changed_when: false
   check_mode: false
   when:
-    - "'docker_hosts' in group_names"
+    - "'chrony_hosts' in group_names"
