@@ -284,9 +284,9 @@ groups:
         labels:
           severity: warning
 
-      # 22. Docker host clock not NTP-synchronized - sustained 30 min
+      # 22. Host clock not NTP-synchronized (docker hosts and Proxmox) - sustained 30 min
       - uid: alert-clock-unsync
-        title: Docker Host Clock Not Synchronized
+        title: Host Clock Not Synchronized
         condition: C
         data:
           - refId: A
@@ -296,7 +296,7 @@ groups:
             datasourceUid: prometheus
             model:
               refId: A
-              expr: node_timex_sync_status{job="node-exporter",type="docker-host"}
+              expr: node_timex_sync_status{job="node-exporter",type=~"docker-host|proxmox"}
               instant: false
               intervalMs: 15000
               maxDataPoints: 43200
