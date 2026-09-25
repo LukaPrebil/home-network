@@ -2,7 +2,7 @@
 # DO NOT EDIT MANUALLY - Changes will be overwritten
 
 {% for server in ntp_servers %}
-server {{ server }} iburst
+server {{ server.host }} iburst{{ (' ' ~ server.options) if server.options is defined else '' }}
 {% endfor %}
 {% for pool in ntp_pools %}
 pool {{ pool }} iburst maxsources {{ ntp_pool_maxsources }}

@@ -94,8 +94,17 @@ timezone: Europe/Ljubljana
 # the seam for a future local stratum-1 time server: add it first in the list.
 # ARNES runs both servers as public stratum 1 for use in Slovenia.
 ntp_servers:
-  - ntp1.arnes.si
-  - ntp2.arnes.si
+  - host: ntp1.arnes.si
+  - host: ntp2.arnes.si
+  # SIQ and PTB run caesium national references, independent of the GPS both
+  # ARNES servers use, so a fault shared by ARNES is outvoted. SIQ polls every
+  # 1024-4096 s to keep the load on the national reference light.
+  - host: ntp.siq.si
+    options: minpoll 10 maxpoll 12
+  # PTB's long round trip keeps it out of the clock average, so it only votes.
+  # A 256 s poll cap lets it catch a sudden ARNES jump sooner.
+  - host: ptbtime1.ptb.de
+    options: maxpoll 8
 # Pool members add votes so chrony can reject one bad ARNES server.
 ntp_pools:
   - si.pool.ntp.org
