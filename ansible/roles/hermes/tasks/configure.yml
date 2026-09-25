@@ -5,6 +5,23 @@
 # Hand-edits will be overwritten on next converge — change defaults or the
 # templates instead.
 
+- name: Assert the pinned models are in the ollama-cloud picker allowlist
+  # Both pins must appear in the allowlist, or a converge would leave a model
+  # that resolves at execution time but is unselectable in the picker - and the
+  # vision model is exactly the one an operator needs to see when debugging why
+  # a photo was misread.
+  ansible.builtin.assert:
+    that:
+      - hermes_model_default in hermes_ollama_cloud_models
+      - hermes_vision_model in hermes_ollama_cloud_models
+    fail_msg: >-
+      hermes_model_default ({{ hermes_model_default }}) and hermes_vision_model
+      ({{ hermes_vision_model }}) must both be listed in
+      hermes_ollama_cloud_models.
+  when:
+    - hermes_model_provider == 'ollama-cloud'
+    - hermes_vision_provider == 'ollama-cloud'
+
 - name: Template Hermes config.yaml
   ansible.builtin.template:
     src: config.yaml.j2
