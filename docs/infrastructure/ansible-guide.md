@@ -65,22 +65,30 @@ all
 ├── proxmox_hosts        → n5p
 ├── truenas_hosts        → tn-storage
 ├── docker_hosts         → containers, rpi4
-├── lxc_containers       → immich, traefik, omada, adguard, monitoring, media
+├── lxc_containers       → immich, traefik, omada, adguard, monitoring, media, hermes
 ├── haos_hosts           → haos (not SSH-managed)
 ├── media_hosts          → media
 ├── arr_stack_hosts      → containers
 ├── monitoring_hosts     → monitoring
 ├── adguard_hosts        → adguard, rpi4
-├── hermes_hosts         → hermes (role ready, LXC not provisioned)
-├── unprovisioned_hosts  → hermes
+├── hermes_hosts         → hermes (LXC 206, provisioned 2026-09-20)
+├── unprovisioned_hosts  → (empty; the group stays for the next deliberate deferral)
 ├── linux_servers        → proxmox_hosts + truenas_hosts + docker_hosts + lxc_containers + adguard_hosts
 └── monitoring_agents    → proxmox_hosts + docker_hosts + lxc_containers
 ```
 
 Key: `linux_servers` is the common role target. `monitoring_agents` gets node-exporter + alloy.
 `unprovisioned_hosts` holds hosts that are declared in IaC but absent on n5p; the plays and the
-Prometheus target lists subtract that group, so a full converge skips hermes instead of failing on SSH.
-Move a host out of the group when `provision-lxc.yml` creates it.
+Prometheus target lists subtract that group, so a full converge does not end on an unreachable host.
+The group is empty today (hermes left it when `provision-lxc.yml` created LXC 206) and stays in the
+inventory so the next deliberate deferral has a home. Move a host out of the group when
+`provision-lxc.yml` creates it.
+
+hermes is a member of `lxc_containers`, so it also inherits `linux_servers` and `monitoring_agents`.
+A full converge therefore installs node-exporter and alloy on LXC 206 and Prometheus starts scraping
+it. The hermes deployment plan listed scrape targets for hermes as out of scope, so this is an open
+decision rather than a settled one; neither agent is installed on the host yet, because no full
+converge has run since it was provisioned.
 
 **HAOS**: runs as a Proxmox VM (192.168.30.144), not SSH-managed. Managed via ha-mcp MCP tools, not Ansible.
 
@@ -207,7 +215,7 @@ running".
 ```bash
 ansible-playbook provision-vms.yml --tags vm-startup-reconcile     # VMs 111, 148
 ansible-playbook provision-haos.yml --tags haos-startup-reconcile  # VM 102 (qm only, guest untouched)
-ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile    # declared LXCs; skips unprovisioned (hermes)
+ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile    # declared LXCs; skips unprovisioned_hosts (empty)
 ansible-playbook provision-truenas.yml                             # VM 100 knobs + gate hookscript
 ansible-playbook site.yml --tags autostart-reconcile --limit n5p   # reconciler unit
 ```

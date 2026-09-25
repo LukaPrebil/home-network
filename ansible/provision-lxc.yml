@@ -432,9 +432,10 @@
 - name: Reconcile onboot and startup order on existing LXC containers
   # The create-step applies onboot/startup only at first provision; this play
   # converges both knobs for every declared container that actually exists.
-  # hermes (206) is declared but intentionally unprovisioned - the probe
-  # answers MISSING for absent vmids and the apply tasks skip them. Live
-  # state already matches the declarations, so this is an expected no-op.
+  # The probe answers MISSING for an absent vmid and the apply tasks skip it,
+  # so a container that is declared but deliberately unprovisioned is tolerated
+  # rather than fatal. Live state matches the declarations, so this is an
+  # expected no-op.
   #
   # Tagged `lxc-startup-reconcile` so it can be run in isolation without
   # triggering the create-flow: ansible-playbook provision-lxc.yml --tags lxc-startup-reconcile

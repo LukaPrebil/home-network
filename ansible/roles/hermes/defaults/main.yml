@@ -234,6 +234,12 @@ hermes_ev_retries: 2
 hermes_ev_retry_backoff_seconds: 5
 hermes_ev_request_delay_seconds: 1.5
 hermes_ev_max_detail_fetches: 25
+# Pages per landing page, following the page's own <link rel="next">. Brand
+# listing pages paginate (the BMW occasion list is 32 cars across 3 pages);
+# model listing pages do not, and their sibling links are models rather than
+# pages, so a page URL is never guessed from the path. This caps one source's
+# request count.
+hermes_ev_max_pages_per_source: 3
 hermes_ev_user_agent: >-
   Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
   (KHTML, like Gecko) Chrome/128.0 Safari/537.36
@@ -290,6 +296,7 @@ hermes_ev_config:
   retry_backoff_seconds: "{{ hermes_ev_retry_backoff_seconds }}"
   request_delay_seconds: "{{ hermes_ev_request_delay_seconds }}"
   max_detail_fetches: "{{ hermes_ev_max_detail_fetches }}"
+  max_pages_per_source: "{{ hermes_ev_max_pages_per_source }}"
   missing_runs_before_gone: "{{ hermes_ev_missing_runs_before_gone }}"
   km_max: "{{ hermes_ev_km_max }}"
   near_miss_factor: "{{ hermes_ev_near_miss_factor }}"
