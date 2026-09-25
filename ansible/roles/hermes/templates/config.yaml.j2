@@ -10,6 +10,30 @@ model:
   provider: "{{ hermes_model_provider }}"
   default: "{{ hermes_model_default }}"
 
+# ── Auxiliary models ─────────────────────────────────────────────────
+# Side tasks run on their own provider/model, so the brain's pin does not decide
+# them. Only vision is configured: it is the one aux lane this host depends on,
+# because reading listing photos is how an airbag verdict stops being a guess.
+# Upstream falls back to a paid OpenRouter model when a configured aux provider
+# is unavailable; OPENROUTER_API_KEY is unset here, so that lane stays inert.
+auxiliary:
+  vision:
+    provider: "{{ hermes_vision_provider }}"
+    model: "{{ hermes_vision_model }}"
+
+# ── Provider model allowlist ─────────────────────────────────────────
+# The picker's view of ollama-cloud, narrowed to the models this host actually
+# uses. It keeps an expensive model from being chosen out of habit. Execution is
+# not gated by this list - hermes has no model denylist - so the pins above and
+# in `model` are what bound spending.
+providers:
+  ollama-cloud:
+    discover_models: false
+    models:
+{% for model in hermes_ollama_cloud_models %}
+      - "{{ model }}"
+{% endfor %}
+
 # ── Security gate ────────────────────────────────────────────────────
 approvals:
   mode: "{{ hermes_approvals_mode }}"
@@ -52,12 +76,22 @@ platforms:
 # agent.disabled_toolsets is a global suppression list that upstream applies
 # last, overriding per-platform toolset lists. See the role defaults for why
 # the built-in Home Assistant toolset is suppressed.
-{% if hermes_disabled_toolsets %}
+#
+# image_input_mode: text keeps an attached photo out of a native attach. The
+# brain's catalog entry claims image input it does not honour, so a native
+# attach answers as though no image arrived; text mode pre-analyses with the
+# auxiliary vision model instead and prepends the description.
+{% if hermes_disabled_toolsets or hermes_image_input_mode %}
 agent:
+{% if hermes_image_input_mode %}
+  image_input_mode: "{{ hermes_image_input_mode }}"
+{% endif %}
+{% if hermes_disabled_toolsets %}
   disabled_toolsets:
 {% for toolset in hermes_disabled_toolsets %}
     - {{ toolset }}
 {% endfor %}
+{% endif %}
 {% endif %}
 
 # ── Cron ─────────────────────────────────────────────────────────────

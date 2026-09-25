@@ -30,6 +30,40 @@ hermes_installer_url: "https://raw.githubusercontent.com/NousResearch/hermes-age
 hermes_model_provider: "ollama-cloud"
 hermes_model_default: "deepseek-v4.1-flash:cloud"
 
+# ── Vision (auxiliary model) ─────────────────────────────────────────
+# Vision runs on its own lane. The brain cannot read images: deepseek's catalog
+# entry advertises image input, but the provider silently drops an attachment
+# and answers as though none was sent (probed 2026-09-25), so an image attached
+# natively is lost with no error. Two knobs keep that honest:
+#
+#   agent.image_input_mode: text  images are pre-analysed by vision_analyze and
+#                                 prepended as text, never attached natively
+#   auxiliary.vision.*            the model that does that reading
+#
+# ollama-cloud is the only configured provider with image-capable models, and
+# three accept images: gemma4:31b, minimax-m3 and kimi-k3. kimi-k3 costs an
+# order of magnitude more (USD 3/15 per Mtok against minimax-m3's 0.225/0.9),
+# and on the airbag control photos it read deployed and intact covers no better
+# than the other two, so the cheap lane is the default. gemma4:31b is cheaper
+# still at USD 0.14/0.4 with matching readings; pin it if budget ever matters
+# more than the slightly better colour and text description.
+hermes_vision_provider: "ollama-cloud"
+hermes_vision_model: "minimax-m3"
+hermes_image_input_mode: "text"  # native | text | auto
+
+# ── Provider model allowlist ─────────────────────────────────────────
+# What the model picker offers for ollama-cloud. A list here is an allowlist (a
+# mapping is read as per-model metadata instead), and discover_models: false
+# stops hermes live-probing the provider catalog whenever the picker opens.
+# This narrows the picker only: hermes has no execution denylist, so what
+# bounds spending is the vision pin above and the brain pin. Keep
+# hermes_model_default and hermes_vision_model in this list; configure.yml
+# fails the converge if either is missing.
+hermes_ollama_cloud_models:
+  - "deepseek-v4.1-flash:cloud"
+  - "minimax-m3"
+  - "gemma4:31b"
+
 # ── Gateway platforms ────────────────────────────────────────────────
 # Telegram is the human surface (approvals land in the same chat). The Home
 # Assistant gateway platform is ON and event-driven: the adapter subscribes
