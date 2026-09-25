@@ -423,6 +423,46 @@ also enables are suppressed so the whitelist stays the only tool surface.
 _Avoid_: "passive" (says nothing about who initiates), "read-only" (service calls still act -
 they just need a human to ask first)
 
+### EV hunt
+
+**Hunt monitor**:
+The scheduled hermes cron job that watches the damaged-car platforms against the
+purchase filters in `.claude/state/ev-purchase/plan.md`. A scheduled turn, so it never
+passes the watch-decision gate that bounds **Event wake**.
+_Avoid_: "the monitor" (collides with the Prometheus monitoring stack), "the alert" (that
+is one message it may send)
+
+**Filter contract**:
+The split of the purchase rules into machine-checkable bounds the fetch script enforces
+(price, km, model, airbags, drivable) and the judgment rules the brain applies to
+survivors (bolt-on zone, pack-untouched, deal-trigger). Bounds are Ansible vars; rule
+changes are reviewed diffs.
+_Avoid_: "the filters" (silent about who checks what)
+
+**Seen set**:
+The script-owned JSON of every listing id the hunt has observed, with first-seen and
+price history. "New" means absent from it; a price decrease re-alerts. It is the data
+source for the **market digest**, never written by the brain.
+_Avoid_: "cache" (it is the dedup record, not a fetch cache), "database"
+
+**Match** vs **near-miss**:
+A candidate inside the purchase bounds is a match and always alerts; one within the
++20% band above a bound is a near-miss and alerts only when damage or mileage is
+exceptional. Near-misses stay in the **seen set** so a price cut re-alerts into range.
+_Avoid_: "hit" (says nothing about which side of the bound)
+
+**Market digest**:
+The weekly Sunday summary of the **seen set** - volume, price movement, sold listings,
+near-miss inventory - that feeds the week-4 market review (switch-trigger reset
+evidence) in the EV purchase plan.
+_Avoid_: "report" (every platform has reports; this one exists to reset the switch-trigger)
+
+**Degraded run**:
+A hunt run whose fetch script failed, so the brain fell back to web tools for data. Its
+alerts are marked degraded and advance no **seen set** state, so a later script run
+re-alerts the same listing rather than trusting fallback data.
+_Avoid_: "fallback run" (hides that the data is unverified)
+
 ### Pi chat remote
 
 **Attach**:
