@@ -182,6 +182,22 @@ def find_first(node, tag=None, cls=None, node_id=None):
     return None
 
 
+def next_page_url(root):
+    """The page's own declaration of its next results page, if any.
+
+    Pagination is read from `<link rel="next">` rather than derived from the
+    URL, because schadeautos.nl overloads the second path segment: it is a page
+    number on a brand listing (/nl/tweedehands-auto/bmw/1) and a model on a
+    model listing (/nl/schadeauto/polestar/2). The model page advertises its
+    own model links as siblings, so guessing page URLs from the path would read
+    Polestar 4 listings as page 2 of Polestar 2.
+    """
+    for link in find_all(root, "link"):
+        if (link.attrs.get("rel") or "").strip().lower() == "next":
+            return link.attrs.get("href") or None
+    return None
+
+
 def classes(node):
     return (node.attrs.get("class") or "").split()
 
@@ -716,8 +732,8 @@ def render_candidate(entry, change, model):
 def render_run(report):
     out = [
         "EV-HUNT RUN %s" % now_iso(),
-        "sources: %d/%d fetched, %d empty, %d failed"
-        % (report["ok"], report["total"], report["empty"], report["failed"]),
+        "sources: %d/%d fetched (%d pages), %d empty, %d failed"
+        % (report["ok"], report["total"], report["pages"], report["empty"], report["failed"]),
         "listings parsed: %d | in scope: %d | matches: %d | near-misses: %d | rejected: %d"
         % (report["parsed"], report["scope"], report["matches"], report["near_misses"], report["rejected"]),
     ]
@@ -792,9 +808,38 @@ def render_digest(state, config, days):
 # ── Run ──────────────────────────────────────────────────────────────
 
 
+def fetch_pages(source, config, user_agent):
+    """Fetch a source's landing page and its paginated pages, in order.
+
+    Returns (outcome, cards, page_count) where outcome is "ok" or "empty". A
+    redirect or an error status on the first page means the source has no stock
+    (the clean brand pages redirect to the homepage when the network carries
+    none). A failure on a later page raises, because the source's coverage is
+    then incomplete and silence would read as "no news".
+    """
+    first = True
+    cards = []
+    url = source["url"]
+    seen_urls = set()
+    while url and url not in seen_urls and len(seen_urls) < config["max_pages_per_source"]:
+        seen_urls.add(url)
+        status, body = fetch(url, config, user_agent)
+        if status in (301, 302, 303, 307, 308) or status >= 400:
+            if first:
+                return "empty", [], len(seen_urls)
+            break
+        root = parse_html(body)
+        cards.extend(CARD_PARSERS[source["platform"]](root))
+        first = False
+        url = next_page_url(root)
+        if config["request_delay_seconds"]:
+            time.sleep(config["request_delay_seconds"])
+    return "ok", cards, len(seen_urls)
+
+
 def run(config, state):
     report = {
-        "total": len(config["sources"]), "ok": 0, "empty": 0, "failed": 0,
+        "total": len(config["sources"]), "ok": 0, "empty": 0, "failed": 0, "pages": 0,
         "parsed": 0, "scope": 0, "matches": 0, "near_misses": 0, "rejected": 0,
         "alerts": [], "errors": [],
     }
@@ -808,23 +853,23 @@ def run(config, state):
         name = source["name"]
         previous = state["sources"].get(name, {})
         try:
-            status, body = fetch(source["url"], config, user_agent)
+            outcome, cards, pages = fetch_pages(source, config, user_agent)
         except RuntimeError as error:
             report["failed"] += 1
             report["errors"].append("%s: %s" % (name, error))
             state["sources"][name] = {"last_count": previous.get("last_count", 0), "last_ok": False, "last_run": now_iso()}
             continue
 
-        if status in (301, 302, 303, 307, 308) or status >= 400:
+        report["pages"] += pages
+        if outcome == "empty":
             # No stock: the clean brand landing pages redirect to the homepage
-            # when the network carries none of that brand. That is an empty
-            # result, not a failure, and not structural drift either.
+            # when the dealer network carries none of that brand. That is an
+            # empty result, not a failure, and not structural drift either.
             report["empty"] += 1
-            state["sources"][name] = {"last_count": 0, "last_ok": True, "last_run": now_iso()}
+            state["sources"][name] = {"last_count": 0, "last_pages": pages, "last_ok": True, "last_run": now_iso()}
             succeeded_sources.add(name)
             continue
 
-        cards = CARD_PARSERS[source["platform"]](parse_html(body))
         # Boonstra renders salvage and clean stock in one list, so its card
         # parser cannot tell the category; the filtered landing page it came
         # from is the answer until the detail page says otherwise.
@@ -836,13 +881,10 @@ def run(config, state):
         succeeded_sources.add(name)
 
         if not cards and previous.get("last_count", 0) > 0:
-            # The page parsed cards last run and none now. Reading that as "no
+            # The source parsed cards last run and none now. Reading that as "no
             # news" would hide a markup change, so it fails loudly instead.
             hard_failures.append("%s: page yielded no listings but yielded %d last run" % (name, previous["last_count"]))
-        state["sources"][name] = {"last_count": len(cards), "last_ok": True, "last_run": now_iso()}
-
-        if config["request_delay_seconds"]:
-            time.sleep(config["request_delay_seconds"])
+        state["sources"][name] = {"last_count": len(cards), "last_pages": pages, "last_ok": True, "last_run": now_iso()}
 
         for card in cards:
             model = match_model(card, config["models"])
