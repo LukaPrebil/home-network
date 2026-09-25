@@ -1,0 +1,51 @@
+---
+# EV hunt monitor: the fetch/filter script, its filter contract, and the
+# judgment skill.
+#
+# No handler here. The script and the skill are read fresh by each cron run, so
+# a change takes effect on the next run with nothing to restart. The cron jobs
+# themselves are runtime state (~/.hermes/cron/jobs.json) that this role does
+# not own; see the role defaults for the create and retire path.
+
+- name: Ensure the EV hunt directory exists
+  ansible.builtin.file:
+    path: "{{ hermes_ev_home }}"
+    state: directory
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0700'  # holds the seen set; state, not secrets, but keep it private
+
+- name: Deploy the EV hunt fetch/filter script
+  ansible.builtin.copy:
+    src: "{{ hermes_ev_script_name }}"
+    dest: "{{ hermes_ev_home }}/{{ hermes_ev_script_name }}"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0640'
+
+- name: Render the EV hunt filter contract
+  # Rendered as JSON rather than a hand-written template so the bounds stay one
+  # reviewable structure in role defaults. The script owns state.json in this
+  # same directory; this file is regenerated on every converge.
+  ansible.builtin.copy:
+    content: "{{ hermes_ev_config | to_nice_json }}\n"
+    dest: "{{ hermes_ev_home }}/config.json"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0640'
+
+- name: Ensure the EV hunt skill directory exists
+  ansible.builtin.file:
+    path: "{{ hermes_ev_skill_dir }}"
+    state: directory
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0755'  # matches how the other skills in this tree are readable
+
+- name: Deploy the EV hunt judgment skill
+  ansible.builtin.template:
+    src: ev-hunt-skill.md.j2
+    dest: "{{ hermes_ev_skill_dir }}/SKILL.md"
+    owner: "{{ hermes_user }}"
+    group: "{{ hermes_user }}"
+    mode: '0644'

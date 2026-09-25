@@ -18,3 +18,12 @@
   tags:
     - hermes
     - service
+
+- name: Include EV hunt monitor tasks
+  # Opt-in: the script, its filter contract, and the judgment skill for the
+  # listing monitor. The cron jobs that call them are runtime state on the LXC.
+  ansible.builtin.include_tasks: ev_hunt.yml
+  tags:
+    - hermes
+    - ev-hunt
+  when: hermes_enable_ev_hunt | bool

@@ -1,0 +1,7 @@
+---
+# Hermes agent LXC (206) host-specific variables.
+#
+# Enable the EV hunt monitor here: the fetch/filter script, the filter
+# contract, and the judgment skill are role-managed, while the two cron jobs
+# that call them are created once on the LXC and live in ~/.hermes/cron.
+hermes_enable_ev_hunt: true

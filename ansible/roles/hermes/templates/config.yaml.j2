@@ -60,6 +60,18 @@ agent:
 {% endfor %}
 {% endif %}
 
+# ── Cron ─────────────────────────────────────────────────────────────
+# Knobs for the scheduled jobs (hermes cron create writes jobs.json, which this
+# role does not template). mirror_delivery mirrors a delivered alert into a
+# session so replying to it continues with the listing in context, and
+# wrap_response drops the cron header/footer so the alert reads as the message
+# the operator wrote it as.
+{% if hermes_enable_ev_hunt %}
+cron:
+  mirror_delivery: true
+  wrap_response: false
+{% endif %}
+
 # ── MCP servers ──────────────────────────────────────────────────────
 # Home Assistant MCP is bridged from the containers VM. It exposes HA
 # device control as tools — useful for "turn off the heat pump" style

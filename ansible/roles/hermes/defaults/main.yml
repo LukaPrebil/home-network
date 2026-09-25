@@ -180,6 +180,154 @@ hermes_terminal_backend: "local"
 hermes_dashboard_bind: "127.0.0.1"
 hermes_dashboard_port: 9119
 
+# ── EV hunt monitor (optional) ───────────────────────────────────────
+# Watches damaged-car listings against the purchase filters decided in
+# .claude/state/ev-purchase/plan.md and reports to Telegram. Opt-in per host:
+# the role default is off, and the hermes host turns it on in host_vars.
+#
+# The two cron jobs are runtime state (~/.hermes/cron/jobs.json), not managed
+# here: create them once on the LXC with `hermes cron create` (the exact
+# commands are recorded in the plan), and retire the hunt by removing them and
+# flipping this off. Only the fetch script, its filter contract, and the
+# judgment skill are role-managed.
+hermes_enable_ev_hunt: false
+hermes_ev_home: "{{ hermes_home }}/ev-hunt"
+hermes_ev_script_name: "ev-hunt-fetch.py"
+hermes_ev_state_name: "state.json"
+hermes_ev_skill_name: "ev-hunt"
+# The skills tree is category directories; productivity already exists on the
+# LXC (hermes ships it), so this needs no new category DESCRIPTION.md.
+hermes_ev_skill_category: "productivity"
+hermes_ev_skill_dir: "{{ hermes_home }}/skills/{{ hermes_ev_skill_category }}/{{ hermes_ev_skill_name }}"
+
+# Filter contract: VAT-inclusive listing-price ceilings. Each is the all-in
+# ceiling from the EV purchase plan (decision 4) minus the EUR 1,650 fixed
+# import/inspection cost and, for salvage, the EUR 1,000 minimum parts budget.
+# They are listing-price bounds, not all-in budgets, so the comparison is
+# against the price on the card. Changing one is a reviewed commit + converge.
+hermes_ev_p2_dm_salvage_max: 14300
+hermes_ev_p2_dm_clean_max: 25400
+hermes_ev_p2_sm_facelift_salvage_max: 14300
+hermes_ev_p2_sm_facelift_clean_max: 27400
+# Pre-2024 single motor: salvage only, at the exceptional-price ceiling.
+hermes_ev_p2_sm_pre24_salvage_max: 11300
+hermes_ev_ev6_salvage_max: 12300
+hermes_ev_ev6_clean_max: 22400
+hermes_ev_i4_salvage_max: 27300
+hermes_ev_i4_clean_max: 28400
+
+hermes_ev_km_max: 100000
+hermes_ev_min_year: 2021
+# Near-miss band: a candidate up to this factor above its bound goes to the
+# brain, which alerts only when damage or mileage is exceptional.
+hermes_ev_near_miss_factor: 1.2
+# Consecutive runs a listing may be absent from a landing page before the
+# digest calls it gone. Two runs (6h) separates a sale from a listing briefly
+# off the page, and the digest is weekly anyway.
+hermes_ev_missing_runs_before_gone: 2
+
+# Fetch politeness: one sequential GET per page, a delay between requests, and
+# a retry budget before the script reports a hard failure (which sends the run
+# to the brain's web-tool fallback).
+hermes_ev_timeout_seconds: 30
+hermes_ev_retries: 2
+hermes_ev_retry_backoff_seconds: 5
+hermes_ev_request_delay_seconds: 1.5
+hermes_ev_max_detail_fetches: 25
+hermes_ev_user_agent: >-
+  Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36
+  (KHTML, like Gecko) Chrome/128.0 Safari/537.36
+
+# Watched landing pages. Model-level pages exist for all three salvage
+# routes. On the clean side only the brand pages exist (a model path is
+# ignored), so the script filters those cards by model itself. The clean
+# Polestar page 302s to the homepage while the network carries no stock; the
+# script reads that as empty rather than as drift, so it stays watched.
+hermes_ev_sources:
+  - name: schadeautos-p2-salvage
+    platform: schadeautos
+    category: salvage
+    url: "https://www.schadeautos.nl/nl/schadeauto/polestar/2"
+  - name: schadeautos-ev6-salvage
+    platform: schadeautos
+    category: salvage
+    url: "https://www.schadeautos.nl/nl/schadeauto/kia/ev6"
+  - name: schadeautos-i4-salvage
+    platform: schadeautos
+    category: salvage
+    url: "https://www.schadeautos.nl/nl/schadeauto/bmw/i4"
+  - name: schadeautos-p2-clean
+    platform: schadeautos
+    category: clean
+    url: "https://www.schadeautos.nl/nl/tweedehands-auto/polestar"
+  - name: schadeautos-ev6-clean
+    platform: schadeautos
+    category: clean
+    url: "https://www.schadeautos.nl/nl/tweedehands-auto/kia"
+  - name: schadeautos-i4-clean
+    platform: schadeautos
+    category: clean
+    url: "https://www.schadeautos.nl/nl/tweedehands-auto/bmw"
+  - name: boonstra-salvage
+    platform: boonstra
+    category: salvage
+    url: "https://www.boonstraschadevoertuigen.nl/aanbod/?_vehicle_speciaal=schadevoertuig"
+  - name: boonstra-clean
+    platform: boonstra
+    category: clean
+    url: "https://www.boonstraschadevoertuigen.nl/aanbod/?_vehicle_speciaal=occasion"
+
+# Rendered verbatim into ~/.hermes/ev-hunt/config.json. Kept as one structure
+# so the JSON is generated rather than hand-built (commas in a template are a
+# silent syntax error). Variant keys: p2 splits into dm / sm_facelift /
+# sm_pre24; ev6 and i4 use "default". A missing category key means the route
+# is not bought in that category (pre-24 single-motor P2, clean).
+hermes_ev_config:
+  state_file: "{{ hermes_ev_home }}/{{ hermes_ev_state_name }}"
+  user_agent: "{{ hermes_ev_user_agent | trim }}"
+  timeout_seconds: "{{ hermes_ev_timeout_seconds }}"
+  retries: "{{ hermes_ev_retries }}"
+  retry_backoff_seconds: "{{ hermes_ev_retry_backoff_seconds }}"
+  request_delay_seconds: "{{ hermes_ev_request_delay_seconds }}"
+  max_detail_fetches: "{{ hermes_ev_max_detail_fetches }}"
+  missing_runs_before_gone: "{{ hermes_ev_missing_runs_before_gone }}"
+  km_max: "{{ hermes_ev_km_max }}"
+  near_miss_factor: "{{ hermes_ev_near_miss_factor }}"
+  sources: "{{ hermes_ev_sources }}"
+  models:
+    - key: p2
+      label: "Polestar 2"
+      match: ["polestar 2"]
+      min_year: "{{ hermes_ev_min_year }}"
+      bounds:
+        dm:
+          salvage: "{{ hermes_ev_p2_dm_salvage_max }}"
+          clean: "{{ hermes_ev_p2_dm_clean_max }}"
+        sm_facelift:
+          salvage: "{{ hermes_ev_p2_sm_facelift_salvage_max }}"
+          clean: "{{ hermes_ev_p2_sm_facelift_clean_max }}"
+        sm_pre24:
+          salvage: "{{ hermes_ev_p2_sm_pre24_salvage_max }}"
+      note: "Pre-2024 single motor is salvage-only (exceptional-price rule)."
+    - key: ev6
+      label: "Kia EV6"
+      match: ["kia ev6"]
+      min_year: "{{ hermes_ev_min_year }}"
+      bounds:
+        default:
+          salvage: "{{ hermes_ev_ev6_salvage_max }}"
+          clean: "{{ hermes_ev_ev6_clean_max }}"
+      note: "EV6 only when at least EUR 2,500 below a comparable Polestar 2 (deal-trigger)."
+    - key: i4
+      label: "BMW i4"
+      match: ["bmw i4"]
+      min_year: "{{ hermes_ev_min_year }}"
+      bounds:
+        default:
+          salvage: "{{ hermes_ev_i4_salvage_max }}"
+          clean: "{{ hermes_ev_i4_clean_max }}"
+      note: "i4 is the Route-B clean-import fallback, not a first choice."
+
 # ── systemd ──────────────────────────────────────────────────────────
 hermes_service_name: "hermes-gateway"
 hermes_dashboard_service_name: "hermes-dashboard"
