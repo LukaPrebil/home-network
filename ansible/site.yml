@@ -251,8 +251,9 @@
     - octoeverywhere
 
 - name: Deploy Hermes Agent
-  # Matches no host while hermes sits in unprovisioned_hosts; the play is
-  # skipped with a "no hosts matched" warning instead of failing on SSH.
+  # hermes_hosts is a one-host group, and the play subtracts
+  # unprovisioned_hosts so a deliberate deferral skips the play with a
+  # "no hosts matched" warning instead of failing on SSH.
   hosts: hermes_hosts:!unprovisioned_hosts
   become: true
   tags:
