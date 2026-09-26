@@ -249,6 +249,19 @@ hermes_ev_ev6_salvage_max: 12300
 hermes_ev_ev6_clean_max: 22400
 hermes_ev_i4_salvage_max: 27300
 hermes_ev_i4_clean_max: 28400
+# Watch-only additions (widened 2026-09-25 from
+# .claude/state/research/2026-09-25-research-ev-model-list-hyundai-chinese.md).
+# Each bound is the purchase plan's top ceiling (EUR 30,000 all-in, the i4's)
+# minus the same EUR 1,650 fixed import/inspection cost the other clean bounds
+# use, and minus the EUR 1,000 minimum parts budget for the salvage bounds, so
+# none of these can outspend the plan's most permissive route. The Ioniq pair
+# watches both routes. Zeekr and Nio are clean-only: their salvage stock either
+# fired its airbags or has no parts and diagnostics path a general workshop can
+# use.
+hermes_ev_ioniq_salvage_max: 27300
+hermes_ev_ioniq_clean_max: 28400
+hermes_ev_zeekr_clean_max: 28400
+hermes_ev_nio_clean_max: 28400
 
 hermes_ev_km_max: 100000
 hermes_ev_min_year: 2021
@@ -296,6 +309,19 @@ hermes_ev_sources:
     platform: schadeautos
     category: salvage
     url: "https://www.schadeautos.nl/nl/schadeauto/bmw/i4"
+  # Widened 2026-09-25. Both URLs are the model links the brand page itself
+  # publishes. The Ioniq 6 page carries stock; the Ioniq 5 page currently
+  # carries none and serves a cross-brand fallback block with HTTP 200 (VW Golf,
+  # Kia Picanto, ...) instead of an empty page, which the model `match` filter
+  # drops, so the source stays watched with no special case.
+  - name: schadeautos-ioniq5-salvage
+    platform: schadeautos
+    category: salvage
+    url: "https://www.schadeautos.nl/nl/schadeauto/hyundai/ioniq-5"
+  - name: schadeautos-ioniq6-salvage
+    platform: schadeautos
+    category: salvage
+    url: "https://www.schadeautos.nl/nl/schadeauto/hyundai/ioniq-6"
   - name: schadeautos-p2-clean
     platform: schadeautos
     category: clean
@@ -308,6 +334,23 @@ hermes_ev_sources:
     platform: schadeautos
     category: clean
     url: "https://www.schadeautos.nl/nl/tweedehands-auto/bmw"
+  # Widened 2026-09-25. The Hyundai page carries stock today; the Zeekr and Nio
+  # pages 302 to the site root while the network carries none of that brand,
+  # which the script reads as empty rather than as drift (same as Polestar). The
+  # Boonstra clean source already covers every brand, so it needs no new entry:
+  # its one page is filtered by the model list below.
+  - name: schadeautos-hyundai-clean
+    platform: schadeautos
+    category: clean
+    url: "https://www.schadeautos.nl/nl/tweedehands-auto/hyundai"
+  - name: schadeautos-zeekr-clean
+    platform: schadeautos
+    category: clean
+    url: "https://www.schadeautos.nl/nl/tweedehands-auto/zeekr"
+  - name: schadeautos-nio-clean
+    platform: schadeautos
+    category: clean
+    url: "https://www.schadeautos.nl/nl/tweedehands-auto/nio"
   - name: boonstra-salvage
     platform: boonstra
     category: salvage
@@ -368,6 +411,40 @@ hermes_ev_config:
           salvage: "{{ hermes_ev_i4_salvage_max }}"
           clean: "{{ hermes_ev_i4_clean_max }}"
       note: "i4 is the Route-B clean-import fallback, not a first choice."
+    - key: ioniq5
+      label: "Hyundai Ioniq 5"
+      match: ["hyundai ioniq 5"]
+      min_year: "{{ hermes_ev_min_year }}"
+      bounds:
+        default:
+          salvage: "{{ hermes_ev_ioniq_salvage_max }}"
+          clean: "{{ hermes_ev_ioniq_clean_max }}"
+      note: "Both routes. Cloth-seat trims are the vegan ones; the ICCU campaigns 41D022/41D033 cover the 2021-2023 build window."
+    - key: ioniq6
+      label: "Hyundai Ioniq 6"
+      match: ["hyundai ioniq 6"]
+      min_year: "{{ hermes_ev_min_year }}"
+      bounds:
+        default:
+          salvage: "{{ hermes_ev_ioniq_salvage_max }}"
+          clean: "{{ hermes_ev_ioniq_clean_max }}"
+      note: "Both routes. Only the base trim is cloth, and EU supply is thin."
+    - key: zeekr
+      label: "Zeekr 001 / X / 7X"
+      match: ["zeekr 001", "zeekr x", "zeekr 7x"]
+      min_year: "{{ hermes_ev_min_year }}"
+      bounds:
+        default:
+          clean: "{{ hermes_ev_zeekr_clean_max }}"
+      note: "Clean only, watch-only: no EU stock under the ceiling when the list was widened."
+    - key: nio
+      label: "Nio ET5 / EL6 / ET7"
+      match: ["nio et5", "nio el6", "nio el7", "nio es6", "nio et7"]
+      min_year: "{{ hermes_ev_min_year }}"
+      bounds:
+        default:
+          clean: "{{ hermes_ev_nio_clean_max }}"
+      note: "Clean only, watch-only: Nio never sold in Slovenia, so service is out of reach today."
 
 # ── systemd ──────────────────────────────────────────────────────────
 hermes_service_name: "hermes-gateway"
