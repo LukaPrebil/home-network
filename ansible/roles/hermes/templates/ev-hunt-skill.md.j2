@@ -53,6 +53,13 @@ Bounds it applies, as VAT-inclusive listing price in EUR:
 | Polestar 2 single motor pre-2024 | {{ "{:,}".format(hermes_ev_p2_sm_pre24_salvage_max | int) }} | not bought |
 | Kia EV6 | {{ "{:,}".format(hermes_ev_ev6_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_ev6_clean_max | int) }} |
 | BMW i4 | {{ "{:,}".format(hermes_ev_i4_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_i4_clean_max | int) }} |
+| Hyundai Ioniq 5 | {{ "{:,}".format(hermes_ev_ioniq_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_ioniq_clean_max | int) }} |
+| Hyundai Ioniq 6 | {{ "{:,}".format(hermes_ev_ioniq_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_ioniq_clean_max | int) }} |
+| Zeekr 001 / X / 7X | not bought | {{ "{:,}".format(hermes_ev_zeekr_clean_max | int) }} |
+| Nio ET5 / EL6 / ET7 | not bought | {{ "{:,}".format(hermes_ev_nio_clean_max | int) }} |
+
+A row reading `not bought` means the script already dropped that car: it only
+reaches you on the route the plan buys.
 
 A MATCH is inside its bound and always alerts. A NEAR-MISS is up to
 {{ (((hermes_ev_near_miss_factor | float) - 1) * 100) | round | int }}% above
@@ -86,6 +93,21 @@ the pre-2024 ceiling. Never clean.
 **i4.** The clean-import fallback. It has to be conspicuously good to earn an
 alert: low mileage, clean damage text, and under
 {{ "{:,}".format(hermes_ev_i4_clean_max | int) }}.
+
+**Ioniq 5 and Ioniq 6.** Added on 2026-09-25 on both routes. The Ioniq 5 is the
+stronger of the two and is a live candidate, not a watch: say plainly that it is
+an addition to the shortlist rather than a replacement for a decided model. Two
+things to carry into any alert: the ICCU campaigns 41D022/41D033 cover the
+2021-2023 build window, so a car in that window needs its campaign status
+confirmed, and a **business-registered** car has only 36 months / 100,000 km of
+high-voltage battery cover instead of 8 years / 160,000 km.
+
+**Watch-only clean entries (Zeekr, Nio).** Added on 2026-09-25 to watch the
+clean market for a price fall. Neither is on the shortlist.
+A MATCH still alerts, because a car under the ceiling is the whole point of
+watching. Say which of the three decided models it would replace and why, or say
+plainly that it beats none of them, so the alert never reads as a recommendation
+to buy. Nothing here is a route change: those cars are watched, not chosen.
 
 **SoH is not a listing-stage filter.** Battery state of health is read at
 inspection: 90% and up buy, 85-90% negotiate, below 85% walk away. Never reject
