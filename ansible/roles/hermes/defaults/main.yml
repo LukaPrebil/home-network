@@ -419,7 +419,7 @@ hermes_ev_config:
         default:
           salvage: "{{ hermes_ev_ioniq_salvage_max }}"
           clean: "{{ hermes_ev_ioniq_clean_max }}"
-      note: "Both routes. Cloth-seat trims are the vegan ones; the ICCU campaigns 41D022/41D033 cover the 2021-2023 build window."
+      note: "Both routes. Cloth on Basis and DYNAMIQ through MY24; TECHNIQ is a cloth/leather mix. The wheel is leather on every EU trim. ICCU campaigns cover charging faults and driveshaft breakage."
     - key: ioniq6
       label: "Hyundai Ioniq 6"
       match: ["hyundai ioniq 6"]
@@ -428,7 +428,7 @@ hermes_ev_config:
         default:
           salvage: "{{ hermes_ev_ioniq_salvage_max }}"
           clean: "{{ hermes_ev_ioniq_clean_max }}"
-      note: "Both routes. Only the base trim is cloth, and EU supply is thin."
+      note: "Both routes. Cloth on Basis, DYNAMIQ and TECHNIQ through MY25; only MY26 limits cloth to the base trim. The wheel is leather on every EU trim."
     - key: zeekr
       label: "Zeekr 001 / X / 7X"
       match: ["zeekr 001", "zeekr x", "zeekr 7x"]
