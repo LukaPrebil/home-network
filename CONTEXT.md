@@ -64,6 +64,24 @@ A job end with progress-before-reset below 90; a fresh fault distinguishes abort
 **Transport flap**:
 Sub-minute `unavailable` blips affecting all mower entities at once (cloud transport hiccup on v0.6.3); triggers must not fire or clear on these.
 
+### Mammotion Luba (blade wear)
+
+**Blade set**:
+The nine blades installed together and replaced together - six on the main disc, three on the side disc.
+_Avoid_: "set of 4"
+
+**Blade stage**:
+One of four roughly 50 h wear segments of a blade set.
+_Avoid_: "hole", "side" (both are physical realizations of a stage, not the unit we track)
+
+**Flip**:
+Advance a blade set to the next blade stage, by turning the blades over or moving them to the second hole.
+_Avoid_: "rotation", "change the blades"
+
+**Replace**:
+Install a fresh blade set and reset the device counter.
+_Avoid_: "flip"
+
 ### Matter fabric (time)
 
 **Time push**:

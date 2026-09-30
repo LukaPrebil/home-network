@@ -19,12 +19,12 @@ All are managed via the `ha-mcp` tools (never edit HA YAML directly). Household-
 | `automation.luba_potrebuje_pomoc` | Needs attention / stuck (persistent) |
 | `automation.luba_offline` | Offline / lost connection (Luka direct) |
 | `automation.luba_dez_med_kosnjo` | Rain while mowing |
-| `automation.luba_obrni_rezila` | Blade flip reminder (persistent) |
-| `automation.luba_zamenjaj_rezila` | Blade replace reminder (persistent) |
-| `automation.luba_potrditev_rezil` | Blade action-button handler (Flipped/Replaced) |
+| `automation.luba_opomnik_rezil` | Blade service reminder, 4-stage model (persistent) |
+| `automation.luba_potrditev_rezil` | Blade action-button handler (Opravljeno / Zamenjano) |
 | `automation.luba_reset_stevca_rezil` | Blade counter re-arm on reset |
+| `script.luba_potrdi_rezila` | Dashboard ack for the earliest due stage |
 
-Helpers (hidden from dashboards): `input_boolean.luba_blade_flip_acked`, `input_boolean.luba_blade_replace_acked`.
+Helpers (hidden from dashboards): `input_boolean.luba_blade_flip_1_acked`, `input_boolean.luba_blade_flip_2_acked`, `input_boolean.luba_blade_flip_3_acked`. There is deliberately no replace ack - see below.
 
 ## Trigger design (why these signals)
 
@@ -35,18 +35,29 @@ Job state is reconstructed from device-level entities only (see `docs/adr/0003-l
   - Do NOT trigger on `sensor.vrt_luba_last_error_code != 0` - that sensor holds the last error *ever* (e.g. `1417` while docked and healthy), not a live-fault flag.
 - **Offline** - `lawn_mower.vrt_luba = unavailable` for 10 min (long debounce absorbs cloud hiccups + this model's state-refresh lag). Clears on reconnect. Admin-only (`notify.mobile_app_sm_s926b`).
 - **Rain while mowing** - `weather.forecast_home` becomes rain-like (`rainy`/`pouring`/`lightning-rainy`/`snowy-rainy`) for 5 min **and** `lawn_mower.vrt_luba` in `mowing`/`returning` (demonstrably out in the yard; `paused` is excluded because it cannot distinguish an in-yard pause from sitting on the dock overnight, which previously risked a false "returning home" alert). The mower exposes no rain-state telemetry, so this correlates HA weather with the mower being out. Clears when rain stops or the mower is no longer out.
-- **Blade flip / replace** - thresholds derived from the live `sensor.vrt_luba_blade_wear_warning_time` (100 h): flip at 50% (template trigger, dynamic), replace at 100% (`numeric_state` above the warning-time entity). Both blade types are double-sided, so the flip stage applies to both. Persistent + sticky, each with an action button (`LUBA_BLADE_FLIPPED` / `LUBA_BLADE_REPLACED`) that sets the matching `input_boolean` and clears the notification. When the app counter resets (`blade_used_time` drops below 1 h on a fresh set), both booleans reset and both blade notifications clear.
+- **Blade service (4 stages)** - a blade set (nine blades: six on the main disc, three on the side disc) runs four roughly 50 h stages, so one set lasts about 200 h: flip in the same hole at 50 h,
+  move to the second hole at 100 h, flip in the same hole at 150 h, replace at 200 h. The boundaries are **hardcoded hours**, deliberately independent of the device's
+  `sensor.vrt_luba_blade_wear_warning_time` (100 h), because the manufacturer's interval does not count side B. `automation.luba_opomnik_rezil` fires on **job end only**
+  (`sensor.vrt_luba_progress` to `0`): blade hours accumulate only while mowing, so the threshold always crosses mid-job and the job end is when you are still outside. An
+  ordered `choose` means only the earliest unacked stage fires, so being two stages behind cannot send two reminders. All four stages share one tag `luba_blade` and one title.
+  The button (`LUBA_BLADE_FLIPPED_1/2/3` or `LUBA_BLADE_REPLACED`) either sets the matching `input_boolean` or, for replace, only clears the notification.
+- **Replace is cleared only by the app counter reset** - the replace stage stays due while `blade_used_time >= 200`, so its reminder returns at each job end until the
+  Mammotion app counter actually resets. Deliberate: the reset is the one step HA cannot observe, and it is what re-arms the whole cycle. There is no `replace_acked` boolean.
+- **Manual ack** - `script.luba_potrdi_rezila` acks the earliest due unacked stage from the `/dashboard-mower` button, so a swiped notification never strands the state.
 
 ## Known limitations / gotchas
 
 - **No map-derived entities anywhere.** Deliberate: on LiDAR Lubas every entity generated from map/task objects - area switches (`switch.vrt_luba_area_*`), saved-task buttons, and task-area sensors - can duplicate/disappear/rename on map sync (Mammotion-HA issues #739/#604/#337). This bit hard on 2026-07-30: `sensor.vrt_luba_task_area_path`, the original trigger backbone, was actually a per-task-area sensor masquerading under a bugged generic display name (issue #700) and was deleted by the integration at a job end, killing three automations. All triggers now use device-level entities only (`progress`, `lawn_mower` state, `last_error_time`) per `docs/adr/0003-luba-device-level-entities-only.md`.
 - **Rain is inferred, not reported** - the mower cannot tell HA "I stopped for rain"; the notification correlates `weather.forecast_home` with `MOWING`.
 - **State-refresh lag** is lowest on cloud mode (`local_push`); triggers fire on transition edges, which tolerates stale idle values. Transport flaps (sub-minute `unavailable` blips across all mower entities at once) are tolerated by design: `int(0)` defaults make flap-restored values fail the numeric gates, and the needs-attention clear trigger filters `unavailable` out via its explicit `to:` list.
-- **Blade counter reset** must be done in the Mammotion app when installing a fresh set; that reset is what re-arms the flip/replace stages.
+- **Blade counter reset** must be done in the Mammotion app when installing a fresh set; that reset is what re-arms the four stages. Until it happens, the replace reminder
+  keeps returning at each job end by design.
+- **Blade stage boundaries are hardcoded**, so a firmware change to the device's blade warning time does not move them. Change them in `automation.luba_opomnik_rezil`.
 
 ## Related
 
 - Integration setup / device details: `../../../CLAUDE.md` Known Issues + memory `project_mammotion_luba_integration`.
 - Shared notification script: `notification-script.md`.
-- Grill decisions + trigger rationale: `.claude/state/plans/2026-07-04-mammotion-luba-notifications.md` (original), `.claude/state/plans/2026-07-31-luba-trigger-redesign.md` (post-deletion redesign).
+- Grill decisions + trigger rationale: `.claude/state/plans/2026-09-30-luba-blade-4-stage-reminders.md` (4-stage blade model). The earlier plan files are gone from
+  `.claude/state/plans/`; their outcomes are captured in this doc and in ADR 0003.
 - Device-level-entities-only decision: `docs/adr/0003-luba-device-level-entities-only.md`; glossary: `CONTEXT.md` (Mammotion Luba section).

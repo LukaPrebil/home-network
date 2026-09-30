@@ -32,6 +32,10 @@ This is the deep-link target for every Luba notification tap (`clickAction: /das
 | Premor | `lawn_mower.pause` |
 | V postajo | `lawn_mower.dock` |
 | Iz postaje | `button.press` on `button.vrt_luba_undock` |
+| Označi rezila opravljena | `script.luba_potrdi_rezila` - acks the earliest due blade stage |
+
+The ack button exists because the blade ack used to be reachable only from the transient push notification. If that push is swiped, the dashboard button (and the next job-end
+reminder) still let you acknowledge. See [`../automations/mower-luba.md`](../automations/mower-luba.md).
 
 Undock is a separate `button` entity, not a `lawn_mower` capability - HA core has no undock service (mower `supported_features: 7` = start/pause/dock only).
 
@@ -54,6 +58,7 @@ Undock is a separate `button` entity, not a `lawn_mower` capability - HA core ha
 | `sensor.vrt_luba_satellites_robot` | Sateliti |
 | `sensor.vrt_luba_area` | Površina |
 | `sensor.vrt_luba_blade_used_time` | Obraba rezil (trend-graph) |
+| stage card (`markdown`) | Rezila - stopnje (current stage and next service, or that nothing is due) |
 | `number.vrt_luba_blade_height` | Višina rezila (slider) |
 | `number.vrt_luba_working_speed` | Hitrost (slider) |
 | `switch.vrt_luba_rain_detection_during_mow_on_off` | Zaznavanje dežja (toggle) |

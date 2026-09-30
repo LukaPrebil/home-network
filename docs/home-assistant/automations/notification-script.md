@@ -70,6 +70,7 @@ All notifications use Android notification channels for organized alert behavior
 | `Maintenance` | `default` | `#FF9800` (orange) | AC filter (lowered to `low`), battery (lowered to `low`), 3D printer |
 | `Monitoring` | `default` | `#F44336` (red) | Mold risk alerts |
 | `Utility` | `default` | `#009688` (teal) | Utility room climate advisory (window and cooling path) |
+| `Mower` | `high` | `#8BC34A` (green) | All Luba mower notifications; only the offline and needs-attention alerts keep `high` |
 
 ### Standard notification data keys
 
