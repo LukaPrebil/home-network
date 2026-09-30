@@ -1,0 +1,75 @@
+---
+# Verify the border router host can carry Thread traffic to the LAN.
+#
+# otbr-agent derives a local on-link prefix from the Thread extended PAN ID (for
+# this network: fd11:1111:1122:2222::/64) and advertises it in the RAs it sends on
+# the backbone interface. It never adds the address itself, so this host holds an
+# address and a route in that prefix only while it accepts its own RA. Without
+# them, replies from Thread devices reach the backbone interface and have nowhere
+# to go: on 2026-09-30 all 21 Matter nodes went unavailable this way while the
+# container stayed healthy, `ot-ctl` answered and 8 children stayed attached.
+#
+# The prefix is deliberately not named here. It is derived from the dataset, so
+# the check asserts the invariant - RA acceptance is on, and the host routes what
+# it learned - rather than a literal that a dataset change would invalidate.
+
+- name: Verify IPv6 RA acceptance is enabled on the backbone interface
+  ansible.builtin.command:
+    cmd: "sysctl -n net.ipv6.conf.{{ otbr_backbone_interface }}.accept_ra"
+  register: otbr_verify_accept_ra
+  changed_when: false
+  check_mode: false
+  retries: 30
+  delay: 5
+  until: otbr_verify_accept_ra.stdout | trim == '2'
+
+- name: Verify the backbone interface holds a global IPv6 address and routes to it
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      addrs="$(ip -6 addr show dev {{ otbr_backbone_interface }} scope global | awk '/inet6/{print $2}' | cut -d/ -f1)"
+      if [ -z "$addrs" ]; then
+        echo "no global IPv6 address on {{ otbr_backbone_interface }}; nothing to route"
+        exit 1
+      fi
+      # The on-link prefix is always a /64 (OpenThread sets that length), so the
+      # first four hextets of the address name the prefix to test a route for.
+      for addr in $addrs; do
+        prefix="$(echo "$addr" | cut -d: -f1-4)"
+        if ip -6 route get "${prefix}::1" 2>/dev/null | grep -q "dev {{ otbr_backbone_interface }}"; then
+          echo "routing ${prefix}::/64 via {{ otbr_backbone_interface }} (address $addr)"
+          exit 0
+        fi
+      done
+      echo "no route via {{ otbr_backbone_interface }} for: $addrs"
+      ip -6 route show dev {{ otbr_backbone_interface }}
+      exit 1
+    executable: /bin/bash
+  register: otbr_verify_onlink_route
+  changed_when: false
+  check_mode: false
+  # The route only appears on the next RA, and the observed RA interval on this
+  # OTBR is up to ~3 minutes.
+  retries: 60
+  delay: 5
+  failed_when: false
+  until: otbr_verify_onlink_route.rc == 0
+
+- name: Fail when the border router host cannot route its on-link prefix
+  ansible.builtin.fail:
+    msg: |
+      {{ otbr_backbone_interface }} on {{ inventory_hostname }} has no usable route in the
+      Thread on-link prefix, so Thread devices cannot reply to a LAN controller and every
+      Matter entity will read unavailable.
+
+      Observed:
+      {{ otbr_verify_onlink_route.stdout | default('') }}
+      {{ otbr_verify_onlink_route.stderr | default('') }}
+
+      Check, in order:
+        1. sysctl net.ipv6.conf.{{ otbr_backbone_interface }}.accept_ra is 2
+        2. /etc/systemd/network/10-netplan-{{ otbr_backbone_interface }}.network.d/10-otbr-ipv6.conf
+           is present, then `networkctl reload`
+        3. whether another supervisor owns the interface (netplan, NetworkManager)
+      See docs/infrastructure/otbr-thread-recovery.md and the 2026-09-30 incident notes.
+  when: otbr_verify_onlink_route.rc | default(1) != 0

@@ -95,6 +95,25 @@ A Matter node exposing the Time Synchronization cluster (0x0038); currently only
 matter-server's on-disk store (`/srv/docker/matter-server/data` on rpi4) holding the fabric credentials and node table; losing it means re-commissioning every Matter device.
 _Avoid_: "matter data dir"
 
+### Thread border routing
+
+**On-link prefix**:
+The ULA the Thread border router advertises on the LAN so LAN hosts take an address in it;
+derived from the extended PAN ID, and `fd11:1111:1122:2222::/64` for the current network.
+_Avoid_: "the fd11 prefix" (names one instance of the concept), "ULA" (the address class, not
+this role)
+
+**Backbone link**:
+The border router's LAN-facing side, eth0 on `containers`, over which it advertises the on-link
+prefix and the off-mesh-routable route.
+_Avoid_: "infrastructure link", "infra netif" (the OTBR implementation's wording), "the ethernet
+side"
+
+**Border router host**:
+The VM that runs the OTBR container; it is the machine that must itself hold an address and
+route in the **on-link prefix**, separately from the container's own health.
+_Avoid_: "the OTBR" unqualified - the container and the host fail independently
+
 ### Solar and tariff
 
 **Passive Mode**:
@@ -521,6 +540,7 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - **Map-derived entities** must never be referenced by automations or dashboards; only **Device-level entities** may be
 - A **Fresh fault** at a low-progress **Job end** means aborted; without it, the same job end is a deliberate cancel
 - A **Time push** lands only on a **Time-capable device**; the other 19 Matter nodes have nowhere to store time
+- A **Border router host** carries Thread traffic to the LAN only while it holds an address and route in the **on-link prefix**; the OTBR container can be healthy, with every Thread child attached, while the host underneath it has lost both, because those two live on opposite sides of the container boundary
 - **Fabric state** loss is re-commission-class, like Thread dataset loss; the two stores back different halves of the same Matter estate
 - **Passive Mode** is reachable only over the **inverter bridge**; the **logger stick** answers no local protocol at all, so it can be neither read nor written
 - The **inverter bridge** and the **tap bridge** are the same hardware in the same enclosure and are opposite in every property that matters: one is read-write and must be terminated, the other is read-only and must not be
@@ -565,6 +585,9 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 > **Dev:** "Can we point the sensors at our NTP server?"
 > **Domain expert:** "No - nothing on the fleet speaks NTP. Time reaches a **Time-capable device** only as a **Time push** from matter-server, and the device forgets on every power cycle unless the push repeats."
 
+> **Dev:** "The OTBR is healthy and every child is attached - why is the border router still the suspect?"
+> **Domain expert:** "Because the mesh ends at the container. If the **Border router host** has no route in the **on-link prefix**, the devices' replies reach the **Backbone link** and go nowhere."
+
 ## Flagged ambiguities
 
 - "task status sensor" - the deleted `sensor.vrt_luba_task_area_path` looked like a stable device-level status enum but was a **map-derived entity** whose display name was bugged upstream (Mammotion-HA #700). Resolved: job state is reconstructed from device-level entities only.
@@ -572,3 +595,4 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - "open the door to the utility room" - resolved: the unit is the **cooling path**, not either door on its own. **Vrata utility** alone routes heat into **Vhod**, which has no sink and saturates; only both doors together reach the air conditioner.
 - "the wired bridge" - unambiguous while one Elfin EE11A existed, ambiguous the moment the second was installed on the TIGO CCA. Resolved: **inverter bridge** and **tap bridge**, each named for what is on the far end. The distinction is physical, not cosmetic - the inverter link needs 120 ohm termination and the tap must never be terminated.
 - "NFS is up" - the 2026-07-22 **NFS readiness gate** treated a `showmount` reply as proof that guests could start. On 2026-08-08 that went green 1 s before `nfsd` had even started and 91 s before the **grace period** ended, and HAOS missed its **start budget** by one second. Resolved: the term is **Storage ready**, and only a completed open-and-write on a real NFS mount proves it.
+- "the OTBR" - used for both the `otbr` container and the `containers` VM that runs it, which is how the 2026-09-30 Matter outage read as healthy everywhere while 21 devices were unreachable. Resolved: the container is the OTBR container and the VM is the **Border router host**; they fail independently.

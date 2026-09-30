@@ -47,6 +47,94 @@
     state: present
     reload: true
 
+# networkd re-applies accept_ra=0 whenever it starts. A drop-in cannot override
+# that on this host (see below), so this is what put it back. Remove the version
+# that failed so the host does not carry dead config.
+- name: Remove the superseded networkd drop-in for the backbone interface
+  ansible.builtin.file:
+    path: "/etc/systemd/network/10-netplan-{{ otbr_backbone_interface }}.network.d/10-otbr-ipv6.conf"
+    state: absent
+
+- name: Read the backbone interface's current RA acceptance
+  ansible.builtin.command:
+    cmd: "sysctl -n net.ipv6.conf.{{ otbr_backbone_interface }}.accept_ra"
+  register: otbr_accept_ra_current
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# The border router host itself must hold an address and route in the Thread
+# network's on-link prefix: otbr-agent advertises that prefix on the backbone
+# interface, but it never adds the address, so the host only gets one by
+# accepting its own RA, and kernel accept_ra must then be 2 rather than 1
+# because forwarding is on.
+#
+# systemd-networkd owns this interface and re-applies accept_ra=0 on every start,
+# because it disables IPv6AcceptRA by default whenever IPv6 forwarding is enabled
+# (systemd.network(5)). That is what took all 21 Matter nodes offline on
+# 2026-09-30: the 0 ended any refresh, and networkd's flush of the foreign
+# address and route on start broke delivery at once.
+#
+# The documented override does NOT work on this host: a drop-in with
+# IPv6AcceptRA=yes, with and without IPv6Forwarding=yes, left accept_ra at 0 and
+# produced no address, measured twice on systemd 259.5 on 2026-09-30. So the
+# kernel keeps the knob instead, and this unit re-applies it whenever networkd
+# starts, ordered after it, with a short retry loop for networkd's asynchronous
+# link configuration. One writer, on the event that used to break it.
+- name: Install the backbone RA acceptance script
+  ansible.builtin.template:
+    src: otbr-accept-ra.sh.j2
+    dest: /usr/local/sbin/otbr-accept-ra.sh
+    owner: root
+    group: root
+    mode: '0755'
+  register: otbr_accept_ra_script
+
+- name: Keep IPv6 RA acceptance on the backbone interface
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/otbr-accept-ra.service
+    content: |
+      # Managed by Ansible (roles/otbr/tasks/prerequisites.yml) - DO NOT EDIT MANUALLY.
+      #
+      # Why not a networkd IPv6AcceptRA=yes drop-in, or a sysctl.d file: see the
+      # header of /usr/local/sbin/otbr-accept-ra.sh, which this unit runs.
+      [Unit]
+      Description=Keep IPv6 RA acceptance on the OTBR backbone interface
+      After=systemd-networkd.service
+      PartOf=systemd-networkd.service
+      StartLimitIntervalSec=0
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/local/sbin/otbr-accept-ra.sh
+
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: '0644'
+  register: otbr_accept_ra_unit
+
+- name: Enable the backbone RA acceptance unit  # noqa: no-handler
+  ansible.builtin.systemd:
+    name: otbr-accept-ra.service
+    enabled: true
+    state: started
+    daemon_reload: "{{ otbr_accept_ra_unit.changed }}"
+  when: otbr_accept_ra_unit.changed
+
+# The unit only runs at networkd's start, so re-run it to repair a host that
+# drifted outside Ansible (for example a value cleared by hand), or after the
+# script it runs changed.
+- name: Re-run the backbone RA acceptance unit when the value is wrong  # noqa: no-handler
+  ansible.builtin.systemd:
+    name: otbr-accept-ra.service
+    state: restarted
+  when: >-
+    otbr_accept_ra_script.changed
+    or (otbr_accept_ra_current.stdout | default('') | trim) != '2'
+
 - name: Ensure required kernel modules load on boot
   ansible.builtin.copy:
     content: |
