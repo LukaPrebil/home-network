@@ -44,22 +44,13 @@ pretensioners, pyro-fuse) or a non-drivable car. It reads those from the
 platform's own damage declaration: the `schades` row on schadeautos.nl, and the
 facet tags plus `Kenmerken` line on Boonstra.
 
-Bounds it applies, as VAT-inclusive listing price in EUR:
+Bounds it applies, as VAT-inclusive listing price in EUR: **{{ "{:,}".format(hermes_ev_clean_max | int) }} clean** and **{{ "{:,}".format(hermes_ev_salvage_max | int) }} salvage**, the same for every model and every variant. A single
+price bar replaced the per-model ceilings on 2026-09-26, so a cheaper EV6 or
+Ioniq now alerts exactly as a Polestar 2 does and the operator chooses by hand.
 
-| Route | Salvage | Clean |
-| --- | --- | --- |
-| Polestar 2 Dual Motor | {{ "{:,}".format(hermes_ev_p2_dm_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_p2_dm_clean_max | int) }} |
-| Polestar 2 single motor 2024+ | {{ "{:,}".format(hermes_ev_p2_sm_facelift_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_p2_sm_facelift_clean_max | int) }} |
-| Polestar 2 single motor pre-2024 | {{ "{:,}".format(hermes_ev_p2_sm_pre24_salvage_max | int) }} | not bought |
-| Kia EV6 | {{ "{:,}".format(hermes_ev_ev6_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_ev6_clean_max | int) }} |
-| BMW i4 | {{ "{:,}".format(hermes_ev_i4_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_i4_clean_max | int) }} |
-| Hyundai Ioniq 5 | {{ "{:,}".format(hermes_ev_ioniq_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_ioniq_clean_max | int) }} |
-| Hyundai Ioniq 6 | {{ "{:,}".format(hermes_ev_ioniq_salvage_max | int) }} | {{ "{:,}".format(hermes_ev_ioniq_clean_max | int) }} |
-| Zeekr 001 / X / 7X | not bought | {{ "{:,}".format(hermes_ev_zeekr_clean_max | int) }} |
-| Nio ET5 / EL6 / ET7 | not bought | {{ "{:,}".format(hermes_ev_nio_clean_max | int) }} |
-
-A row reading `not bought` means the script already dropped that car: it only
-reaches you on the route the plan buys.
+Two models are clean-only and never reach you on the salvage route: Zeekr
+(001/X/7X) and Nio (ET5/EL6/ET7). Neither had stock under the ceiling when it
+was added, so expect silence from them until the market falls.
 
 A MATCH is inside its bound and always alerts. A NEAR-MISS is up to
 {{ (((hermes_ev_near_miss_factor | float) - 1) * 100) | round | int }}% above
@@ -82,17 +73,11 @@ HV fault codes, structural bends, and non-drivable cars. The script catches
 fire, SRS damage and a declared non-drivable car; flood, HV fault codes and
 structural bends are yours to spot in the damage text.
 
-**Deal-trigger (EV6).** The EV6 is a compromise on looks, so it alerts only when
-it is at least EUR 2,500 cheaper than a comparable Polestar 2 in the same feed.
-When no comparable P2 is in this run's output, compare against the P2 rows in
-the price history the script prints, and say which comparison you used.
-
-**Exceptional-price rule (pre-2024 P2 single motor).** Salvage only, at or below
-the pre-2024 ceiling. Never clean.
-
-**i4.** The clean-import fallback. It has to be conspicuously good to earn an
-alert: low mileage, clean damage text, and under
-{{ "{:,}".format(hermes_ev_i4_clean_max | int) }}.
+**One price bar for every model.** Every model and every variant carries the
+same bound, so do not add a preference of your own. An EV6, an Ioniq, or a
+pre-2024 front-drive Polestar 2 alerts on exactly the same terms as a Dual Motor
+Polestar 2 or an i4. The shortlist ranking decides what you say about a car,
+never whether it alerts.
 
 **Ioniq 5 and Ioniq 6.** Added on 2026-09-25 on both routes. The Ioniq 5 is the
 stronger of the two and is a live candidate, not a watch: say plainly that it is
