@@ -1,0 +1,41 @@
+#!/bin/sh
+# Managed by Ansible (roles/otbr/tasks/prerequisites.yml) - DO NOT EDIT MANUALLY.
+#
+# Runs after systemd-networkd starts, and again whenever it restarts (PartOf=).
+#
+# The border router host must hold an address and route in the Thread network's
+# on-link prefix. otbr-agent advertises that prefix in the RAs it sends on the
+# backbone interface, but it never adds the address itself, so the host only gets
+# one by accepting its own RA. That needs kernel accept_ra = 2 rather than 1,
+# because 1 is ignored while IPv6 forwarding is on.
+#
+# systemd-networkd re-applies accept_ra = 0 on every start: it disables
+# IPv6AcceptRA by default whenever IPv6 forwarding is enabled. The 0 ends any
+# refresh of the RA-derived address and route, and networkd's start also flushes
+# the foreign state it does not own. That is what took all 21 Matter nodes
+# offline on 2026-09-30, while the OTBR container stayed healthy.
+#
+# The documented override (a drop-in with IPv6AcceptRA=yes) does not work on this
+# host: it left accept_ra at 0 and produced no address, measured with and without
+# IPv6Forwarding=yes on systemd 259.5. So the kernel keeps the knob, and this unit
+# re-applies it on the one event that used to break it.
+set -eu
+
+IF='{{ otbr_backbone_interface }}'
+
+# networkd configures links asynchronously, so retry instead of assuming order.
+i=0
+while [ "$i" -lt 20 ]; do
+    echo 2 > "/proc/sys/net/ipv6/conf/${IF}/accept_ra"
+    echo 64 > "/proc/sys/net/ipv6/conf/${IF}/accept_ra_rt_info_max_plen"
+
+    if [ "$(cat "/proc/sys/net/ipv6/conf/${IF}/accept_ra")" = "2" ]; then
+        exit 0
+    fi
+
+    i=$((i + 1))
+    sleep 1
+done
+
+echo "otbr-accept-ra: accept_ra did not stick on ${IF}" >&2
+exit 1

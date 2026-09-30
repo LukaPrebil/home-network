@@ -1520,3 +1520,63 @@ groups:
           description: "The per-panel plant view is stale. All 427 sensor.tigo_* entities in Home Assistant go unavailable 180 s after the last report, and nothing has alerted on that until now. First check the bridge's own socket, which is the failure this has been seen as: a read-only connect to 192.168.40.162:7160 that returns bytes means the bus is fine and the bridge's TCP client is black-holed, which `ansible-playbook site.yml --tags tigo --limit containers` repairs by reconnecting. A connect that returns nothing means the fault is upstream: CCA or TAP radio power, then the switch in the PV enclosure."
         labels:
           severity: warning
+
+      # 26. Matter nodes dropping off the Thread network
+      - uid: alert-matter-nodes-offline
+        title: Matter Devices Unavailable
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              # matter-server marks each node unavailable on its own grace period, so a
+              # break anywhere in the Thread-to-LAN return path arrives here as one line
+              # per node, staggered over tens of minutes, while every infrastructure
+              # signal stays green - the container is healthy, ot-ctl answers and the
+              # children stay attached. On 2026-09-30 all 21 nodes went this way at
+              # 06:29 and nothing reported it for six hours.
+              expr: sum(count_over_time({job="docker", container="matter-server"} |= "offline grace period expired" [15m]))
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              queryType: range
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 3
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Matter devices are dropping off in Home Assistant"
+          description: "More than 3 Matter nodes have gone unavailable in 15 minutes, which is a path problem rather than a device problem. Check the border router host first: `sysctl net.ipv6.conf.eth0.accept_ra` must be 2 on the containers VM and `ip -6 route get fd11:1111:1122:2222:<rpi4 address>` must resolve, because the Thread on-link prefix route is what carries device replies back to matter-server. If the route is missing the fix is a networkctl reload on containers, then `docker restart matter-server` on rpi4, since its retry backoff stretches to hours. See docs/infrastructure/otbr-thread-recovery.md and the 2026-09-30 incident note."
+        labels:
+          severity: warning

@@ -33,3 +33,9 @@
   tags:
     - otbr
     - otbr-watchdog
+
+- name: Include post-deploy verification tasks
+  ansible.builtin.include_tasks: verify.yml
+  tags:
+    - otbr
+    - otbr-verify

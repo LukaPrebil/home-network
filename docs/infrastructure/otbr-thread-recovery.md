@@ -18,6 +18,75 @@ runbook and the rationale.
   controller; OTBR is only the Thread border router. They are split across
   hosts to avoid the mDNS port-5353 conflict (see the repo Known Issues).
 
+## Backbone IPv6: the on-link prefix route
+
+The border router host must hold an address and a route in the Thread network's **on-link
+prefix**, or Thread devices cannot answer anything on the LAN.
+
+- otbr-agent derives that prefix from the extended PAN ID (`fd` + extpanid bytes 0-4 +
+  bytes 6-7) and advertises it in the RAs it sends on the backbone interface. For this
+  dataset (`1111111122222222`) it is `fd11:1111:1122:2222::/64`.
+- otbr-agent never adds the address itself. It only appends the prefix as a PIO with the
+  on-link and autoconfiguration flags, so the host gets an address and route only by
+  accepting its own RA. That needs kernel `accept_ra = 2`, not 1, because 1 is ignored
+  while IPv6 forwarding is on.
+- The route is what carries replies from Thread devices back to a LAN controller. Matter
+  runs between `matter-server` on rpi4, whose only global IPv6 address is in this prefix,
+  and the devices.
+
+### What breaks it
+
+`systemd-networkd` owns eth0 on `containers` (netplan is IPv4-only) and, because IPv6
+forwarding is enabled, it disables IPv6AcceptRA by default and re-applies
+`accept_ra = 0` on every start. It also drops the foreign address and route it does not
+own when it starts. A `netplan apply`, a package upgrade that restarts networkd, or a
+reboot all do this.
+
+On 2026-09-30 an unattended upgrade of openssl and libevent ran needrestart in Ubuntu mode,
+which restarts every daemon linked against an upgraded library. networkd restarted at
+06:27:41, 21 of 21 Matter nodes went unavailable between 06:29 and 06:58, and nothing else
+complained: the container stayed healthy, `ot-ctl` answered, 8 children stayed attached,
+and `ot-ctl ping <device>` succeeded.
+
+Symptoms, in the order to check them:
+
+```bash
+sysctl -n net.ipv6.conf.eth0.accept_ra                    # expect 2
+ip -6 addr show dev eth0 scope global                     # expect an fd11 address
+ip -6 route get fd11:1111:1122:2222:<rpi4 address>        # expect dev eth0, not unreachable
+```
+
+### How it is kept
+
+`otbr-accept-ra.service` (with `/usr/local/sbin/otbr-accept-ra.sh`) re-applies
+`accept_ra = 2` and `accept_ra_rt_info_max_plen = 64`. It is `PartOf=systemd-networkd.service`,
+so a networkd restart re-runs it, and ordered `After=` it so networkd's own write lands
+first. Both files are owned by `ansible/roles/otbr/`.
+
+Three alternatives were measured and do **not** work on this host, so do not reintroduce
+them:
+
+- A networkd drop-in with `IPv6AcceptRA=yes` (with and without `IPv6Forwarding=yes`) left
+  `accept_ra` at 0 and produced no address.
+- `networkctl reload` re-reads the `.network` files without re-applying the link sysctls.
+- A host `sysctl.d` file loses the race: networkd starts after `systemd-sysctl`.
+
+### Recovering without touching the container
+
+A container recreate costs a Thread leader loss, and this failure never needs one:
+
+```bash
+# on containers
+sudo sysctl -w net.ipv6.conf.eth0.accept_ra=2     # or: systemctl restart otbr-accept-ra
+# wait for the next RA (interval ~1-3 min) for the address and route to return
+# then, on rpi4, force matter-server to stop backing off (its MRP backoff reaches hours)
+docker restart matter-server
+```
+
+A converge now guards this. `roles/otbr/tasks/verify.yml` fails when the interface holds
+no global address or no route to it, and the Grafana rule "Matter Devices Unavailable"
+reports nodes dropping off within minutes instead of hours.
+
 ## Overview: the dataset is the network identity
 
 A Thread network is defined by its **Active Operational Dataset**. otbr-agent
@@ -298,6 +367,9 @@ For a clean VM-level rollback, restore the Proxmox snapshot taken in step 1.
 ## Reference
 
 - Role: `ansible/roles/otbr/`
+- Backbone RA acceptance: `roles/otbr/tasks/prerequisites.yml`,
+  `templates/otbr-accept-ra.sh.j2`, and the `otbr-accept-ra.service` unit it installs
+- Guard: `roles/otbr/tasks/verify.yml` (included from `tasks/main.yml` as `otbr-verify`)
 - Vault key: `vault_thread_active_dataset` (alias `otbr_thread_active_dataset`)
 - Live OTBR: container `otbr` on `containers` (`192.168.30.140`), data at
   `/srv/docker/otbr/data` mounted to `/var/lib/thread`.
