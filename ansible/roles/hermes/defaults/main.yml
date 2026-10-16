@@ -234,34 +234,17 @@ hermes_ev_skill_name: "ev-hunt"
 hermes_ev_skill_category: "productivity"
 hermes_ev_skill_dir: "{{ hermes_home }}/skills/{{ hermes_ev_skill_category }}/{{ hermes_ev_skill_name }}"
 
-# Filter contract: VAT-inclusive listing-price ceilings. Each is the all-in
-# ceiling from the EV purchase plan (decision 4) minus the EUR 1,650 fixed
-# import/inspection cost and, for salvage, the EUR 1,000 minimum parts budget.
-# They are listing-price bounds, not all-in budgets, so the comparison is
-# against the price on the card. Changing one is a reviewed commit + converge.
-hermes_ev_p2_dm_salvage_max: 14300
-hermes_ev_p2_dm_clean_max: 25400
-hermes_ev_p2_sm_facelift_salvage_max: 14300
-hermes_ev_p2_sm_facelift_clean_max: 27400
-# Pre-2024 single motor: salvage only, at the exceptional-price ceiling.
-hermes_ev_p2_sm_pre24_salvage_max: 11300
-hermes_ev_ev6_salvage_max: 12300
-hermes_ev_ev6_clean_max: 22400
-hermes_ev_i4_salvage_max: 27300
-hermes_ev_i4_clean_max: 28400
-# Watch-only additions (widened 2026-09-25 from
-# .claude/state/research/2026-09-25-research-ev-model-list-hyundai-chinese.md).
-# Each bound is the purchase plan's top ceiling (EUR 30,000 all-in, the i4's)
-# minus the same EUR 1,650 fixed import/inspection cost the other clean bounds
-# use, and minus the EUR 1,000 minimum parts budget for the salvage bounds, so
-# none of these can outspend the plan's most permissive route. The Ioniq pair
-# watches both routes. Zeekr and Nio are clean-only: their salvage stock either
-# fired its airbags or has no parts and diagnostics path a general workshop can
-# use.
-hermes_ev_ioniq_salvage_max: 27300
-hermes_ev_ioniq_clean_max: 28400
-hermes_ev_zeekr_clean_max: 28400
-hermes_ev_nio_clean_max: 28400
+# Filter contract: VAT-inclusive listing-price ceilings, the same for every
+# watched model and every variant. The per-model price penalties were removed on
+# 2026-09-26 by the owner: favoring one model must not hide a cheaper example of
+# another, so the hunt surfaces every option under the cap and the operator
+# chooses by hand. Each bound is the all-in ceiling from the EV purchase plan
+# minus the EUR 1,650 fixed import/inspection cost and, for salvage, the
+# EUR 1,000 minimum parts budget. They are listing-price bounds, not budgets, so
+# the comparison is against the price on the card. Changing one is a reviewed
+# commit + converge.
+hermes_ev_clean_max: 28400
+hermes_ev_salvage_max: 27300
 
 hermes_ev_km_max: 100000
 hermes_ev_min_year: 2021
@@ -385,40 +368,41 @@ hermes_ev_config:
       min_year: "{{ hermes_ev_min_year }}"
       bounds:
         dm:
-          salvage: "{{ hermes_ev_p2_dm_salvage_max }}"
-          clean: "{{ hermes_ev_p2_dm_clean_max }}"
+          salvage: "{{ hermes_ev_salvage_max }}"
+          clean: "{{ hermes_ev_clean_max }}"
         sm_facelift:
-          salvage: "{{ hermes_ev_p2_sm_facelift_salvage_max }}"
-          clean: "{{ hermes_ev_p2_sm_facelift_clean_max }}"
+          salvage: "{{ hermes_ev_salvage_max }}"
+          clean: "{{ hermes_ev_clean_max }}"
         sm_pre24:
-          salvage: "{{ hermes_ev_p2_sm_pre24_salvage_max }}"
-      note: "Pre-2024 single motor is salvage-only (exceptional-price rule)."
+          salvage: "{{ hermes_ev_salvage_max }}"
+          clean: "{{ hermes_ev_clean_max }}"
+      note: "Single motor splits into pre-2024 front-drive and 2024+ rear-drive. Both carry the shared bound and both buy either route; the exceptional-price rule was removed 2026-09-26."
     - key: ev6
       label: "Kia EV6"
       match: ["kia ev6"]
       min_year: "{{ hermes_ev_min_year }}"
       bounds:
         default:
-          salvage: "{{ hermes_ev_ev6_salvage_max }}"
-          clean: "{{ hermes_ev_ev6_clean_max }}"
-      note: "EV6 only when at least EUR 2,500 below a comparable Polestar 2 (deal-trigger)."
+          salvage: "{{ hermes_ev_salvage_max }}"
+          clean: "{{ hermes_ev_clean_max }}"
+      note: "Shared bound. The deal-trigger against a comparable Polestar 2 was removed 2026-09-26."
     - key: i4
       label: "BMW i4"
       match: ["bmw i4"]
       min_year: "{{ hermes_ev_min_year }}"
       bounds:
         default:
-          salvage: "{{ hermes_ev_i4_salvage_max }}"
-          clean: "{{ hermes_ev_i4_clean_max }}"
-      note: "i4 is the Route-B clean-import fallback, not a first choice."
+          salvage: "{{ hermes_ev_salvage_max }}"
+          clean: "{{ hermes_ev_clean_max }}"
+      note: "i4 is the Route-B clean-import fallback, not a first choice. It carries the shared bound."
     - key: ioniq5
       label: "Hyundai Ioniq 5"
       match: ["hyundai ioniq 5"]
       min_year: "{{ hermes_ev_min_year }}"
       bounds:
         default:
-          salvage: "{{ hermes_ev_ioniq_salvage_max }}"
-          clean: "{{ hermes_ev_ioniq_clean_max }}"
+          salvage: "{{ hermes_ev_salvage_max }}"
+          clean: "{{ hermes_ev_clean_max }}"
       note: "Both routes. Cloth on Basis and DYNAMIQ through MY24; TECHNIQ is a cloth/leather mix. The wheel is leather on every EU trim. ICCU campaigns cover charging faults and driveshaft breakage."
     - key: ioniq6
       label: "Hyundai Ioniq 6"
@@ -426,8 +410,8 @@ hermes_ev_config:
       min_year: "{{ hermes_ev_min_year }}"
       bounds:
         default:
-          salvage: "{{ hermes_ev_ioniq_salvage_max }}"
-          clean: "{{ hermes_ev_ioniq_clean_max }}"
+          salvage: "{{ hermes_ev_salvage_max }}"
+          clean: "{{ hermes_ev_clean_max }}"
       note: "Both routes. Cloth on Basis, DYNAMIQ and TECHNIQ through MY25; only MY26 limits cloth to the base trim. The wheel is leather on every EU trim."
     - key: zeekr
       label: "Zeekr 001 / X / 7X"
@@ -435,16 +419,16 @@ hermes_ev_config:
       min_year: "{{ hermes_ev_min_year }}"
       bounds:
         default:
-          clean: "{{ hermes_ev_zeekr_clean_max }}"
-      note: "Clean only, watch-only: no EU stock under the ceiling when the list was widened."
+          clean: "{{ hermes_ev_clean_max }}"
+      note: "Clean only: these have no salvage parts or diagnostics path a general workshop can use. No EU stock was under the ceiling when the list was widened."
     - key: nio
       label: "Nio ET5 / EL6 / ET7"
       match: ["nio et5", "nio el6", "nio el7", "nio es6", "nio et7"]
       min_year: "{{ hermes_ev_min_year }}"
       bounds:
         default:
-          clean: "{{ hermes_ev_nio_clean_max }}"
-      note: "Clean only, watch-only: Nio never sold in Slovenia, so service is out of reach today."
+          clean: "{{ hermes_ev_clean_max }}"
+      note: "Clean only: Nio never sold in Slovenia, so service is out of reach today."
 
 # ── systemd ──────────────────────────────────────────────────────────
 hermes_service_name: "hermes-gateway"
