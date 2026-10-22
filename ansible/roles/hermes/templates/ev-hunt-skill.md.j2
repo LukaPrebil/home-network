@@ -19,9 +19,18 @@ script's state file is the only history.
    python3 {{ hermes_ev_home }}/{{ hermes_ev_script_name }}
    ```
 
-   Read its stdout. Exit code 0 means the data is trustworthy. Exit code 1, or
-   output starting with `EV-HUNT FAILED`, is a **degraded run** (below). This
-   skill is the whole contract: do not read the script, the config, or the
+   Read its stdout and its exit code.
+
+   | Exit | Meaning |
+   | --- | --- |
+   | 0 | every watched source was swept |
+   | 2 | **partial sweep**: some sources were not reachable |
+   | 1 | nothing was swept (`EV-HUNT FAILED`) |
+
+   Exit 0 means the data is trustworthy. Exit 1, or output starting with
+   `EV-HUNT FAILED`, is a **degraded run** (below). Exit 2 is a **partial
+   sweep** (below): the candidates it printed are real, the silence is not.
+   This skill is the whole contract: do not read the script, the config, or the
    state file, and do not search the filesystem. The script run and the
    judgment are the entire job.
 2. The output lists MATCH and NEAR-MISS candidates. Judge each one from that
@@ -32,7 +41,7 @@ script's state file is the only history.
    re-fetching. Reply-time inspection (below) is where you read a page closely,
    and that is one listing, on request.
 3. Deliver the alerts (below). If there is nothing new, or nothing worth
-   alerting, reply with exactly `[SILENT]`.
+   alerting, reply with exactly `[SILENT]` - unless the run was a partial sweep.
 
 ## What the script already decided
 
@@ -154,21 +163,30 @@ The job delivers your final response to the Telegram home channel.
 - Two or more: send each block with `hermes send -t telegram '<block>'`, then
   reply exactly `[SILENT]` so the delivery does not duplicate them.
 
-## Degraded run
+## Degraded and partial runs
 
-A degraded run is one where the script exited non-zero after its own retries.
-The listing feed is then unavailable, and you may fall back to `web_search` and
-`web_extract` for the same watched platforms, with the same bounds and the same
-damage rules.
+A **degraded run** is one where the script exited 1 after its own retries, so
+nothing was swept. The listing feed is then unavailable, and you may fall back
+to `web_search` and `web_extract` for the same watched platforms, with the same
+bounds and the same damage rules.
+
+A **partial sweep** is exit 2. The sources listed under `source errors:` were
+never read; everything else was. Judge the candidates that came back and send
+them as ordinary alerts, then end your reply with one line naming the platforms
+that were not swept and why. Never reply `[SILENT]` to a partial sweep: half a
+feed cannot say the market is quiet.
 
 Mark every alert from a degraded run with `DEGRADED: <script error>` as its
 first line, and say the data came from your own web tools rather than the
 listing feed. A degraded run advances no seen-set state, so the next healthy run
-re-alerts the same listing.
+re-alerts the same listing. A partial sweep advances it for the sources it did
+read, which is why its alerts are ordinary ones: the next healthy run reads the
+rest and only the genuinely new listings alert.
 
-If the script fails and the web fallback yields nothing usable either, reply
-with a single line starting `[CRON_FAILURE]` describing the failure. Do not
-repair the script, the config, or the state file.
+If a degraded run's web fallback yields nothing usable either, reply with a
+single line starting `[CRON_FAILURE]` describing the failure. A partial sweep
+never gets that reply: it has real data, so it reports the gap in its one
+closing line instead. Do not repair the script, the config, or the state file.
 
 ## Hard limits
 
