@@ -20,7 +20,7 @@ monitoring_stack_compose_dir: "/opt/monitoring"
 monitoring_stack_compose_file: "{{ monitoring_stack_compose_dir }}/docker-compose.yml"
 
 # Grafana configuration
-monitoring_stack_grafana_version: "12.4.9"
+monitoring_stack_grafana_version: "12.4.13"
 monitoring_stack_grafana_port: 3000
 monitoring_stack_grafana_admin_user: "admin"
 monitoring_stack_grafana_admin_password: "{{ vault_grafana_admin_password }}"

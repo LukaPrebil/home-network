@@ -171,7 +171,11 @@ labels:
 ```
 
 ### Rate Limiting
-Applied to all public routes except Home Assistant. Config: 100 req/min average, 50 burst.
+Applied to all public routes except Home Assistant. Config: 600 req/min average, 300 burst, keyed on `X-Real-Ip` (`traefik_rate_limit_average` / `_burst` / `_period`).
+
+The budget is sized for single-page apps. One cold load of Immich pulls every `_app/immutable` chunk plus a timeline of thumbnails, and the earlier 100/min with 50 burst answered the app's own bootstrap requests with `429`, which the UI surfaces as `Expected a JSON response (... HTTP 429 ...)`. The key is `X-Real-Ip` rather than the socket peer because a Cloudflare visitor arrives from an edge address and a LAN client arrives from the hairpin-NAT address, so the default criterion shares one bucket between unrelated clients.
+
+The seven routers that carry the limiter (`kuma`, `status`, `immich`, `grafana`, `jellyfin`, `paperless`, `pds`) are watched by the `alert-public-route-429` Grafana rule: more than 20 x 429 over 5 minutes, sustained for 5 more, opens a warning naming the router. `ha-secure` has no route-wide limiter, `ha-login-secure` has `alert-ha-login-429`, and the four internal routers use `lan-only`.
 ```yaml
 labels:
   - "traefik.http.routers.myservice.middlewares=rate-limit@file"

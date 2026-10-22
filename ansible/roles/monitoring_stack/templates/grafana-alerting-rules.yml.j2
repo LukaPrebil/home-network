@@ -965,6 +965,78 @@ groups:
         labels:
           severity: warning
 
+      # 27. The shared public-route limiter clipping normal traffic. This is the
+      # guard the 2026-10-22 Immich incident lacked: the limiter answered 1994
+      # bootstrap requests with 429 and nothing alerted, so the failure only
+      # surfaced as "Expected a JSON response ... HTTP 429" in the UI. Router
+      # labels are enabled on the traefik host, so each app has its own series.
+      # The four internal routers carry lan-only, not rate-limit, and are
+      # excluded; ha-secure has no route-wide limiter and ha-login-secure has
+      # its own alert, so both stay out.
+      - uid: alert-public-route-429
+        title: Public Route Rate Limited
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: sum by (router) (increase(traefik_router_requests_total{router=~"(kuma|status|immich|grafana|jellyfin|paperless|pds)-secure@file",code="429"}[5m]))
+              instant: false
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 20
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Traefik rate-limited {{ '{{' }} $labels.router {{ '}}' }}"
+          description: |
+            More than 20 requests to the shared rate-limit middleware received
+            429 over 5 minutes, sustained. Two readings, and the count per client
+            tells them apart: first run
+            sum by (router) (increase(traefik_router_requests_total{code="429"}[15m]))
+            to find the app, then grep " 429 " /opt/traefik/logs/access.log on the
+            traefik host (format: common, so match on path and router name, not
+            Host). A single client clipped while loading its own app means the
+            budget is too small for it - raise traefik_rate_limit_average and
+            traefik_rate_limit_burst - and this is the symptom the 2026-10-22
+            Immich incident produced. Many clients each losing a request means
+            the limiter is absorbing abuse, and CrowdSec decisions are the next
+            place to look.
+        labels:
+          severity: warning
+
   # ============================================================
   # CrowdSec Security
   # ============================================================

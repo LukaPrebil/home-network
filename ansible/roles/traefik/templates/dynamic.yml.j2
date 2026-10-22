@@ -35,11 +35,22 @@ http:
         # - X-Real-IP
 
     # Rate limiting
+    # Keyed on X-Real-Ip, not the socket peer: behind Cloudflare every visitor
+    # arrives from an edge IP, and on the LAN path the hairpin NAT collapses
+    # every client into one source address, so the default criterion shares a
+    # single bucket between unrelated clients. warp sets X-Real-Ip from
+    # CF-Connecting-IP for Cloudflare peers and Traefik replaces it with the
+    # socket address for everyone else, which makes the header spoof-proof.
+    # The budget has to fit an SPA: one cold load of Immich pulls the whole
+    # _app/immutable bundle plus a timeline's worth of thumbnails, which the
+    # old 100/min average and 50 burst could not serve.
     rate-limit:
       rateLimit:
-        average: 100
-        burst: 50
-        period: 1m
+        average: {{ traefik_rate_limit_average }}
+        burst: {{ traefik_rate_limit_burst }}
+        period: {{ traefik_rate_limit_period }}
+        sourceCriterion:
+          requestHeaderName: X-Real-IP
 
 {% if traefik_ha_login_rate_limit_enabled | default(false) | bool %}
     # Login-only limiter for Home Assistant auth flows - the only HA traffic
