@@ -77,3 +77,28 @@
 - name: Display Docker version
   ansible.builtin.debug:
     msg: "Docker installed: {{ docker_version.stdout }}"
+
+# A host that stops backing /srv/docker with NFS (dev VM, traefik/media LXCs) sets
+# docker_nfs_volumes_enabled=false, which skips nfs.yml entirely - so the drop-in
+# nfs.yml installed earlier stays behind. It is not harmless: its ExecStartPre wants
+# /srv/docker to be an nfs/nfs4 mount, and with Restart=on-failure and no start limit
+# the unit retries forever, so doker sits in "activating (start-pre)" and any
+# `systemctl restart docker` hangs instead of failing. That is what wedged the dev VM
+# on 2026-10-22: docker-ce.postinst ran deb-systemd-invoke restart docker.service,
+# systemd waited on a start that could never finish, and dpkg held the apt lock for
+# 50 minutes with the package half-configured.
+- name: Remove the wait-for-NFS drop-in on hosts without an NFS-backed docker volume
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d/wait-for-nfs.conf
+    state: absent
+  register: docker_wait_for_nfs_dropin
+  when: not (docker_nfs_volumes_enabled | bool)
+
+- name: Start Docker once the stale drop-in is gone
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+    daemon_reload: true
+  when:
+    - not (docker_nfs_volumes_enabled | bool)
+    - docker_wait_for_nfs_dropin is changed
