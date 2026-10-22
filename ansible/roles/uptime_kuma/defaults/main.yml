@@ -5,11 +5,11 @@
 # Compose file on local rootfs (M-09: keeps secret-bearing service state off
 # the LAN-readable NFS export; the data itself lives on iSCSI)
 uptime_kuma_base_dir: "/opt/uptime-kuma"
-# Data directory on iSCSI mount (NOT NFS — Uptime Kuma 2.x uses SQLite which requires POSIX file locking)
+# Data directory on iSCSI mount (NOT NFS - Uptime Kuma 2.x uses SQLite which requires POSIX file locking)
 uptime_kuma_data_dir: "/mnt/uptime-kuma"
 
 # Docker image
-uptime_kuma_image: "louislam/uptime-kuma:2.5.0"
+uptime_kuma_image: "louislam/uptime-kuma:2.5.6"
 uptime_kuma_container_name: "uptime-kuma"
 
 # Network configuration
