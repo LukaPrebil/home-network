@@ -30,6 +30,12 @@ Read-only and polite: sequential GETs, one per landing page plus one per
 candidate detail page, browser User-Agent, no query-string URLs on
 schadeautos.nl (its robots.txt disallows them). The monitor never contacts a
 seller, never bids, and never writes outside its state directory.
+
+Exit codes are the contract with the judgment skill: 0 when every source was
+swept, 2 when some were not (a partial sweep, whose candidates are still worth
+judging), 1 when nothing was swept at all. A source that fails inside `run()`
+is collected rather than fatal, so without the 2 the report of a half-dead
+platform would be indistinguishable from a quiet market.
 """
 
 import argparse
@@ -730,8 +736,12 @@ def render_candidate(entry, change, model):
 
 
 def render_run(report):
+    # A partial sweep is named in the first line because that line is what the
+    # brain reads before anything else: a run that swept half the platform is
+    # not a quiet market, and the rest of the report is indistinguishable from a
+    # healthy one.
     out = [
-        "EV-HUNT RUN %s" % now_iso(),
+        "EV-HUNT %s %s" % ("PARTIAL" if report["failed"] else "RUN", now_iso()),
         "sources: %d/%d fetched (%d pages), %d empty, %d failed"
         % (report["ok"], report["total"], report["pages"], report["empty"], report["failed"]),
         "listings parsed: %d | in scope: %d | matches: %d | near-misses: %d | rejected: %d"
@@ -740,6 +750,10 @@ def render_run(report):
     if report["errors"]:
         out.append("source errors:")
         out.extend("  - %s" % error for error in report["errors"])
+        out.append(
+            "warning: %d of %d sources were not swept, so a [SILENT] here is not a quiet market"
+            % (report["failed"], report["total"])
+        )
     out.append("alerts: %d" % len(report["alerts"]))
     for entry, change, model in report["alerts"]:
         out.append("")
@@ -1005,9 +1019,12 @@ def main(argv=None):
         print("error: %s" % error)
         return 1
 
+    # State still advances: the sources that answered were read in full, and the
+    # next healthy run re-reads the rest. Only the exit code says the sweep was
+    # partial, which is the one thing the skill cannot infer from the report.
     save_state(config["state_file"], state)
     print(render_run(report))
-    return 0
+    return 2 if report["failed"] else 0
 
 
 if __name__ == "__main__":
