@@ -682,7 +682,12 @@ groups:
         labels:
           severity: critical
 
-      # 12. Internet download speed degraded - < 800 Mbps
+      # 12. Internet download speed degraded - < 400 Mbps. The threshold tracks the
+      # router's real ceiling, not the line's: the Omada ER605 cannot route 1 Gbps, so
+      # a healthy link measures 480-530 Mbps and an 800 Mbps threshold only ever
+      # reported the hardware. 400 Mbps still catches a genuine collapse. The
+      # 2026-09-18 silence that muted this rule "until ER707-M2" is unnecessary at
+      # the new threshold and was removed with it.
       - uid: alert-speed-download
         title: Internet Download Speed Degraded
         condition: C
@@ -716,7 +721,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - 800
+                      - 400
                     type: lt
                   operator:
                     type: and
@@ -730,8 +735,8 @@ groups:
         execErrState: Error
         for: 0s
         annotations:
-          summary: "Download speed below 800 Mbps"
-          description: "Internet download speed is {{ '{{' }} $values.B.Value {{ '}}' }} Mbps (threshold: 800 Mbps)."
+          summary: "Download speed below 400 Mbps"
+          description: "Internet download speed is {{ '{{' }} $values.B.Value {{ '}}' }} Mbps (threshold: 400 Mbps). The ER605 tops out near 530 Mbps, so this fires on a real collapse rather than on the router's ceiling."
         labels:
           severity: warning
 
