@@ -9,6 +9,16 @@
     upgrade: "{{ common_upgrade_type }}"
     update_cache: true
     cache_valid_time: 0
+  environment:
+    # needrestart deadlocked this task on the dev VM on 2026-10-22: its
+    # dpkg-status hook (run from docker-ce.postinst) blocked in anon_pipe_read
+    # while dpkg waited on the child, and the postinst's `|| cat > /dev/null`
+    # fallback then blocked in pipe_wait_readable, so a 50-minute upgrade sat
+    # on one host with docker-ce half-configured. NEEDRESTART_SUSPEND skips the
+    # hook entirely; DEBIAN_FRONTEND keeps any debconf prompt from waiting on
+    # a stdin that no one is watching.
+    NEEDRESTART_SUSPEND: "1"
+    DEBIAN_FRONTEND: noninteractive
   when: ansible_os_family == "Debian"
 
 - name: Autoremove orphaned packages
