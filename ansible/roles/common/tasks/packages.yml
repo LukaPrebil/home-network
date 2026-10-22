@@ -13,6 +13,22 @@
     state: present
   when: ansible_os_family == "Debian"
 
+# Deliberate exception to the state: present convention above. A CA bundle only
+# helps if it tracks the distribution: a stale store keeps trusting roots the
+# distro has pulled, and nothing else on the box will ever notice. Pinned to
+# latest so every converge closes the gap, and it stays idempotent because apt
+# changes nothing when the candidate equals the installed version. Long-running
+# Go processes cache the system pool at first use, so a bundle upgrade needs the
+# consumer restarted before it takes effect.
+- name: Ensure the system CA trust store is current  # noqa: package-latest
+  ansible.builtin.apt:
+    name: ca-certificates
+    state: latest
+    update_cache: true
+    cache_valid_time: 0
+  register: common_ca_certificates
+  when: ansible_os_family == "Debian"
+
 - name: Install qemu-guest-agent on KVM guests
   # Required for Proxmox to read the guest's IPs, run `qm guest exec`, and
   # do graceful shutdown via the agent channel. Gated on virtualization

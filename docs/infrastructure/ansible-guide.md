@@ -171,6 +171,7 @@ password: "{{ vault_some_password | replace('$', '$$') }}"
 - **cAdvisor**: image is `ghcr.io/google/cadvisor`, tags have **no `v` prefix** (e.g., `v0.51.0` is wrong, `0.51.0` is correct)
 - **AdGuard Home**: schema auto-migrates on binary upgrade - just update the version variable
 - When bumping versions, update the variable in `defaults/main.yml` and re-run with the appropriate tag
+- **`ca-certificates` is the one package deliberately on `state: latest`** (`roles/common/tasks/packages.yml`, marked `# noqa: package-latest`). A pin buys nothing for a trust store: a stale bundle keeps trusting roots the distribution has pulled, and the failure is silent. Distros publish root removals as package updates (USN-8944-1 and DSA-6572-1 pulled the two roots that cross-signed the compromised eMudhra CA), so the role tracks the candidate and stays idempotent. Two consequences worth knowing: long-running Go services cache the system pool at first use, so `traefik`, `crowdsec`, `adguard` and `pds` need a restart before a new bundle takes effect, and container images carry their own copy of the store, so they only move when rebuilt upstream.
 
 ## Provisioning Pattern (Multi-Play)
 
