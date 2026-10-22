@@ -47,8 +47,12 @@ hermes_model_default: "deepseek-v4.1-flash:cloud"
 # than the other two, so the cheap lane is the default. gemma4:31b is cheaper
 # still at USD 0.14/0.4 with matching readings; pin it if budget ever matters
 # more than the slightly better colour and text description.
+#
+# Default re-pinned to glm-5.3-flash on 2026-10-22. The comparison above was
+# measured against minimax-m3 and is kept as the record of that probe; nothing
+# in it was re-measured for the new model.
 hermes_vision_provider: "ollama-cloud"
-hermes_vision_model: "minimax-m3"
+hermes_vision_model: "glm-5.3-flash"
 hermes_image_input_mode: "text"  # native | text | auto
 
 # ── Provider model allowlist ─────────────────────────────────────────
@@ -63,6 +67,7 @@ hermes_ollama_cloud_models:
   - "deepseek-v4.1-flash:cloud"
   - "minimax-m3"
   - "gemma4:31b"
+  - "glm-5.3-flash"
 
 # ── Gateway platforms ────────────────────────────────────────────────
 # Telegram is the human surface (approvals land in the same chat). The Home
