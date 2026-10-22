@@ -65,8 +65,19 @@ traefik_warp_version: "v1.1.5"
 traefik_cloudflare_ipv4_ranges: []
 traefik_cloudflare_ipv6_ranges: []
 
+# Shared public-route rate limit. Sized for SPAs, not API clients: one cold
+# load of Immich or Grafana pulls the whole _app/immutable bundle plus a
+# screen of thumbnails, so the previous 100/minute average with 50 burst
+# returned 429 on the app's own bootstrap calls. Keyed on X-Real-Ip for the
+# same reason as the HA login limiter below: the socket peer is a Cloudflare
+# edge IP on the WAN path and a single hairpin-NAT address on the LAN path,
+# which puts unrelated clients in one bucket.
+traefik_rate_limit_average: 600
+traefik_rate_limit_burst: 300
+traefik_rate_limit_period: "1m"
+
 # Home Assistant login-flow rate limit. Defaults to disabled: a normal HA
-# browser load consumes nearly the whole 100/minute shared limiter, so HA has
+# browser load consumes nearly the whole shared limiter, so HA has
 # NO route-wide limiter and only login-flow POSTs may be limited. The limiter
 # keys on X-Real-Ip, which is the verified visitor IP on the Cloudflare path
 # and the direct socket address everywhere else.
