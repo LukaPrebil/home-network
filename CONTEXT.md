@@ -205,6 +205,194 @@ _Avoid_: reading gateway membership as string membership. The two gateways are n
 two strings - gateway 4609 carries nodes 4, 5, 6 and 9 while 4610 carries 10 to 30.
 Gateways are placed for RF coverage; string membership is operator-supplied config.
 
+### EV charging
+
+**Surplus-only charge**:
+The default charging policy: the car draws power only while the metering point is exporting
+PV surplus, so it never adds to the **Night load** the SOFAR battery carries and never causes
+a grid import. The car is a daytime sink for energy that would otherwise leave as
+**viški**.
+_Avoid_: "solar charging" (the house runs on solar at night too, via the battery - the point is
+import timing, not energy color); "eco mode" (vendor UI wording that varies per box)
+
+**Night load**:
+The evening-to-morning house consumption the 20.48 kWh battery is sized to carry without
+grid import, especially through **Blok** 1. Adding the car to it defeats both the battery's
+sizing and the **gross-import rule** economics, so by policy the car stays out of it, with
+exactly one standing exception, the **Conditioning draw**.
+_Avoid_: "overnight charging" as a routine (it is exactly what the policy forbids; the
+sanctioned exception is **Trip recovery**)
+
+**Trip recovery**:
+The sanctioned exception to **Surplus-only charge**: a known-ahead trip gets a charge plan
+aimed at a departure time and target SoC, scheduled into the daylight of the days before it.
+When the window is too short, an en-route DC fast stop is the accepted fallback, not a
+failure of the plan.
+_Avoid_: "fast charging" (a power level, not a purpose); "top up before the trip" (hides that
+the 11 kW ceiling exists for exactly this and nothing else)
+
+**Charge floor**:
+The lowest power an EVSE will hold a session at: 6 A per phase, so 4.2 kW across three
+phases or 1.4 kW on one. The floor, not the 11 kW ceiling, decides how much marginal spring
+and autumn surplus the car can harvest, which is why the charger choice is designed around
+it.
+_Avoid_: "minimum charging power" (silent about phase count, which changes it threefold)
+
+**Surplus signal**:
+The whole-house grid exchange at the point of common coupling, read from the inverter's
+internal CTs as register 0x0488 (`active_power_pcc_total`), positive on export. Verified live
+on the evening of 2026-10-12: with PV off and the battery carrying the whole house, the
+register reads ~0 where a plant-only view would have read the full discharge as export. It
+is the control input that **Surplus-only charge** modulates against, and because the entire
+**Backed-up panel** sits behind the same CTs, it sees the car with no extra metering.
+_Avoid_: "export reading" (the same register reads import; the sign carries direction),
+"the DTSU666" (bypassed, and not the source of this value), "CT clamp" (nothing external
+is clamped anywhere)
+
+**Backed-up panel**:
+The entire main distribution panel, served through the inverter's EPS load path, so every
+house circuit - including the carport charging point - sits both behind the internal CTs
+and inside the island. Two consequences, one per side of the CTs: every load is visible to
+the **Surplus signal**, and every load stays live through an island event, so any big load
+carried on it needs its own **Island guard**.
+_Avoid_: "backup circuits" (there is no partial backup list to be on or off - the whole
+panel is one), "EPS loads" (vendor wording that hides the CT-visibility consequence)
+
+**Battery-first**:
+The surplus allocation rule: the SOFAR battery eats all PV surplus until satisfied, and the
+EV never preempts it. In the surplus season the battery is full late morning and every
+afternoon export is car food; in winter the house and battery take essentially all
+production and the EV charges only through **Trip recovery**.
+_Avoid_: "battery priority" (sounds like a tunable weight; the rule is absolute), "sharing the
+surplus" (there is no sharing - the EV eats only what would otherwise become **viški**)
+
+**Island guard**:
+The rule that the EVSE stops charging whenever the inverter runs in island mode, because the
+point stays live through the **Backed-up panel** and the surplus loop is structurally blind
+in an island (the **Surplus signal** reads ~0 there). Resolved 2026-10-12: hard block, no
+surplus-in-island exceptions, a short debounce so ride-through blips do not flap sessions,
+automatic resume once the grid status returns, and fail-closed - an unreadable inverter state
+blocks charging rather than allowing it. Which register value encodes the island is a
+one-time calibration against a real island test, not a guess.
+_Avoid_: "outage blocking" (the grid being out is not the trigger - the island being live is),
+"the charger turns off in a blackout" (nothing turns off - that is the whole problem), moving
+the point to a non-backup spur (it deletes the guard and the **Surplus signal** together)
+
+**Boost**:
+The manual override that charges immediately at full current, knowingly importing whatever
+PV cannot cover. Session-scoped: on unplug it reverts to **Surplus-only charge** by itself, so
+a forgotten Boost never becomes a silent night-long import. It is one of only two standing
+paths to deliberate import, the other being a **Charge plan** hitting its deadline.
+_Avoid_: "fast charging" (a power level, not consent to import), "manual override" (which of
+the several overrides?), leaving the mode sticky after the guest drives off
+
+**Permissionless surplus**:
+The rule that any plugged-in car may charge while the point exports, guest or resident, with
+no approval step while the **Car gate** is open - the energy was leaving as **viški** anyway.
+Only deliberate import (**Boost**, or a **Charge plan** escalating at its deadline) requires
+an operator action, and that is what makes helping a guest charge a two-gesture affair: plug
+in, and hit Boost only if they need speed.
+_Avoid_: adding per-guest approval flows (the gate exists for an empty house, not to judge
+who the guest is), treating guest sessions as a different charging policy (the sink's owner
+changes nothing about import timing)
+
+**Charge plan**:
+A target SoC plus a departure time, handed to evcc, which then runs surplus-first and
+escalates to import only as late as the deadline still allows. It is the implementation of
+**Trip recovery**, and because it escalates only near the deadline, its import lands in
+daylight cheap **Blok** windows instead of the night the raw Boost would burn.
+_Avoid_: "scheduled charging" (a wallbox timer starts at a set time regardless of surplus;
+the plan is deadline-driven and surplus-first), "overnight Boost for the trip" (the exact
+thing the ladder forbids)
+
+**Vehicle feed**:
+The car's charging telemetry entering the estate through exactly one BMW CarData client,
+owned by evcc. Resolved 2026-10-12, after finding that BMW killed the legacy MyBMW API for
+third-party clients (Approov attestation, autumn 2025) and Home Assistant removed its BMW
+integration entirely (March 2026): the mature, quota-aware CarData consumer left in this
+ecosystem is evcc's `cardata` vehicle, so HA reads the car from evcc's MQTT output, never
+from BMW directly.
+_Avoid_: "the BMW integration" (none exists in HA anymore), "CarData in HA" (inverts the
+data direction), adding a second client for charging data (the quota is spent once, by the
+client that manages its own cache)
+
+**Presence feed**:
+The second BMW CarData client, separate from the **Vehicle feed**: self-hosted, connected to
+BMW's streaming endpoint, publishing only presence-class data (location, doors) over MQTT for
+HA. It exists so location-based automations (chiefly the **Car gate**) get live data without
+polling a 50-calls-per-day budget, and it is deliberately not the source of any charging
+data.
+_Avoid_: a hosted relay (no third party may hold the BMW client credentials - same class of
+rule as no cloud in the automation path), duplicating SoC (charging telemetry belongs to the
+**Vehicle feed** alone)
+
+**Car gate**:
+The anti-theft bound on every session: charging is enabled only while the i4 is home or the
+operator is home, judged from the **Presence feed** and phone presence, and a stale feed reads
+as away. It exists for exactly one scenario - the house empty for days and a neighbour over
+the fence with a cable - so it is a default with sanctioned openings, not a lock.
+_Avoid_: "presence lock" (which presence?), "the security feature" (the box's disabled
+local start surface is the security feature; the gate is the enable policy)
+
+**Token override**:
+The registered RFID chip at the box: a possession credential that may open a session while
+the **Car gate** is closed, running under **Surplus-only charge** so a leaked token burns
+nothing but **viški**. Import still needs the owner's **Boost** or **Guest override**. It is
+also the always-works path when both gate signals die at once (phone flat, stream stale),
+and the physical fallback when the whole stack is down: the box's default current is set to
+6 A, so a brain-dead session is slow, bounded and visible. It does not open the **Island
+guard** - nothing does.
+_Avoid_: "RFID authentication" (possession of the token is the authorization, the reader is
+just the mechanism), plug-and-charge auto-start (the hole the token replaces: plugging in
+alone must start nothing)
+
+**Control-loss watchdog**:
+The box-side rule that disables charging when the controller stops talking: an idle box
+stays off, a mid-session box stops within a few minutes of the last Modbus write. Resolved
+2026-10-12 as fail-closed, never fallback current, because a stale setpoint imports
+indefinitely with nobody watching - the same silent degradation the tap bridge taught the
+house to distrust, now with a 4-11 kW draw attached.
+_Avoid_: "fallback to 6 A" (a fallback current keeps charging with no brain), treating it
+as optional (it is the **Island guard**'s posture applied to a different dead input)
+
+**Guest override**:
+The explicit, session-scoped opening of the **Car gate** from HA for the away-and-friend
+case: one session, expiring on unplug, and the only import path while the gate is closed.
+_Avoid_: "disabling the gate" (the gate never comes off; one session opens)
+
+**Surplus dump**:
+The heat pump converting surplus into stored heat through its SG-Ready PV input, driven by the
+Shelly 1 Gen4 dry contact on the PAC-IF033B-E controller. It is a house load inside the loop,
+not a loop participant: the battery eats first, the dump takes the deep end of genuine
+export, and the car harvests the residual, which lands disproportionately in the **Charge
+floor**'s 1p band. Its trigger must clear its own unmodulated compressor draw with margin,
+because the signal is binary and an undersized trigger manufactures import.
+_Avoid_: "heat pump PV mode" (vendor wording for the same signal), coordinating it with
+evcc (no protocol is needed or wanted - the loop follows whatever export remains), firing it
+on band-level export (that is the car's food, and the binary dump would overshoot into
+import)
+
+**Connection budget**:
+The 3x25 A (17.25 kW) house connection that every big load must fit inside simultaneously:
+the 12 kW inverter, the winter heat pump, and an EV. Resolved 2026-10-12 to a static Boost
+cap of 9-10 kW via the loadpoint maxcurrent, not dynamic headroom trimming; dynamic
+downrating stays a revisit option if real load patterns ever demand it.
+_Avoid_: "the 16 A circuit" (that is the charging point's feeder, which caps the box, not
+the house), "11 kW Boost" (the point allows it, the connection does not, in a winter evening
+alongside the heat pump)
+
+**Conditioning draw**:
+The one standing exception to the car staying out of the **Night load**: cabin and pack
+preconditioning, which is always a deliberate manual start (MyBMW or in-car, since CarData
+is read-only and no command path exists), so the grid import it may cost is consented by
+the act itself. The EVSE enable that makes wall-powered conditioning possible is
+feed-triggered from the climatisation state on the **Presence feed**, with a parked
+low-current enable as the fallback; an HA confirmation card with predicted energy and
+battery states is an optional nicety, never a gate.
+_Avoid_: "preheat scheduling" (nothing in the house can start it - only the car's owner
+can), letting it fall on the traction battery (that is the disabled-EVSE failure mode, and
+it burns range on the very morning the trip needs it)
+
 ### Utility room thermal
 
 **Vhod**:
@@ -547,6 +735,22 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - A **module** is reported under a **node ID** that belongs to one **TAP gateway**, but its panel position comes only from TIGO EI - nothing on the bus carries it
 - The **monitoring bus** and the **meter bus** both leave the inverter as RS485 on pins 1 and 2 of an RJ45 jack, so a cable moves between them unchanged; only the jack it is plugged into decides whether the inverter answers or competes
 - **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
+- A **Surplus-only charge** keeps the car out of the **Night load**, so the battery's sizing assumption survives the EV: the car eats only what would otherwise become **viški**, and a **Trip recovery** is the only sanctioned reason it may ever do otherwise
+- The **Surplus signal** needs no meter on the **Meter bus** and no clamp anywhere: the internal CTs see the whole house (verified 2026-10-12), so the DTSU666 stays bypassed and 0x0488 remains the loop input
+- The charging point lands on the **Backed-up panel**, so the **Surplus signal** sees the car with no extra metering, and charging carries an **Island guard** because the point stays live when the grid is gone
+- In island mode the **Surplus signal** still reads ~0, so the surplus loop is structurally blind to the island; the **Island guard** must read the inverter's state directly and can never be inferred from the loop's own balance
+- **Battery-first** makes the EV and the battery never compete: whatever the EV takes was already on its way to the grid, so the battery's evening job is untouched by charging
+- **Boost** is session-scoped and self-reverting, so the **Night load** policy cannot be violated by a forgotten mode, while **Permissionless surplus** keeps guest charging free of ceremony
+- The **Vehicle feed** and the **Presence feed** are two CarData clients with disjoint jobs: charging data flows only through evcc, presence only through the self-hosted bridge, so neither quota is spent twice and neither source is trusted for the other's job
+- The **Car gate** ORs signals from different failure domains - phone presence dies with the phone, the **Presence feed** dies with BMW - so one dead signal never locks out a resident car, and the **Token override** covers the both-dead case
+- A **Token override** session runs **Surplus-only charge**: possession buys **viški**, never grid import, so the import path stays the owner's alone (**Boost**, **Guest override**)
+- Surplus has three sinks in fixed order: the battery eats all it can take, the **Surplus dump** takes the deep end of genuine export, and the EV harvests the residual - so **Battery-first** binds the other two with no protocol between them
+- The **Surplus dump** converts some above-floor hours into **Charge floor** band hours: once the compressor runs, the residual export is small, which raises rather than lowers the value of 1p switching
+- A **Conditioning draw** spends **Night load** only behind a manual start: no one taps preheat, nothing draws - the exception is bounded by consent, not by a timer
+- The **Control-loss watchdog**, the **Island guard** and the **Car gate** are one fail-closed posture applied to three dead inputs: a dead controller, a dead grid and an empty house each de-energize the point rather than improvise
+- The **Token override** is the sanctioned physical opening in two of the three: possession at the box starts a 6 A local session through a closed gate or a dead stack, and nothing opens the **Island guard**
+- The **Connection budget** bounds **Boost** at 9-10 kW: a winter evening's heat pump plus house load plus full 11 kW would trip a 3x25 A main, and a rare deliberate override gains nothing by living on that edge
+- A **Charge plan** is the only scheduled import: it escalates late enough that its import lands in daylight cheap **Blok** windows, which is the (b) rung of the **Trip recovery** ladder
 - The **gross-import rule** is what widens that spread: a self-consumed kWh avoids energy, omreznina, prispevki, trosarina and the DDV on all of it, while an exported kWh earns only the viski rate plus DDV
 - **Dobroimetje** carries across an **obračunsko obdobje** boundary but never expires, so surplus value is deferred rather than lost
 - The **NFS readiness gate** delays only *later* **startup order groups**, so any guest sharing order=1 with the TrueNAS VM starts ungated

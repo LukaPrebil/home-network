@@ -359,6 +359,17 @@ storage, but it is also exactly what would appear if those CTs measure only what
 through the inverter rather than the whole house at the point of connection. If the two
 diverge over a few days, restoring the meter stops being out of scope.
 
+> **Resolved 2026-10-12, live evening reading: the internal CTs see the whole house.** With
+> PV off and the battery discharging 3.4 kW to carry a 3.31 kW house load,
+> `active_power_pcc_total` read +0.03 kW - a plant-only view would have read the full
+> discharge as export. The per-phase registers (+0.94 / +1.09 / -2.01 kW, netting ~0)
+> match the imbalance exchange of a balanced inverter output serving an unbalanced load,
+> and the load derived per phase from output minus PCC (0.18 + 0.03 + 3.09) matches
+> `load_sys` at 3.31 kW. Register 0x0488 is therefore the whole-house grid exchange and
+> needs no independent meter for EV charging control or automation. One caveat survives:
+> a feeder landing directly on the grid ahead of the CTs would remain invisible to it, and
+> the carport charging point is the one such feeder whose landing is unverified.
+
 ## Plan
 
 There is no cheap interim step. Nothing happens in Home Assistant until the bridge is
