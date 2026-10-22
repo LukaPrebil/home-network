@@ -145,7 +145,11 @@ These bind future work. They are settled, not open questions.
 The battery is sized to carry a winter evening and night, roughly 16:00 to 08:00,
 running a three-phase Mitsubishi Ecodan heat pump without importing during the
 expensive network-fee blocks. The inverter is sized at 12 kW so the heat pump and a
-future 11 kW EV charger do not bottleneck each other.
+future 11 kW EV charger do not bottleneck each other. That second assumption survives
+the EVSE grill of 2026-10-12 unchanged, but its purpose shifted: the 11 kW path exists
+for **Trip recovery** headroom before a known long trip, not for routine charging. The
+routine mode is surplus-only at the charge floor (see the EV charging terms in
+`CONTEXT.md`).
 
 ## Contract state
 
@@ -169,4 +173,8 @@ SofarCloud reachable for remote diagnostics.
   solar dump via a Shelly 1 Gen4 dry contact on the PAC-IF033B-E controller's PV
   input is planned but not installed. See
   [`orca-heatpump-modbus.md`](orca-heatpump-modbus.md).
-- **EV charging**: an 11 kW AC charger is anticipated but not installed.
+- **EV charging**: an 11 kW AC charger is anticipated but not installed. The charging
+  policy (surplus-only, battery-first, the guards) and the box shortlist are settled in
+  `.claude/state/plans/2026-10-12-evse-grill-exit.md`; the load-side context is the
+  internal CTs' whole-house PCC reading resolved in
+  [`sofar-inverter-ha-integration.md`](sofar-inverter-ha-integration.md).
