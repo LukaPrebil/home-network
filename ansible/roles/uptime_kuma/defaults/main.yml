@@ -9,7 +9,7 @@ uptime_kuma_base_dir: "/opt/uptime-kuma"
 uptime_kuma_data_dir: "/mnt/uptime-kuma"
 
 # Docker image
-uptime_kuma_image: "louislam/uptime-kuma:2.5.6"
+uptime_kuma_image: "louislam/uptime-kuma:2.5.7"
 uptime_kuma_container_name: "uptime-kuma"
 
 # Network configuration
