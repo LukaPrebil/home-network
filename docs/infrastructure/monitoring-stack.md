@@ -59,6 +59,44 @@ pveum user token add root@pam monitoring --privsep 1
 ansible-playbook site.yml --tags monitoring-acl --limit n5p
 ```
 
+### Speedtest alert calibration
+
+The speedtest exporter runs one Ookla test per scrape and the job scrapes every 30
+minutes (`monitoring_stack_speedtest_scrape_interval`), so the download and upload rules
+see one sample per half hour, not a continuous series. `reduce last` holds that sample
+between scrapes, which has two consequences.
+
+**One slow test is noise, not a fault.** In the 30 days to 2026-10-26, 133 of 1439 samples
+sat below the 400 Mbps floor, 121 of the 127 episodes were a single sample, and latency
+was unchanged during them (median 1.73 ms against 1.70 ms). The ER605 tops out near
+530 Mbps, so the floor sits inside the router's own variance, not on a line fault.
+`alert-speed-download` therefore carries `for: 45m`: because the held value keeps the
+condition true across the 30-minute gap, any `for:` in the ~35-55m band means "two
+consecutive slow tests" and resets on the first good one. Below 35m it fires on one
+sample; at 60m or more a low-low-good run cancels itself. Do not express the same thing
+as a PromQL `max_over_time`/`count_over_time` conjunction: it fires 15 minutes sooner but
+returns 0/1, so the message loses the Mbps figure.
+
+If two-sample confirmation is still too chatty, lower the floor rather than lengthening
+`for:`: 375 Mbps yields 3 episodes a month and 350 yields 2, against 6 at 400. Re-derive
+the count before changing either:
+
+```promql
+last_over_time(speedtest_download_bytes{job="speedtest"}[35m]) / 125000   # one point per test
+```
+
+Upload and latency keep `for: 0s` on purpose. Upload read 306-315 Mbps on all 1439 samples
+and latency 0.94-2.78 ms, so both floors sit far outside the noise range and one sample
+past them is already real.
+
+**A dead exporter is not a slow line.** Both rules carry `noDataState: OK`, so a stopped
+exporter leaves them silent. `up{job="speedtest"}` does not catch it either: the exporter
+exits 0 with no output when its Ookla server ID is decommissioned, so the probe endpoint
+still answers 200. `alert-speedtest-blind` (Monitoring Health) covers the gap with
+`absent_over_time(speedtest_download_bytes{job="speedtest"}[2h]) > 0`, which returns a
+positive value only when the metric is gone and leaves `execErrState: Error` to report a
+Prometheus outage.
+
 ---
 
 ## Traefik Router Metrics and HA 429 Alerts

@@ -154,6 +154,14 @@ _Avoid_: treating it as banked kWh - it is euros at the viški rate, not energy
 Omrežnina, prispevki and trošarina are billed on the whole quantity taken from the
 grid, never on import net of export, so an exported kWh relieves no network charge.
 
+**Plane**:
+A set of panels sharing one tilt and one azimuth, so one surface for irradiance; the unit a production forecast is declared per. It cuts across **string** membership: string A mixes the carport with the west roof, and both west rows are one plane.
+_Avoid_: "array" (at this plant that reads as a string), "roof side" (the carport is its own plane and not a side of the house roof)
+
+**Forecast advisory**:
+The rule that a PV production forecast may inform an operator decision but never gates a capability, so a degraded feed costs information rather than function.
+_Avoid_: "forecast dependency" (there is none to design around), "fallback forecast" (the fallback is the live **Surplus signal** plus the operator's judgement, not a second forecast)
+
 **Logger stick**:
 The SOFAR LSW-3 Wi-Fi dongle that talks to SofarCloud. Port 8899 is open but answers no
 protocol, so it carries nothing locally and is not a data source.
@@ -564,17 +572,19 @@ _Avoid_: "crash loop" - a crash loop is visible precisely because the container 
 this is the opposite case.
 
 **Blind source**:
-An Alloy log source that is configured, running and reporting healthy while shipping
-nothing, because its target list resolved to empty. `systemctl is-active` says active,
-the component logs no error, and the alerts that read its stream simply stay quiet,
-which is indistinguishable from the host being fine. The only tell is a zero in the
-source's own target-count metric (`loki_source_file_files_active_total`,
-`loki_source_docker_target_entries_total`), already scraped and, so far, never watched.
-It has now happened four times: docker logs with no `discovery.docker`, host metrics
-pushed to a disabled receiver, container logs missing until a second converge, and
-n5p plus rpi4 tailing a `/var/log/syslog` that Debian 13 never creates.
+A component that is configured, running and reporting healthy while shipping nothing.
+`systemctl is-active` says active, the component logs no error, and the alerts that read
+its stream simply stay quiet, which is indistinguishable from the host being fine. The
+tell is always a component accounting for its own throughput, never a liveness check: a
+zero in Alloy's target-count metric (`loki_source_file_files_active_total`,
+`loki_source_docker_target_entries_total`), the optimisers' own last-report time inside
+the taptap payload, or the absence of a `speedtest_download_bytes` sample while
+`up{job="speedtest"}` still reads 1.
+It has now happened four times on the log side: docker logs with no `discovery.docker`,
+host metrics pushed to a disabled receiver, container logs missing until a second
+converge, and n5p plus rpi4 tailing a `/var/log/syslog` that Debian 13 never creates.
 _Avoid_: "log shipping is broken" - nothing is broken; the source is doing exactly what
-its empty target list asks of it.
+an empty target list or a decommissioned test server asks of it.
 
 ### Model residency (n5p)
 
@@ -745,6 +755,7 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - The **Car gate** ORs signals from different failure domains - phone presence dies with the phone, the **Presence feed** dies with BMW - so one dead signal never locks out a resident car, and the **Token override** covers the both-dead case
 - A **Token override** session runs **Surplus-only charge**: possession buys **viški**, never grid import, so the import path stays the owner's alone (**Boost**, **Guest override**)
 - Surplus has three sinks in fixed order: the battery eats all it can take, the **Surplus dump** takes the deep end of genuine export, and the EV harvests the residual - so **Battery-first** binds the other two with no protocol between them
+- A **Forecast advisory** keeps the forecast out of the control path: a session runs on the live **Surplus signal**, and the forecast only shapes whether the operator starts a **Charge plan** or a **Surplus dump**
 - The **Surplus dump** converts some above-floor hours into **Charge floor** band hours: once the compressor runs, the residual export is small, which raises rather than lowers the value of 1p switching
 - A **Conditioning draw** spends **Night load** only behind a manual start: no one taps preheat, nothing draws - the exception is bounded by consent, not by a timer
 - The **Control-loss watchdog**, the **Island guard** and the **Car gate** are one fail-closed posture applied to three dead inputs: a dead controller, a dead grid and an empty house each de-energize the point rather than improvise
