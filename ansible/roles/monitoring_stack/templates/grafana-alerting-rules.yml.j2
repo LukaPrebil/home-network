@@ -682,12 +682,25 @@ groups:
         labels:
           severity: critical
 
-      # 12. Internet download speed degraded - < 400 Mbps. The threshold tracks the
-      # router's real ceiling, not the line's: the Omada ER605 cannot route 1 Gbps, so
-      # a healthy link measures 480-530 Mbps and an 800 Mbps threshold only ever
-      # reported the hardware. 400 Mbps still catches a genuine collapse. The
-      # 2026-09-18 silence that muted this rule "until ER707-M2" is unnecessary at
-      # the new threshold and was removed with it.
+      # 12. Internet download speed degraded - < 400 Mbps on two consecutive tests.
+      # The threshold tracks the router's real ceiling, not the line's: the Omada ER605
+      # cannot route 1 Gbps, so a healthy link measures 480-530 Mbps and an 800 Mbps
+      # threshold only ever reported the hardware. 400 Mbps still catches a genuine
+      # collapse. The 2026-09-18 silence that muted this rule "until ER707-M2" is
+      # unnecessary at the new threshold and was removed with it.
+      #
+      # for: 45m is how "two consecutive tests" is expressed. The exporter emits one
+      # sample per 30 minutes and reduce last holds it between scrapes, so the condition
+      # stays true across the gap and any for: in the ~35-55m band means "two samples",
+      # resetting on the first good one. Below 35m it fires on a single sample; at 60m
+      # or more a low-low-good run cancels itself. A PromQL conjunction (max_over_time
+      # plus count_over_time) would fire 15 minutes sooner but returns 0/1 and loses the
+      # Mbps figure from the message.
+      # Why two samples: in the 30 days to 2026-10-26, 133 of 1439 samples were below
+      # 400 and 121 of the 127 episodes were a single sample, so one slow Ookla run is
+      # measurement noise rather than a WAN fault. If two-sample confirmation is still
+      # too chatty, lower the floor (375 gives 3 episodes a month, 350 gives 2) instead
+      # of lengthening for:, which only works inside the band above.
       - uid: alert-speed-download
         title: Internet Download Speed Degraded
         condition: C
@@ -733,14 +746,16 @@ groups:
                     type: last
         noDataState: OK
         execErrState: Error
-        for: 0s
+        for: 45m
         annotations:
-          summary: "Download speed below 400 Mbps"
-          description: "Internet download speed is {{ '{{' }} $values.B.Value {{ '}}' }} Mbps (threshold: 400 Mbps). The ER605 tops out near 530 Mbps, so this fires on a real collapse rather than on the router's ceiling."
+          summary: "Download speed below 400 Mbps for over an hour"
+          description: "Internet download speed is {{ '{{' }} printf \"%.0f\" $values.B.Value {{ '}}' }} Mbps on the last two 30-minute tests (threshold: 400 Mbps). The ER605 tops out near 530 Mbps, so this fires on a real collapse rather than on the router's ceiling."
         labels:
           severity: warning
 
-      # 13. Internet upload speed degraded - < 200 Mbps
+      # 13. Internet upload speed degraded - < 200 Mbps. Kept at for: 0s: upload read
+      # 306-315 Mbps on all 1439 samples of the 30 days to 2026-10-26, so the floor sits
+      # 35% outside the noise range and one dip below it is already a real event.
       - uid: alert-speed-upload
         title: Internet Upload Speed Degraded
         condition: C
@@ -789,11 +804,13 @@ groups:
         for: 0s
         annotations:
           summary: "Upload speed below 200 Mbps"
-          description: "Internet upload speed is {{ '{{' }} $values.B.Value {{ '}}' }} Mbps (threshold: 200 Mbps)."
+          description: "Internet upload speed is {{ '{{' }} printf \"%.0f\" $values.B.Value {{ '}}' }} Mbps (threshold: 200 Mbps)."
         labels:
           severity: warning
 
-      # 14. High latency - ping > 80ms sustained
+      # 14. High latency - ping > 80ms sustained. Kept at for: 0s for the same reason as
+      # upload: measured latency ran 0.94-2.78 ms across the same window, 29x below the
+      # floor, so one sample above it is real.
       # speedtest_latency_seconds is already in ms despite the name
       - uid: alert-speed-latency
         title: Internet High Latency
@@ -843,7 +860,7 @@ groups:
         for: 0s
         annotations:
           summary: "Internet latency above 80 ms"
-          description: "Ping latency is {{ '{{' }} $values.B.Value {{ '}}' }} ms (threshold: 80 ms)."
+          description: "Ping latency is {{ '{{' }} printf \"%.1f\" $values.B.Value {{ '}}' }} ms (threshold: 80 ms)."
         labels:
           severity: warning
 
@@ -1531,6 +1548,67 @@ groups:
         annotations:
           summary: "Host log shipping stopped on {{ '{{' }} $labels.instance {{ '}}' }}"
           description: "Alloy on {{ '{{' }} $labels.instance {{ '}}' }} has read no journal lines in 2 hours. Host logs from it are not reaching Loki, so Error Log Spike, Service Crash Detected and Authentication Failure Spike are all blind for that host."
+        labels:
+          severity: warning
+
+      # 22b. The speedtest exporter stopped producing samples
+      - uid: alert-speedtest-blind
+        title: Speedtest Exporter Silent
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 7200
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              # The download and upload rules read a metric the exporter emits once per
+              # 30 minutes, and both carry noDataState: OK, so a dead exporter leaves
+              # them quiet instead of alerting. up{job="speedtest"} is not a substitute:
+              # the exporter exits 0 with no output when its Ookla server ID is
+              # decommissioned, so the probe endpoint answers 200 while no
+              # speedtest_download_bytes sample is ever produced. absent_over_time
+              # answers 1 in that shape and is empty while samples flow, which keeps
+              # noDataState: OK meaningful (a Prometheus outage reaches execErrState).
+              expr: absent_over_time(speedtest_download_bytes{job="speedtest"}[2h])
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "No internet speed test sample for 2 hours"
+          description: "The speedtest exporter has produced no sample in 2 hours, so Internet Download Speed Degraded and Internet Upload Speed Degraded are blind. Check the exporter container first; if it is running, its Ookla server ID (41998) is likely decommissioned, which makes it exit 0 with no output."
         labels:
           severity: warning
 
