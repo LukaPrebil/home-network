@@ -87,6 +87,30 @@ A converge now guards this. `roles/otbr/tasks/verify.yml` fails when the interfa
 no global address or no route to it, and the Grafana rule "Matter Devices Unavailable"
 reports nodes dropping off within minutes instead of hours.
 
+## The web GUI can be dead while the mesh is healthy
+
+`otbr-web` (port 8086) is a separate process from `otbr-agent`, and only Uptime Kuma watches it:
+the compose healthcheck runs `ot-ctl state`, and `otbr-watchdog.sh` covers only a stopped
+container or an unresponsive agent. On 2026-10-31 a reboot left the GUI dead while the agent held
+`router` with 5 routers and the REST API answered on 8081.
+
+`/run` lives in the container's writable layer, so it survives a restart, and Docker restarts the
+same container after a boot (`unless-stopped`). The previous run's `/run/otbr-web.pid` was still
+there; its pid had been reused by an earlier boot process, so the init script's own `status` check
+called it running and `start_web()` logged `thread web interface already started; not starting`.
+`/run` therefore mounts as a tmpfs (`tmpfs:` in `roles/otbr/templates/docker-compose.yml.j2`), so
+every start begins empty.
+
+Recover the GUI without bouncing the agent:
+
+```bash
+# on containers
+sudo docker exec otbr sh -c 'rm -f /run/otbr-web.pid; service otbr-web start'
+```
+
+If that does not bring 8086 back, `ansible-playbook site.yml --tags otbr --limit containers`
+recreates the container, at the cost of a Thread leader loss.
+
 ## Overview: the dataset is the network identity
 
 A Thread network is defined by its **Active Operational Dataset**. otbr-agent

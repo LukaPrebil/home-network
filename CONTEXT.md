@@ -114,6 +114,11 @@ The VM that runs the OTBR container; it is the machine that must itself hold an 
 route in the **on-link prefix**, separately from the container's own health.
 _Avoid_: "the OTBR" unqualified - the container and the host fail independently
 
+**Border router web GUI**:
+The `otbr-web` process inside the OTBR container serving the diagnostic UI on port 8086; it
+fails independently of otbr-agent, of the container's health check, and of the host.
+_Avoid_: "OTBR Web" (the monitor's label), "the OTBR is down"
+
 ### Solar and tariff
 
 **Passive Mode**:
@@ -739,6 +744,7 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - A **Fresh fault** at a low-progress **Job end** means aborted; without it, the same job end is a deliberate cancel
 - A **Time push** lands only on a **Time-capable device**; the other 19 Matter nodes have nowhere to store time
 - A **Border router host** carries Thread traffic to the LAN only while it holds an address and route in the **on-link prefix**; the OTBR container can be healthy, with every Thread child attached, while the host underneath it has lost both, because those two live on opposite sides of the container boundary
+- A **Border router web GUI** proves nothing about the mesh: its absence is invisible to the container's health check, which interrogates only otbr-agent, so a dead GUI reads healthy in `docker ps`, in a converge and in the Thread role
 - **Fabric state** loss is re-commission-class, like Thread dataset loss; the two stores back different halves of the same Matter estate
 - **Passive Mode** is reachable only over the **inverter bridge**; the **logger stick** answers no local protocol at all, so it can be neither read nor written
 - The **inverter bridge** and the **tap bridge** are the same hardware in the same enclosure and are opposite in every property that matters: one is read-write and must be terminated, the other is read-only and must not be
@@ -810,4 +816,4 @@ _Avoid_: "the app" (reads as a native app; v1 ships no native app)
 - "open the door to the utility room" - resolved: the unit is the **cooling path**, not either door on its own. **Vrata utility** alone routes heat into **Vhod**, which has no sink and saturates; only both doors together reach the air conditioner.
 - "the wired bridge" - unambiguous while one Elfin EE11A existed, ambiguous the moment the second was installed on the TIGO CCA. Resolved: **inverter bridge** and **tap bridge**, each named for what is on the far end. The distinction is physical, not cosmetic - the inverter link needs 120 ohm termination and the tap must never be terminated.
 - "NFS is up" - the 2026-07-22 **NFS readiness gate** treated a `showmount` reply as proof that guests could start. On 2026-08-08 that went green 1 s before `nfsd` had even started and 91 s before the **grace period** ended, and HAOS missed its **start budget** by one second. Resolved: the term is **Storage ready**, and only a completed open-and-write on a real NFS mount proves it.
-- "the OTBR" - used for both the `otbr` container and the `containers` VM that runs it, which is how the 2026-09-30 Matter outage read as healthy everywhere while 21 devices were unreachable. Resolved: the container is the OTBR container and the VM is the **Border router host**; they fail independently.
+- "the OTBR" - used for both the `otbr` container and the `containers` VM that runs it, which is how the 2026-09-30 Matter outage read as healthy everywhere while 21 devices were unreachable. Resolved: the container is the OTBR container and the VM is the **Border router host**; they fail independently. The 2026-10-31 incident added a third independent surface inside the container: the **Border router web GUI** was dead while otbr-agent held `router` with 5 routers, so "the OTBR is down" now has three possible referents.
