@@ -10,8 +10,9 @@
 # Traefik's lan-only allowlist. The allowlists below are the observed
 # consumers, not guesses:
 #   - SSH: Ansible runs from the operator Mac on VLAN 1.
-#   - UI/API 8043: Traefik (the omada-secure router) and the monitoring LXC,
-#     whose omada exporter polls the API. 8088/8843 are the HTTP and portal
+#   - UI/API 8043: Traefik (the omada-secure router), the monitoring LXC,
+#     whose omada exporter polls the API, and containers, where Uptime Kuma's
+#     "Omada SDN" keyword check runs. 8088/8843 are the HTTP and portal
 #     equivalents.
 #   - UDP 29810/27001 and TCP 29811-29817: the Omada device plane. Discovery is
 #     device-initiated, so the controller must accept it inbound.

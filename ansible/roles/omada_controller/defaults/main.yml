@@ -53,6 +53,9 @@ omada_controller_ssh_allow_cidrs:
 # Admin UI and client portal. 8043 also serves the API that the monitoring
 # stack's omada exporter polls, so the monitoring LXC must stay allowed.
 # 192.168.30.110 is rpi4, which SNATs tailnet clients into the LAN.
+# 192.168.30.140 is containers, where Uptime Kuma's "Omada SDN" keyword check
+# runs; it was missing when this allowlist first landed on 2026-09-16, and the
+# monitor timed out silently for 45 days until someone read its history.
 #
 # 192.168.254.0/24 is TEMPORARY: the operator Mac's resolver sends *.lukapg.dev
 # to Cloudflare, so the LAN-only Traefik route is not usable from it and direct
@@ -63,6 +66,7 @@ omada_controller_ui_ports: ["8043", "8088", "8843"]
 omada_controller_ui_allow_cidrs:
   - "192.168.60.142/32"  # Traefik (DMZ), the omada-secure router
   - "192.168.30.146/32"  # monitoring LXC, omada exporter
+  - "192.168.30.140/32"  # containers, the Uptime Kuma "Omada SDN" blackbox check
   - "192.168.30.110/32"  # rpi4, tailnet subnet router
   - "192.168.30.90/32"   # wired recovery address on the operator Mac
   - "192.168.254.0/24"   # TEMPORARY - transitional VLAN 1, delete at step 8
