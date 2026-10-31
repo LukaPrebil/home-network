@@ -13,6 +13,18 @@ otbr_image_ref: "{{ otbr_image }}:{{ otbr_version }}{{ ('@' + otbr_image_digest)
 # Container names
 otbr_container_name: "otbr"
 
+# Runtime directory
+#
+# /run must start empty on every container start. A restarted container (docker
+# restart, or unless-stopped after a host reboot) keeps its writable layer, so
+# /run survives into the new run: on 2026-10-31 the stale /run/otbr-web.pid from
+# the previous run made `service otbr-web start` report "already started" once
+# its pid had been reused by another boot process, and the web GUI never came up
+# while otbr-agent held router. The same directory also carries the wpan lock and
+# the dbus socket blamed for the D-Bus EMERG loop, so a tmpfs is the fix for the
+# whole class rather than for this one file.
+otbr_run_tmpfs_opts: "size=16m,mode=0755"
+
 # Base directories (local rootfs, M-09: the thread data carries the network
 # key and PSKc and must not sit on the LAN-readable NFS export)
 otbr_base_dir: "/opt/otbr"

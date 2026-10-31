@@ -17,6 +17,12 @@ services:
     privileged: true
     # Host networking required for Thread/mDNS
     network_mode: host
+    # /run is a tmpfs so every container start begins with an empty runtime dir.
+    # A restarted container keeps its writable layer, so a stale pidfile, wpan
+    # lock or dbus socket would otherwise survive into the new run (2026-10-31:
+    # web GUI dead behind a healthy otbr-agent).
+    tmpfs:
+      - /run:{{ otbr_run_tmpfs_opts }}
     volumes:
       - {{ otbr_data_dir }}:/var/lib/thread
     devices:
@@ -51,5 +57,5 @@ services:
       retries: 3
       start_period: 90s
     # No autoheal label on purpose: autoheal's only action is `docker restart`,
-    # which reproduces the EMERG loop. The otbr-watchdog systemd timer on the
-    # host owns recovery and force-recreates (clean /run) instead.
+    # which is not this role's apply path. The otbr-watchdog systemd timer on the
+    # host owns recovery and force-recreates instead.

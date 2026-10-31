@@ -9,15 +9,18 @@
 #      exits. Docker's unless-stopped policy can't recover it (gives up while
 #      the device is absent; skips the already-exited container on next boot).
 #
-#   B) Container running but otbr-agent is dead. After a `docker restart` (or a
-#      bad init) otbr-agent gets stuck in a D-Bus EMERG crash loop: ot-ctl
+#   B) Container running but otbr-agent is dead. A bad init, or a restart against
+#      a stale runtime dir, leaves otbr-agent in a D-Bus EMERG crash loop: ot-ctl
 #      returns "Connection refused", yet the container stays "running" and even
 #      reports docker-healthy. Neither the restart policy nor autoheal recover
-#      this - and autoheal's `docker restart` would only reproduce the EMERG.
+#      this, and autoheal's `docker restart` is not the apply path. /run is a
+#      tmpfs now, so the stale dbus socket and pid files behind this mode cannot
+#      survive a restart; recovery stays as it is.
 #
-# Remediation for BOTH is the same: force-recreate the container so it gets a
-# pristine /run (clean dbus). We discover the compose file from the container's
-# own labels so this is independent of where the compose project lives.
+# Remediation for BOTH is the same: force-recreate the container so the
+# entrypoint runs again from a pristine start. We discover the compose file from
+# the container's own labels so this is independent of where the compose project
+# lives.
 set -eu
 
 DEVICE='{{ otbr_thread_usb_device }}'
