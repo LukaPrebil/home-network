@@ -22,3 +22,10 @@ Deployed — see `ansible/roles/crowdsec/` and the CrowdSec section in `docs/net
 * **Why:** To apply professional software development practices to your infrastructure code. This allows you to test your Ansible roles in isolated environments before deploying them to your live servers, preventing errors and ensuring reliability.
 * **Recommended Tool:** **Molecule**.
 * **How it Fits:** Molecule is a testing framework for Ansible. You would use it locally on your MacBook. It can automatically spin up temporary Docker containers, run your Ansible role against them, run tests to verify the outcome, and then destroy the containers. This is a great way to ensure your automation code is robust.
+
+---
+## 4. Cloudflare IaC
+
+* **Why:** Cloudflare DNS and Access are configured by hand today (the `ovis` hostname and its Access policy, plus every existing public subdomain). A hand-made policy is invisible to review, and an email or token change leaves nothing to diff.
+* **What to explore:** Terraform (the `cloudflare` provider) or the Cloudflare API for DNS records and Access applications/policies, and whether the existing `traefik_cloudflare_dns_api_token` can be scoped for it.
+* **How it fits:** A `cloudflare/` tree beside `ansible/`, run from the control node, so a new public hostname and its gate land in one commit. Decided 2026-11-03 while planning the Ovis rollout; not scoped yet.

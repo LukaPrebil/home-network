@@ -134,6 +134,15 @@ http:
 {% endif %}
 {% endif %}
 
+    # Ovis - the bearer token its server requires on every request. Traefik
+    # injects it so the phone never types it, and Cloudflare Access stays the
+    # identity layer in front. The server is bound to the Mac's LAN address,
+    # so a client that bypasses Traefik still needs this same token.
+    ovis-token:
+      headers:
+        customRequestHeaders:
+          Authorization: "Bearer {{ traefik_ovis_token }}"
+
 {# Build security middleware chain applied to all public routes #}
 {% set _ns = namespace(security_mw = []) %}
 {% if traefik_cloudflare_real_ip_enabled | default(false) %}
@@ -430,9 +439,31 @@ http:
         - proxy-headers
         - security-headers
 
-{% endif %}
+    # Ovis - phone client for the pi sessions running on the Mac. No
+    # rate-limit: the installed app polls status and holds a WebSocket, and the
+    # shared 100/min bucket already broke Home Assistant's UI (see ha-secure).
+    # Access and the injected token are the controls; the ACL matrix allows
+    # only the DMZ to reach the Mac's port.
+    ovis-secure:
+      rule: "Host(`ovis.{{ traefik_domain | default('lukapg.dev') }}`)"
+      entryPoints:
+        - websecure
+      service: ovis
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "{{ traefik_domain }}"
+            sans:
+              - "*.{{ traefik_domain }}"
+      middlewares:
+{% for mw in _ns.security_mw %}
+        - {{ mw }}
+{% endfor %}
+        - proxy-headers
+        - security-headers
+        - ovis-token
 
-  # Services - backend targets
+{% endif %}
   services:
 {% if traefik_acme_enabled | default(false) %}
     homeassistant:
@@ -508,6 +539,14 @@ http:
       loadBalancer:
         servers:
           - url: "http://{{ hostvars['adguard']['ansible_host'] }}:3000"
+        passHostHeader: true
+
+    # Ovis server on the Mac. Not an inventory host: the Mac is
+    # not Ansible-managed, so traefik_ovis_backend carries its address.
+    ovis:
+      loadBalancer:
+        servers:
+          - url: "http://{{ traefik_ovis_backend }}"
         passHostHeader: true
 {% endif %}
 
