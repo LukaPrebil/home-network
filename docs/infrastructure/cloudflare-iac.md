@@ -209,6 +209,26 @@ does:
   literal `[CF AI Audit]`), are not settable, and are therefore not declared.
 - **`trusted_accounts`** on the organization is rejected as read-only.
 
+## The origin address is treated as public
+
+The nine `lukapg.dev` A records point at one origin address, supplied as
+`TF_VAR_lukapg_public_ipv4` from `iac/secrets.sops.yaml` and declared `sensitive`, so no plan,
+comment or CI log prints it. That closes future leakage only: the address was committed once in the
+pull request that introduced this root, and GitHub keeps pull-request refs permanently, so it is
+published and is treated as known.
+
+The accepted position is defence in depth rather than concealment. Only `ovis` carries the
+`cloudflare-only` middleware, so a client that knows the address can send `Host: ha.lukapg.dev`
+straight to Traefik and skip the geo challenge, Bot Fight Mode and the AI-crawler block. What still
+stands in the way is CrowdSec on the Traefik access log, the per-route rate limits, and each
+service's own authentication. Two alternatives were considered and deferred: putting
+`cloudflare-only` on every public router, which breaks LAN access because AdGuard rewrites
+`ha.lukapg.dev` and `grafana.lukapg.dev` to Traefik, and fronting the public routes with Cloudflare
+Tunnel, which removes the inbound port entirely.
+
+If the address is ever changed, only the SOPS value moves: the records are proxied, so nothing in
+DNS changes.
+
 ## Recovery
 
 - **Lost or corrupted state**: the committed `import` blocks re-adopt every
