@@ -102,3 +102,47 @@
   when:
     - not (docker_nfs_volumes_enabled | bool)
     - docker_wait_for_nfs_dropin is changed
+
+# A container whose bind-mounted data path is an unmounted stub keeps running and
+# writes to the VM disk. PDS did that for three and a half days after the 2026-10-31
+# boot: the mount failed with "Dependency failed", Docker started anyway, and the
+# health check stayed green. Listing the path in docker_required_mounts turns that
+# into a Docker that refuses to start, which is the same fail-closed behaviour the
+# NFS drop-in above already imposes.
+- name: Ensure the Docker unit drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Require the data mounts before Docker starts
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker.service.d/wait-for-mounts.conf
+    content: |
+      # Managed by Ansible (roles/docker): do not edit by hand.
+      # Each path below must be mounted before Docker starts, so a failed mount
+      # cannot let a container write into the VM disk instead of its storage.
+      [Unit]
+      {% for mount in docker_required_mounts %}
+      RequiresMountsFor={{ mount }}
+      {% endfor %}
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload systemd daemon
+  when: docker_required_mounts | length > 0
+
+- name: Drop the mount requirement when the list is empty
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d/wait-for-mounts.conf
+    state: absent
+  notify: Reload systemd daemon
+  when: docker_required_mounts | length == 0
+
+- name: Remove the superseded single-path drop-in the rustfs role used to write
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d/wait-for-rustfs-mount.conf
+    state: absent
+  notify: Reload systemd daemon

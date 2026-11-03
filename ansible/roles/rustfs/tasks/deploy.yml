@@ -1,39 +1,6 @@
 ---
 # Deploy and manage the RustFS object store with Docker Compose
 
-- name: Ensure the Docker unit drop-in directory exists
-  ansible.builtin.file:
-    path: /etc/systemd/system/docker.service.d
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
-
-- name: Require the RustFS mount before Docker starts
-  # When the zvol is unmounted, /mnt/rustfs is an ordinary directory on the VM
-  # disk, so the bind mount below would come up empty and the store would write
-  # into the rootfs. RequiresMountsFor makes docker.service depend on the mount
-  # unit: a failed iSCSI mount at boot then stops Docker instead of starting
-  # the container against a stub. The fstab entry is deliberately not `nofail`,
-  # so the mount unit is the single authority either way.
-  #
-  # This is a proper systemd dependency, not an ExecStartPre retry loop: it
-  # fails fast. The containers VM already gates Docker on the NFS mount the same
-  # way, so storage loss was never a partial-availability scenario here.
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/docker.service.d/wait-for-rustfs-mount.conf
-    content: |
-      # Managed by Ansible (roles/rustfs): do not edit by hand.
-      # Keeps Docker from starting the object store against an unmounted
-      # {{ rustfs_mount_point }}, where the bind mount would point at the VM disk.
-      [Unit]
-      RequiresMountsFor={{ rustfs_mount_point }}
-    owner: root
-    group: root
-    mode: '0644'
-  register: rustfs_mount_guard
-  notify: Reload systemd units
-
 - name: Ensure the RustFS base directory exists
   ansible.builtin.file:
     path: "{{ rustfs_base_dir }}"

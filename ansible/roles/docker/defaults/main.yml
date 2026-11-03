@@ -31,3 +31,13 @@ docker_nfs_opts: "{{ nfs_common_opts }}"
 # local rootfs (dev VM, traefik/media LXCs) so the role neither mounts the prod
 # share nor leaves an empty /srv/docker stub that would mask a missing mount.
 docker_nfs_volumes_enabled: true
+
+# Bind-mounted data paths that must be mounted before Docker starts.
+#
+# A container whose data path is an unmounted stub keeps running and writes to the
+# VM disk: PDS did exactly that for three and a half days after a 2026-10-31 boot,
+# health checks and all. Listing the path here renders a docker.service drop-in with
+# RequiresMountsFor, so a failed mount stops Docker instead of letting the container
+# start against the stub. It is a systemd dependency, not a retry loop, so it fails
+# fast. Empty list = no drop-in.
+docker_required_mounts: []
