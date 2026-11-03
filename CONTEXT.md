@@ -741,6 +741,20 @@ _Avoid_: "kill the session" (abort ends a turn, not the session)
 The phone-side PWA served by the Ovis server at a public hostname behind the Gate. Installed to the home screen on the Galaxy S24+; compatible with iOS. The vendor's native apps are not used.
 _Avoid_: "the app" (reads as a native app; the client here is the browser app)
 
+### Harness surfaces
+
+**Turn surface**:
+What a pi session owns while it runs: the model, the context window, the prompt, the prompt cache, the tools and the dialogs. Data that exists only between a user message and the turn that answers it is turn data.
+_Avoid_: "session state" (the transcript is not the turn; the turn is the work in flight)
+
+**Host surface**:
+What herdr owns with no agent involved: panes, focus, keybindings, layout, agent lifecycle events and startup hooks. It outlives any one pi session inside it.
+_Avoid_: "the terminal" (herdr owns the pane, the outer terminal owns neither) and "session" (herdr sessions are a third namespace, separate from pi sessions)
+
+**Binary**:
+A tool with its own CLI that runs with or without a session and is queried outside pi and herdr. It earns a wrapper only after the second time you reach for it.
+_Avoid_: "tool" (in pi a tool is something the model calls, which is the opposite of a binary you run yourself)
+
 ## Relationships
 
 - A **Job** produces exactly one **Job end**, which is either **Finished** or **Cancelled/aborted**
@@ -756,6 +770,7 @@ _Avoid_: "the app" (reads as a native app; the client here is the browser app)
 - The **monitoring bus** and the **meter bus** both leave the inverter as RS485 on pins 1 and 2 of an RJ45 jack, so a cable moves between them unchanged; only the jack it is plugged into decides whether the inverter answers or competes
 - **Blok** boundaries drive when the battery should discharge; the **viški** / **manki** spread drives why self-consumption is preferred over export
 - A **Surplus-only charge** keeps the car out of the **Night load**, so the battery's sizing assumption survives the EV: the car eats only what would otherwise become **viški**, and a **Trip recovery** is the only sanctioned reason it may ever do otherwise
+- A capability lives where its input lives: turn data is a **pi package**, host data is a **herdr plugin**, and a tool used outside both stays a **binary** until a second use argues for a wrapper
 - The **Surplus signal** needs no meter on the **Meter bus** and no clamp anywhere: the internal CTs see the whole house (verified 2026-10-12), so the DTSU666 stays bypassed and 0x0488 remains the loop input
 - The charging point lands on the **Backed-up panel**, so the **Surplus signal** sees the car with no extra metering, and charging carries an **Island guard** because the point stays live when the grid is gone
 - In island mode the **Surplus signal** still reads ~0, so the surplus loop is structurally blind to the island; the **Island guard** must read the inverter's state directly and can never be inferred from the loop's own balance
