@@ -61,6 +61,16 @@ docker_socket_proxy_endpoint: "tcp://{{ docker_socket_proxy_container_name }}:{{
 iscsi_chap_user: "{{ vault_iscsi_chap_user }}"
 iscsi_chap_secret: "{{ vault_iscsi_chap_secret }}"
 
+# RustFS object store root credential. The service contract (endpoint, ports,
+# container name) lives in host_vars/containers.yml and the role defaults
+# because only the containers VM consumes it; the credential lives here because
+# SOPS-backed secrets are resolved in group_vars/all. RustFS takes this as an
+# access-key/secret-key pair (RUSTFS_ACCESS_KEY / RUSTFS_SECRET_KEY), not a
+# username/password, and it is the only identity with admin rights on the IAM
+# API - consumers get their own scoped keys from the rustfs role.
+rustfs_root_access_key: "{{ vault_rustfs_root_access_key }}"
+rustfs_root_secret_key: "{{ vault_rustfs_root_secret_key }}"
+
 # MQTT broker contract (served by the mosquitto role on the containers VM;
 # consumed by the taptap_mqtt bridge on the same host and by Home Assistant on
 # another). Declared here rather than in the role because a consumer on a

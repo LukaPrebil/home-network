@@ -1,0 +1,97 @@
+---
+# Deploy and manage the RustFS object store with Docker Compose
+
+- name: Ensure the RustFS base directory exists
+  ansible.builtin.file:
+    path: "{{ rustfs_base_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Ensure the rc client config directory exists
+  ansible.builtin.file:
+    path: "{{ rustfs_rc_config_dir }}"
+    state: directory
+    owner: "{{ rustfs_rc_config_uid }}"
+    group: "{{ rustfs_rc_config_gid }}"
+    mode: '0700'
+
+# No notify on the env/compose templates: rustfs.env is an env_file, so the
+# compose deploy task (state: present) recreates on changes to either;
+# `docker compose restart` would double-bounce without re-reading them.
+- name: Deploy the RustFS environment file
+  ansible.builtin.template:
+    src: rustfs.env.j2
+    dest: "{{ rustfs_base_dir }}/rustfs.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Deploy the rc client config
+  # One 0600 file holding the alias credentials beats passing them on the
+  # command line, where `ps` would expose them for the life of each call.
+  ansible.builtin.template:
+    src: rc-config.toml.j2
+    dest: "{{ rustfs_rc_config_dir }}/config.toml"
+    owner: "{{ rustfs_rc_config_uid }}"
+    group: "{{ rustfs_rc_config_gid }}"
+    mode: '0600'
+  no_log: true
+
+- name: Deploy the Docker Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ rustfs_base_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Pull and start the RustFS service
+  community.docker.docker_compose_v2:
+    project_src: "{{ rustfs_base_dir }}"
+    pull: "always"
+    state: present
+  register: rustfs_deploy
+  when: rustfs_service_state != 'stopped'
+
+- name: Pull the RustFS CLI image
+  # Used for the readiness check here and by the IAM key tasks; pulling it
+  # explicitly keeps the first readiness attempt from racing an image pull.
+  community.docker.docker_image:
+    name: "{{ rustfs_rc_image }}"
+    source: pull
+
+- name: Verify RustFS answers an authenticated S3 call
+  # A port probe proves nothing: docker-proxy keeps the port open while the
+  # server crash-loops behind it. This lists buckets with the root credential,
+  # so it exercises the published endpoint, the credential path and the data
+  # directory in one call, and it fails loudly when the container is stopped.
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --env
+      - XDG_CONFIG_HOME=/cfg
+      - --volume
+      - "{{ rustfs_rc_config_dir }}:/cfg/rc:ro"
+      - "{{ rustfs_rc_image }}"
+      - ls
+      - local/
+  register: rustfs_ready
+  until: rustfs_ready.rc == 0
+  retries: 30
+  delay: 5
+  changed_when: false
+  when: rustfs_service_state == 'started'
+
+- name: Display RustFS deployment status
+  ansible.builtin.debug:
+    msg:
+      - "RustFS object store deployment complete"
+      - "S3 endpoint: http://{{ rustfs_bind_address }}:{{ rustfs_port }}"
+      - "Data: {{ rustfs_mount_point }} (xfs, iSCSI zvol on {{ rustfs_iscsi_target_ip }})"
+      - "Buckets: {{ rustfs_ready.stdout_lines | default([]) }}"
+  when: rustfs_service_state == 'started'

@@ -1,0 +1,18 @@
+# rc (RustFS CLI) client configuration
+# Managed by Ansible - do not edit manually
+#
+# One alias per consumer key plus `local` for the root credential. The file is
+# 0600 and owned by the rc image's uid, so the secret keys never appear in a
+# command line, in `ps`, or in a converge log.
+schema_version = 1
+
+[defaults]
+color = "never"
+{% for alias in rustfs_rc_aliases %}
+[[aliases]]
+name = "{{ alias.name }}"
+endpoint = "http://{{ rustfs_bind_address }}:{{ rustfs_port }}"
+access_key = "{{ alias.access_key }}"
+secret_key = "{{ alias.secret_key }}"
+region = "us-east-1"
+{% endfor %}

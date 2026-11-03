@@ -1,0 +1,92 @@
+---
+# XFS filesystem on the RustFS iSCSI zvol
+#
+# The first-use format is destructive by nature, so the guard here mirrors what
+# common.assert_nfs_mount does for NFS deployments: refuse to touch anything
+# that is not the declared zvol. The device is resolved from the target's own
+# by-path symlink (never a bare /dev/sdX), is asserted to be a whole disk, and
+# is only formatted when it carries no filesystem at all.
+
+- name: Install XFS userland tools
+  ansible.builtin.apt:
+    name: xfsprogs
+    state: present
+    update_cache: true
+
+- name: Resolve iSCSI disk device path via target IQN
+  ansible.builtin.shell:
+    cmd: readlink -f /dev/disk/by-path/*{{ rustfs_iscsi_target_iqn }}*lun-0
+  register: rustfs_device_path
+  changed_when: false
+
+- name: Probe filesystem type on the RustFS zvol
+  # blkid exits non-zero for both "no filesystem" and transient probe errors, so
+  # gating mkfs on its rc could reformat a momentarily unreadable LUN. lsblk
+  # separates the two: a failed probe aborts the play, empty FSTYPE means blank
+  ansible.builtin.command:
+    cmd: lsblk -no FSTYPE {{ rustfs_device_path.stdout }}
+  register: rustfs_device_fstype
+  changed_when: false
+
+- name: Probe device type on the RustFS zvol
+  ansible.builtin.command:
+    cmd: lsblk -no TYPE {{ rustfs_device_path.stdout }}
+  register: rustfs_device_type
+  changed_when: false
+
+- name: Assert the resolved device is the declared RustFS zvol
+  # A device that is not a whole disk, or whose by-path symlink does not carry
+  # the rustfs target IQN, means the glob matched something else. Formatting
+  # then would destroy unrelated data.
+  ansible.builtin.assert:
+    that:
+      - rustfs_device_path.stdout is match('^/dev/')
+      - rustfs_device_type.stdout | trim == 'disk'
+    fail_msg: >-
+      {{ rustfs_device_path.stdout | default('(unresolved)') }} is not a whole
+      disk (lsblk type '{{ rustfs_device_type.stdout | trim }}'). Refusing to
+      format: the RustFS zvol is the only device this role may write.
+    quiet: true
+
+- name: Refuse to format a device that already carries a foreign filesystem
+  ansible.builtin.fail:
+    msg: >-
+      {{ rustfs_device_path.stdout }} carries a '{{ rustfs_device_fstype.stdout | trim }}'
+      filesystem, not the declared xfs. Refusing to reformat: that is either an
+      unexpected device or a filesystem this role did not create. Inspect the
+      zvol on tn-storage before continuing.
+  when:
+    - rustfs_device_fstype.stdout | trim | length > 0
+    - rustfs_device_fstype.stdout | trim != 'xfs'
+
+- name: Format the RustFS zvol with XFS
+  # mkfs.xfs refuses to overwrite an existing filesystem without -f, and that
+  # refusal is wanted here: this only ever runs on a blank device.
+  ansible.builtin.command:
+    cmd: mkfs.xfs -L {{ rustfs_filesystem_label }} {{ rustfs_device_path.stdout }}
+  when: rustfs_device_fstype.stdout | trim | length == 0
+  changed_when: true
+
+- name: Mount the RustFS zvol via fstab
+  # x-systemd.requires keeps the mount unit behind iscsid: with node.startup set
+  # to automatic the session comes back on its own at boot, but the mount must
+  # not race it, or the fstab entry fails and the container starts against the
+  # empty mount point. state=mounted creates the mount point when absent.
+  ansible.posix.mount:
+    path: "{{ rustfs_iscsi_mount_point }}"
+    src: "LABEL={{ rustfs_filesystem_label }}"
+    fstype: xfs
+    opts: _netdev,defaults,noatime,x-systemd.requires=iscsid.service
+    state: mounted
+
+- name: Hand the mount point to the container's runtime user
+  # The image runs as uid 10001 and has no root at runtime; a root-owned
+  # directory would fail on the first write. This chowns the filesystem root
+  # inode, so it survives the remount on boot rather than being re-applied
+  # against the bare mount point.
+  ansible.builtin.file:
+    path: "{{ rustfs_iscsi_mount_point }}"
+    state: directory
+    owner: "{{ rustfs_run_uid }}"
+    group: "{{ rustfs_run_gid }}"
+    mode: '0750'

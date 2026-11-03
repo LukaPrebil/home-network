@@ -1,0 +1,20 @@
+---
+# Main tasks file for the RustFS object store role
+
+- name: Include iSCSI client setup tasks
+  ansible.builtin.include_tasks: iscsi.yml
+  tags:
+    - rustfs
+    - iscsi
+
+- name: Include filesystem mount tasks
+  ansible.builtin.include_tasks: mount.yml
+  tags:
+    - rustfs
+    - mount
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - rustfs
+    - deploy

@@ -1,0 +1,33 @@
+---
+# Docker Compose file for RustFS (S3-compatible object store)
+#
+# Data lives on the iSCSI zvol mounted at {{ rustfs_mount_point }}. The console
+# (port 9001) is disabled: nothing in the estate uses it, `rc` covers
+# administration, and an unused web login is one more thing to keep patched.
+# Enable it temporarily with RUSTFS_CONSOLE_ENABLE=true when debugging.
+
+services:
+  rustfs:
+    image: {{ rustfs_image }}
+    container_name: {{ rustfs_container_name }}
+    restart: unless-stopped
+    # Explicit rather than relying on the image default: the bind mount is
+    # chowned to these ids, so the two have to agree
+    user: "{{ rustfs_run_uid }}:{{ rustfs_run_gid }}"
+    ports:
+      # Bound to the VLAN 30 address, not 0.0.0.0: docker publishes straight
+      # onto the interface and bypasses ufw, so this line is the reachability
+      # control for the buckets
+      - "{{ rustfs_bind_address }}:{{ rustfs_port }}:9000"
+    volumes:
+      - {{ rustfs_mount_point }}:{{ rustfs_data_dir }}
+    env_file:
+      - {{ rustfs_base_dir }}/rustfs.env
+    healthcheck:
+      # Liveness only. The deploy verifies readiness with an authenticated S3
+      # call; this keeps autoheal able to restart a wedged process.
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
