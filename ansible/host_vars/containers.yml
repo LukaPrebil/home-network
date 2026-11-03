@@ -5,10 +5,18 @@
 # Role: Docker host for containerized services
 # IP: 192.168.30.140 (VLAN 30, Servers)
 
-# iSCSI initiator identity for the pds / uptime_kuma zvol mounts. Declarative so
-# a VM rebuild keeps matching allowed_initiators in host_vars/tn-storage.yml
-# instead of regenerating a random IQN that silently fails the allowlist.
+# iSCSI initiator identity for the pds / uptime_kuma / rustfs zvol mounts.
+# Declarative so a VM rebuild keeps matching allowed_initiators in
+# host_vars/tn-storage.yml instead of regenerating a random IQN that silently
+# fails the allowlist.
 iscsi_initiator_iqn: "iqn.2004-10.com.ubuntu:01:8297a10ca"
+
+# RustFS object store endpoint. The S3 API binds to this address only, so the
+# buckets answer on VLAN 30 (and anything routed to it, such as the rpi4
+# tailnet subnet route) and never on the WAN. Declared here because the
+# OpenTofu root in iac/object-store pins the same address literally: the CI
+# path reaches it over the subnet route and must not depend on AdGuard.
+rustfs_bind_address: "192.168.30.140"
 
 # OTBR Configuration (containers VM hosts the USB dongle and OTBR)
 otbr_thread_usb_device: "/dev/serial/by-id/usb-ITEAD_SONOFF_Zigbee_3.0_USB_Dongle_Plus_V2_20221029081826-if00"

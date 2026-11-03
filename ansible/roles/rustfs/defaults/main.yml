@@ -1,0 +1,106 @@
+---
+# RustFS object store (S3-compatible) on the containers VM
+
+# Version pinning. Both halves are pinned: the server, and the `rc` CLI that the
+# readiness check and the IAM key tasks drive.
+rustfs_version: "1.0.4"
+rustfs_image: "rustfs/rustfs:{{ rustfs_version }}"
+rustfs_container_name: "rustfs"
+rustfs_rc_version: "v0.1.37"
+rustfs_rc_image: "rustfs/rc:{{ rustfs_rc_version }}"
+
+# Directories
+# Compose file, env file and rc client config live on the local rootfs (M-09:
+# the env file carries the root credential, which must not sit on the
+# LAN-readable NFS export). Object data lives on the iSCSI zvol.
+rustfs_base_dir: "/opt/rustfs"
+rustfs_rc_config_dir: "{{ rustfs_base_dir }}/rc"
+# Data directory on the iSCSI mount (NOT NFS - RustFS prohibits NFS as a storage
+# medium outright, and wants a local filesystem)
+rustfs_mount_point: "/mnt/rustfs"
+# Path the container sees the mount at
+rustfs_data_dir: "/data"
+
+# Container identity. The published image runs as uid/gid 10001 (user rustfs)
+# and the bind mount is chowned to match, so the container never needs root.
+rustfs_run_uid: 10001
+rustfs_run_gid: 10001
+# The rc image runs as uid 100/gid 101, and only that identity may read its
+# 0600 config file
+rustfs_rc_config_uid: 100
+rustfs_rc_config_gid: 101
+
+# Network. Docker publishes straight onto the interface, bypassing ufw, so the
+# bind address is the reachability control: VLAN 30 (and the tailnet subnet
+# route), never the WAN.
+rustfs_port: 9000
+rustfs_bind_address: "{{ ansible_host }}"
+
+# The bucket that holds Terraform state. Named here because the scoped keys are
+# limited to it, and because it is the one bucket the object-store root owns.
+rustfs_state_bucket: "terraform-state"
+
+# Consumer keys. RustFS mints an access-key/secret-key pair per consumer, and
+# each pair carries its own policy - one leaked key cannot reach another
+# bucket. Access keys are usernames and stay in the clear here; the secrets come
+# from SOPS.
+#
+# tf-bootstrap is what the object-store root uses to create the bucket it stores
+# state in; the root credential never reaches OpenTofu. tf-control and tf-ci get
+# the state bucket only. The secret-key rotation procedure is
+# `rc admin user rm <key>` followed by a converge (the role never rewrites an
+# existing secret silently).
+rustfs_state_bucket_policy:
+  Version: "2012-10-17"
+  Statement:
+    - Effect: Allow
+      Action:
+        - "s3:*"
+      Resource:
+        - "arn:aws:s3:::{{ rustfs_state_bucket }}"
+        - "arn:aws:s3:::{{ rustfs_state_bucket }}/*"
+
+rustfs_all_buckets_policy:
+  Version: "2012-10-17"
+  Statement:
+    - Effect: Allow
+      Action:
+        - "s3:*"
+      Resource:
+        - "arn:aws:s3:::*"
+        - "arn:aws:s3:::*/*"
+
+rustfs_keys:
+  - name: tf-bootstrap
+    description: "OpenTofu bootstrap root for the object store (all buckets)"
+    access_key: "tf-bootstrap"
+    secret_key: "{{ vault_rustfs_tf_bootstrap_secret_key }}"
+    document: "{{ rustfs_all_buckets_policy }}"
+  - name: tf-control
+    description: "Operator Terraform root: {{ rustfs_state_bucket }} only"
+    access_key: "tf-control"
+    secret_key: "{{ vault_rustfs_tf_control_secret_key }}"
+    document: "{{ rustfs_state_bucket_policy }}"
+  - name: tf-ci
+    description: "CI Terraform jobs: {{ rustfs_state_bucket }} only"
+    access_key: "tf-ci"
+    secret_key: "{{ vault_rustfs_tf_ci_secret_key }}"
+    document: "{{ rustfs_state_bucket_policy }}"
+
+# Aliases written to the rc client config: `local` for the root credential (the
+# readiness check and this role's own IAM calls), plus one alias per consumer
+# key so the documented commands run verbatim - `rc ls tf-control/terraform-state`.
+rustfs_rc_aliases: >-
+  {{ [{'name': 'local',
+       'access_key': rustfs_root_access_key,
+       'secret_key': rustfs_root_secret_key}] + rustfs_keys }}
+
+# iSCSI configuration
+rustfs_iscsi_target_ip: "{{ truenas_nfs_server }}"
+rustfs_iscsi_target_iqn: "iqn.2005-10.org.freenas.ctl:rustfs"
+rustfs_iscsi_mount_point: "{{ rustfs_mount_point }}"
+# XFS labels max out at 12 characters
+rustfs_filesystem_label: "rustfs-data"
+
+# Service state
+rustfs_service_state: "started"

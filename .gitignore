@@ -41,5 +41,15 @@ keys.txt
 .claude/scheduled_tasks.lock
 .claude/state/
 
+# OpenTofu/Terraform working directories and local state. Terraform state for
+# the IaC roots belongs in the object store, not on a laptop: a
+# terraform.tfstate appearing here means the S3 backend failed to load and must
+# be investigated, never committed. The dependency lock file is tracked on
+# purpose - it pins the provider version state was written with.
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup
+**/crash.log
+
 # Local artifacts
 backups/

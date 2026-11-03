@@ -1,0 +1,201 @@
+---
+# IAM keys and policies for the object store's consumers
+#
+# RustFS mints one access-key/secret-key pair per consumer and attaches a
+# separate policy to each, so a leaked key reaches exactly one bucket. The
+# secrets come from SOPS.
+#
+# The role creates a user only when it is absent and never rewrites an existing
+# secret, matching how configure-truenas.yml treats the iSCSI CHAP record.
+# Rotation is therefore explicit: `rc admin user rm <key>`, then converge.
+#
+# Secrets are handed to `rc` through the process environment and forwarded into
+# the container with a bare `-e NAME`, so no secret ever appears in a command
+# line, in `ps`, or in a converge log.
+
+- name: Ensure the policy document directory exists
+  ansible.builtin.file:
+    path: "{{ rustfs_base_dir }}/policies"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Render the IAM policy documents
+  ansible.builtin.copy:
+    content: "{{ item.document | to_nice_json }}\n"
+    dest: "{{ rustfs_base_dir }}/policies/{{ item.name }}.json"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ rustfs_keys }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Read the current IAM user records
+  # rc exits non-zero for a user that does not exist yet; that is the signal the
+  # create task below acts on, not an error
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --env
+      - XDG_CONFIG_HOME=/cfg
+      - --volume
+      - "{{ rustfs_rc_config_dir }}:/cfg/rc:ro"
+      - "{{ rustfs_rc_image }}"
+      - admin
+      - user
+      - info
+      - local
+      - "{{ item.access_key }}"
+      - --json
+  loop: "{{ rustfs_keys }}"
+  loop_control:
+    label: "{{ item.access_key }}"
+  register: rustfs_iam_users
+  changed_when: false
+  failed_when: false
+
+- name: Create the IAM users that do not exist yet
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --env
+      - RUSTFS_KEY_ACCESS
+      - --env
+      - RUSTFS_KEY_SECRET
+      - --env
+      - XDG_CONFIG_HOME=/cfg
+      - --volume
+      - "{{ rustfs_rc_config_dir }}:/cfg/rc:ro"
+      - --entrypoint
+      - sh
+      - "{{ rustfs_rc_image }}"
+      - -c
+      - 'exec rc admin user add local "$RUSTFS_KEY_ACCESS" "$RUSTFS_KEY_SECRET"'
+  loop: "{{ rustfs_keys }}"
+  loop_control:
+    label: "{{ item.access_key }}"
+    index_var: key_idx
+  environment:
+    RUSTFS_KEY_ACCESS: "{{ item.access_key }}"
+    RUSTFS_KEY_SECRET: "{{ item.secret_key }}"
+  when: rustfs_iam_users.results[key_idx].rc != 0
+  changed_when: true
+  no_log: true
+
+- name: Read the current IAM policy documents
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --env
+      - XDG_CONFIG_HOME=/cfg
+      - --volume
+      - "{{ rustfs_rc_config_dir }}:/cfg/rc:ro"
+      - "{{ rustfs_rc_image }}"
+      - admin
+      - policy
+      - info
+      - local
+      - "{{ item.name }}"
+      - --json
+  loop: "{{ rustfs_keys }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: rustfs_iam_policies
+  changed_when: false
+  failed_when: false
+
+- name: Create or update the IAM policies that drift from the declared document
+  # `policy create` is an upsert, so a changed policy document lands here. The
+  # comparison ignores the server's create_date/update_date wrapper by looking
+  # only at the document itself.
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --env
+      - XDG_CONFIG_HOME=/cfg
+      - --volume
+      - "{{ rustfs_rc_config_dir }}:/cfg/rc:ro"
+      - --volume
+      - "{{ rustfs_base_dir }}/policies:/policies:ro"
+      - "{{ rustfs_rc_image }}"
+      - admin
+      - policy
+      - create
+      - local
+      - "{{ item.name }}"
+      - "/policies/{{ item.name }}.json"
+  loop: "{{ rustfs_keys }}"
+  loop_control:
+    label: "{{ item.name }}"
+    index_var: key_idx
+  when: >-
+    rustfs_iam_policies.results[key_idx].rc != 0
+    or ((rustfs_iam_policies.results[key_idx].stdout | from_json).policy.policy | to_nice_json)
+       != (item.document | to_nice_json)
+  changed_when: true
+
+- name: Read the IAM user records for policy attachment
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --env
+      - XDG_CONFIG_HOME=/cfg
+      - --volume
+      - "{{ rustfs_rc_config_dir }}:/cfg/rc:ro"
+      - "{{ rustfs_rc_image }}"
+      - admin
+      - user
+      - info
+      - local
+      - "{{ item.access_key }}"
+      - --json
+  loop: "{{ rustfs_keys }}"
+  loop_control:
+    label: "{{ item.access_key }}"
+  register: rustfs_iam_user_policies
+  changed_when: false
+
+- name: Attach each key's policy
+  # Idempotent by inspection: `policy attach` on an already-attached policy
+  # would report a change on every converge otherwise
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --env
+      - XDG_CONFIG_HOME=/cfg
+      - --volume
+      - "{{ rustfs_rc_config_dir }}:/cfg/rc:ro"
+      - "{{ rustfs_rc_image }}"
+      - admin
+      - policy
+      - attach
+      - local
+      - "{{ item.name }}"
+      - --user
+      - "{{ item.access_key }}"
+  loop: "{{ rustfs_keys }}"
+  loop_control:
+    label: "{{ item.name }} -> {{ item.access_key }}"
+    index_var: key_idx
+  when: >-
+    item.name not in
+    (((rustfs_iam_user_policies.results[key_idx].stdout | from_json).policies) | default([]))
+  changed_when: true
+
+- name: Report the object store keys
+  ansible.builtin.debug:
+    msg: "{{ rustfs_keys | map(attribute='description') | list }}"

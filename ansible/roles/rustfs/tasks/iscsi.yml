@@ -1,0 +1,180 @@
+---
+# iSCSI client setup for the RustFS data volume
+# Connects to the TrueNAS iSCSI target that backs the RustFS zvol. RustFS
+# prohibits NFS as a storage medium outright and wants a local filesystem, so
+# block storage is the only supported data path here.
+#
+# The CHAP and initiator blocks below are a deliberate copy of the pds and
+# uptime_kuma roles: three copies is the existing pattern, and extracting a
+# shared role is a separate refactor.
+
+- name: Install open-iscsi package
+  ansible.builtin.apt:
+    name: open-iscsi
+    state: present
+    update_cache: true
+
+- name: Enable and start iscsid service
+  ansible.builtin.systemd:
+    name: iscsid
+    enabled: true
+    state: started
+
+- name: Ensure iSCSI lock directory exists
+  ansible.builtin.file:
+    path: /run/lock/iscsi
+    state: directory
+    mode: '0755'
+
+- name: Read configured iSCSI initiator IQN
+  ansible.builtin.command:
+    cmd: grep -E '^InitiatorName=' /etc/iscsi/initiatorname.iscsi
+  register: rustfs_iscsi_initiator_current
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Check for active iSCSI sessions before touching initiator identity
+  ansible.builtin.command:
+    cmd: iscsiadm -m session
+  register: rustfs_iscsi_active_sessions
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Refuse to change initiator IQN under active iSCSI sessions
+  ansible.builtin.fail:
+    msg: >-
+      /etc/iscsi/initiatorname.iscsi reads '{{ rustfs_iscsi_initiator_current.stdout | default('') }}'
+      but iscsi_initiator_iqn is '{{ iscsi_initiator_iqn }}' and this host has active iSCSI
+      sessions. Rewriting the initiator identity under live sessions would desync the
+      TrueNAS allowed_initiators allowlist mid-flight. Log out of all sessions first
+      (iscsiadm -m node --logoutall=all) or align iscsi_initiator_iqn with the live value.
+  when:
+    - rustfs_iscsi_initiator_current.stdout | default('') != 'InitiatorName=' ~ iscsi_initiator_iqn
+    - rustfs_iscsi_active_sessions.rc == 0
+
+- name: Ensure declarative iSCSI initiator IQN
+  # A rebuilt VM regenerates a random IQN and silently falls off the TrueNAS
+  # allowed_initiators allowlist; pin the identity from host_vars instead
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/initiatorname.iscsi
+    regexp: '^InitiatorName='
+    line: "InitiatorName={{ iscsi_initiator_iqn }}"
+    create: true
+    owner: root
+    group: root
+    mode: '0600'
+  register: rustfs_iscsi_initiator_config
+
+- name: Restart iscsid to load the declarative initiator IQN  # noqa: no-handler
+  # iscsid reads initiatorname.iscsi only at startup; the identity must be live
+  # before the discovery/login tasks below present it to TrueNAS, so an
+  # end-of-play handler would be too late
+  ansible.builtin.systemd:
+    name: iscsid
+    state: restarted
+  when: rustfs_iscsi_initiator_config is changed
+
+- name: Set iSCSI CHAP defaults in iscsid.conf
+  # sendtargets discovery rewrites node records from iscsid.conf defaults, so
+  # the CHAP params must live here: another role's later discovery in the same
+  # converge would otherwise wipe per-node auth params set moments earlier.
+  # Discovered node records inherit these three values on every re-discovery.
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/iscsid.conf
+    regexp: '^#?\s*node.session.auth.authmethod\s*=.*$'
+    line: 'node.session.auth.authmethod = CHAP'
+
+- name: Set iSCSI CHAP user default in iscsid.conf
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/iscsid.conf
+    regexp: '^#?\s*node.session.auth.username\s*=.*$'
+    line: 'node.session.auth.username = {{ iscsi_chap_user }}'
+
+- name: Set iSCSI CHAP secret default in iscsid.conf
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/iscsid.conf
+    regexp: '^#?\s*node.session.auth.password\s*=.*$'
+    line: 'node.session.auth.password = {{ iscsi_chap_secret }}'
+  no_log: true
+
+- name: Discover iSCSI targets on TrueNAS
+  ansible.builtin.command:
+    cmd: iscsiadm -m discovery -t sendtargets -p {{ rustfs_iscsi_target_ip }}
+  register: rustfs_iscsi_discovery
+  changed_when: false
+  failed_when: rustfs_iscsi_discovery.rc != 0
+
+- name: Check CHAP state on the iSCSI node record
+  # iscsiadm -o show prints node.session.auth.* including the password, so this
+  # task and everything downstream of it stay no_log. Runs after discovery so
+  # the node record exists, and before login so the login negotiates CHAP.
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ rustfs_iscsi_target_iqn }} --portal {{ rustfs_iscsi_target_ip }} -o show
+  register: rustfs_iscsi_node_params
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Require CHAP on the iSCSI node record
+  # Three one-flag updates: open-iscsi has no single set-auth command. Params
+  # live in the node DB and iscsid uses them for boot auto-login too; a live
+  # session is never logged out here (the zvol is mounted and in use).
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ rustfs_iscsi_target_iqn }} --portal {{ rustfs_iscsi_target_ip }} -o update -n node.session.auth.authmethod -v CHAP
+  register: rustfs_iscsi_chap_method
+  changed_when: rustfs_iscsi_chap_method.rc == 0
+  when:
+    - rustfs_iscsi_node_params.rc == 0
+    - "'node.session.auth.authmethod = CHAP' not in (rustfs_iscsi_node_params.stdout | default(''))"
+  no_log: true
+
+- name: Set CHAP user on the iSCSI node record
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ rustfs_iscsi_target_iqn }} --portal {{ rustfs_iscsi_target_ip }} -o update -n node.session.auth.username -v {{ iscsi_chap_user }}
+  when:
+    - rustfs_iscsi_node_params.rc == 0
+    - "'node.session.auth.authmethod = CHAP' not in (rustfs_iscsi_node_params.stdout | default(''))"
+  no_log: true
+  changed_when: true
+
+- name: Set CHAP secret on the iSCSI node record
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ rustfs_iscsi_target_iqn }} --portal {{ rustfs_iscsi_target_ip }} -o update -n node.session.auth.password -v {{ iscsi_chap_secret }}
+  when:
+    - rustfs_iscsi_node_params.rc == 0
+    - "'node.session.auth.authmethod = CHAP' not in (rustfs_iscsi_node_params.stdout | default(''))"
+  no_log: true
+  changed_when: true
+
+- name: Check if iSCSI session already exists
+  ansible.builtin.command:
+    cmd: iscsiadm -m session
+  register: rustfs_iscsi_sessions
+  changed_when: false
+  failed_when: false
+
+- name: Login to iSCSI target
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ rustfs_iscsi_target_iqn }} --portal {{ rustfs_iscsi_target_ip }} --login
+  when: rustfs_iscsi_target_iqn not in (rustfs_iscsi_sessions.stdout | default(''))
+  register: rustfs_iscsi_login
+  changed_when: rustfs_iscsi_login.rc == 0
+
+- name: Configure iSCSI node for automatic login on boot
+  ansible.builtin.command:
+    cmd: iscsiadm -m node --targetname {{ rustfs_iscsi_target_iqn }} --portal {{ rustfs_iscsi_target_ip }} -o update -n node.startup -v automatic
+  changed_when: false
+
+- name: Wait for iSCSI device to appear  # noqa: no-handler
+  # Block-and-wait is the intent: following tasks resolve the device path and
+  # format the filesystem; a handler at end-of-play would be too late.
+  ansible.builtin.shell:
+    cmd: ls /dev/disk/by-path/*{{ rustfs_iscsi_target_iqn }}*lun-0 2>/dev/null
+  register: rustfs_iscsi_device_wait
+  until: rustfs_iscsi_device_wait.rc == 0
+  retries: 6
+  delay: 5
+  changed_when: false
+  when: rustfs_iscsi_login is changed

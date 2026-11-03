@@ -11,6 +11,7 @@
 #   ansible-playbook site.yml --tags monitoring-agents   # Node Exporter + Alloy
 #   ansible-playbook site.yml --tags paperless-ngx       # Paperless-ngx document management
 #   ansible-playbook site.yml --tags pds                  # ATProto PDS
+#   ansible-playbook site.yml --tags rustfs               # RustFS object store
 #   ansible-playbook site.yml --tags ha-mcp              # Home Assistant MCP server
 #   ansible-playbook site.yml --tags tigo                # MQTT broker + TIGO optimizer bridge
 #   ansible-playbook site.yml --tags mosquitto           # Just the MQTT broker
@@ -214,6 +215,15 @@
   roles:
     - docker
     - pds
+
+- name: Deploy RustFS object store
+  hosts: containers
+  become: true
+  tags:
+    - rustfs
+  roles:
+    - docker
+    - rustfs
 
 - name: Deploy Home Assistant MCP server
   hosts: containers
