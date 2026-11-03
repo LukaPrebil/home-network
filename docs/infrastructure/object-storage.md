@@ -247,6 +247,11 @@ Already covered under "Rolling back a bad state write" - the same
 - **The image logs to `/logs` inside the container** (`RUSTFS_OBS_LOG_DIRECTORY`
   is set in the image), so container logs are the only log surface and they do
   not touch the host filesystem. `docker logs rustfs` it is.
+- **`region = "us-east-1"` is a signing label, not a location.** SigV4 needs a region string,
+  RustFS defaults `RUSTFS_REGION` to `us-east-1`, and the provider, the backend and the `rc`
+  aliases all use the same value so they cannot disagree. Nothing is sent to AWS and the bytes
+  stay on the zvol. Setting the server to `eu-central-1` works only if the provider, the backend
+  and every alias change with it; it buys clarity and nothing else.
 - **`/health` needs no credential.** It is a liveness endpoint; the deploy's
   readiness check is the authenticated bucket listing precisely because of that.
 - **`rc admin policy` needs a recent `rustfs/rc`.** Pinned at v0.1.37, which is verified; very early CLI builds return
