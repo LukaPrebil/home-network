@@ -4,7 +4,7 @@
 
 - Do NOT add `Co-Authored-By` trailers to commit messages
 - Use conventional commits (`feat:`, `fix:`, `docs:`, `chore:`, etc.)
-- **Direct pushes to `main` are allowed for this repo** (overrides the global "always use a feature branch + PR" rule). This is a single-operator homelab repo with no CI gating merges - feature branches add ceremony without protection. Still fine to use a branch + PR when changes warrant review or staging, but do not block on it.
+- **Changes land by pull request.** The global branch + PR rule applies here too; never push to `main` directly.
 
 ## Core Conventions
 
