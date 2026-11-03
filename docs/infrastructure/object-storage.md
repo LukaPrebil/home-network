@@ -114,12 +114,34 @@ sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan'
 sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store apply'
 ```
 
-`iac/secrets.sops.yaml` also carries `RUSTFS_ROOT_PASSWORD`. No root consumes it;
-it is there so "the root credential is not in state" stays a checkable assertion:
+### State encryption
+
+The state object is encrypted at rest by OpenTofu itself, independent of the bucket:
+`pbkdf2` derives a key from a passphrase, `aes_gcm` encrypts with it, and `enforced = true`
+refuses a plaintext state outright instead of reading it as if nothing were wrong. The object
+in the bucket is `{"serial":N,...,"encrypted_data":...}`, so a snapshot of the zvol or a read
+of the bucket yields no account identifiers.
+
+The passphrase is `TF_VAR_state_passphrase` in `iac/secrets.sops.yaml`, which is why every
+command goes through `sops exec-env`. Without it OpenTofu cannot read the state and says so:
+that failure is intended, because a silent fallback to "no state" would let a plan propose
+creating buckets that already exist.
+
+Rotating the passphrase is a state migration, not a value swap: add the new provider and keep
+the old one as a `fallback` method, apply, then remove the old one. Never delete the old
+passphrase before the state has been rewritten with the new one.
+
+CI needs the same variable as a secret. The Cloudflare root inherits this block unchanged, and
+its state holds an Access allow-list, so encryption is not optional there either.
+
+### The root credential is not in state
+
+The assertion reads the Ansible secret directly, so no canary copy of the root credential has to
+sit in the environment OpenTofu runs in:
 
 ```bash
-sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store show -json' \
-  | jq -r '..|strings' | grep -c "$(sops -d --extract '["RUSTFS_ROOT_PASSWORD"]' iac/secrets.sops.yaml)"   # 0
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan -json' \
+  | jq -r '..|strings' | grep -c "$(sops -d --extract '["vault_rustfs_root_secret_key"]' ansible/group_vars/all/secrets.sops.yml)"   # 0
 ```
 
 ### Bootstrapping a new root (chicken and egg)
@@ -244,15 +266,29 @@ Already covered under "Rolling back a bad state write" - the same
   for one debugging session by setting `RUSTFS_CONSOLE_ENABLE=true` in
   `roles/rustfs/templates/rustfs.env.j2` and converging.
 - **`/mnt/rustfs` must be mounted before the container starts.** A missing mount
-  means RustFS writes into a stub directory on the VM's rootfs. That is why the
-  fstab entry carries `x-systemd.requires=iscsid.service` and why the deploy
-  verifies with a real S3 call. The same hazard exists for the PDS zvol - that
-  mount was found unmounted on 2026-11-03, with the container writing to
-  `/mnt/pds` on the rootfs; worth checking before the next reboot of the
-  containers VM.
+  means RustFS writes into a stub directory on the VM's rootfs. Three things
+  enforce the order: the fstab entry carries `x-systemd.requires=iscsid.service`,
+  the deployment verifies with a real S3 call, and the role installs
+  `/etc/systemd/system/docker.service.d/wait-for-rustfs-mount.conf` with
+  `RequiresMountsFor=/mnt/rustfs`, so a failed mount at boot stops Docker instead
+  of starting the container against a stub. That drop-in is a systemd dependency
+  rather than a retry loop, so it fails fast.
+- **The guard covers boot, not a mount that disappears later.** If the iSCSI
+  session drops while Docker runs, the container keeps its namespace and writes
+  into whatever sits at that path. The tell is an empty bucket list: check
+  `findmnt -no FSTYPE,SOURCE /mnt/rustfs`, restore the mount, restart the
+  container. A Prometheus rule on the mountpoint is the planned detection and is
+  not installed yet.
+- **PDS and Uptime Kuma have no such guard.** The PDS zvol was found unmounted on
+  2026-11-03, three and a half days after a reboot, with the container writing to
+  `/mnt/pds` on the rootfs. See `.claude/state/known-issues.md`; the same fix is
+  owed to both.
 
 ## Not done
 
+- Boot guards for the `pds` and `uptime-kuma` zvols: rustfs has one, they do not,
+  and PDS has already failed this way once.
+- No alert yet on a missing `/mnt/rustfs` mountpoint.
 - No replication off the host, and no restic-style consumer yet - both were out
   of scope for the first cut.
 - One bucket only: `iac/object-store` adds the next one when something needs it.
