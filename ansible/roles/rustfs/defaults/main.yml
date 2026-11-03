@@ -6,7 +6,7 @@
 rustfs_version: "1.0.4"
 rustfs_image: "rustfs/rustfs:{{ rustfs_version }}"
 rustfs_container_name: "rustfs"
-rustfs_rc_version: "v0.1.36"
+rustfs_rc_version: "v0.1.37"
 rustfs_rc_image: "rustfs/rc:{{ rustfs_rc_version }}"
 
 # Directories

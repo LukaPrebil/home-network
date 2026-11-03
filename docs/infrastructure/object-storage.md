@@ -249,7 +249,7 @@ Already covered under "Rolling back a bad state write" - the same
   not touch the host filesystem. `docker logs rustfs` it is.
 - **`/health` needs no credential.** It is a liveness endpoint; the deploy's
   readiness check is the authenticated bucket listing precisely because of that.
-- **`rc admin policy` needs `rustfs/rc` >= v0.1.4.** Earlier CLI builds return
+- **`rc admin policy` needs a recent `rustfs/rc`.** Pinned at v0.1.37, which is verified; very early CLI builds return
   `HTTP 501 NotImplemented` against a server that does implement the call.
 - **Deleting a versioned bucket is not `rc rb`.** `R object remove
   <bucket>/ --recursive --versions --force` clears data versions but leaves
