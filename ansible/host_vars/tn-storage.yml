@@ -180,3 +180,26 @@ iscsi_zvols:
     target_name: "uptime-kuma"
     allowed_initiators:
       - "iqn.2004-10.com.ubuntu:01:8297a10ca"  # containers VM
+  # RustFS object store. A zvol rather than an NFS share because RustFS
+  # prohibits NFS as its storage medium outright, and prefers XFS.
+  # Growing it: raise volsize here and re-run configure-truenas.yml; zfs grows
+  # the block device in place, then xfs_growfs on the client (see
+  # docs/infrastructure/object-storage.md).
+  - name: "{{ zfs_pool_name }}/rustfs"
+    volsize: 10737418240  # 10 GiB in bytes
+    description: "RustFS object store data (S3 buckets + Terraform state)"
+    compression: lz4
+    target_name: "rustfs"
+    allowed_initiators:
+      - "iqn.2004-10.com.ubuntu:01:8297a10ca"  # containers VM
+
+# Datasets that get a daily snapshot task created by configure-truenas.yml.
+# Datasets already carrying a task (UI-made or earlier) are skipped, never
+# modified: changing retention on an existing task prunes live snapshots, which
+# is a deliberate manual act. All four user-data datasets are listed so a
+# TrueNAS rebuild recreates the full set; tank/pds keeps its longer 2WEEK task.
+zfs_snapshot_datasets:
+  - "{{ zfs_pool_name }}/docker-volumes"
+  - "{{ zfs_pool_name }}/pds"
+  - "{{ zfs_pool_name }}/uptime-kuma"
+  - "{{ zfs_pool_name }}/rustfs"
