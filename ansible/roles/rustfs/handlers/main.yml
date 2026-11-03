@@ -1,8 +1,0 @@
----
-# The only handler in this role. Compose and env drift is applied by the
-# docker_compose_v2 task itself, so neither notifies anything; this one exists
-# because a changed systemd drop-in needs a daemon-reload before the next start.
-
-- name: Reload systemd units
-  ansible.builtin.systemd:
-    daemon_reload: true
