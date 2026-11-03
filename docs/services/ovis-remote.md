@@ -87,6 +87,18 @@ allow the Bun binary to receive inbound connections rather than turning the fire
 pi must run inside a herdr pane. A pi started in a plain terminal has no chat, status or
 remote input, because Ovis attaches through herdr.
 
+## Cloudflare setup
+
+1. **DNS:** proxied record for `ovis` pointing where `pds` points. It must stay proxied;
+   a DNS-only record makes requests arrive from the real client and Traefik answers `403`.
+2. **Access application:** self-hosted, domain `ovis.lukapg.dev`, session one month, policy
+   Allow -> Emails -> the operator's address.
+3. **App Launcher policy:** Zero Trust -> Access controls -> Access settings -> App Launcher ->
+   Manage -> add an Allow policy for the same email and enable One-time PIN. Without it, the
+   PIN flow ends on the launcher with "contact your administrator to enable the Access App
+   Launcher application", even though the application itself is configured. Open
+   `https://ovis.lukapg.dev` to reach the app; the team-domain page is the launcher.
+
 ## Deploy
 
 ```bash
