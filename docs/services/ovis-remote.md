@@ -110,6 +110,28 @@ The route only works once the Mac answers, so install Ovis first. Cloudflare Acc
 exist before the DNS record: a proxied record with no Access application is an open
 terminal port.
 
+## Alerts
+
+Web Push fires on three events: a pane **waiting for an answer**, a **finished turn**, and a
+**terminal that ended**. Two gates decide whether a given event reaches the phone.
+
+- **Nothing is sent while a window of the app is in use.** A connected page that is visible and
+  focused suppresses every alert, because that screen already shows the change. A phone in the
+  foreground receives nothing; lock it or leave the app and the alerts resume.
+- **A finish needs a turn worth telling.** The default preference is "long": a turn shorter than
+  60 s sends nothing, and a qualifying finish waits 60 s before it goes out, so an answer typed at
+  the desk calls it off. A waiting pane waits 10 s.
+
+For pi, `done` needs no cooperation from herdr. Ovis keeps each pane's "worked since it was last
+idle" itself and reports a back-to-idle that follows work as `done` until focus lands on the pane.
+That is why a pi pane alerts on a finish even though herdr's pi integration reports only
+`working`, `blocked` and `idle`.
+
+`blocked` does not fire for pi. The herdr pi integration waits for a `herdr:blocked` event that
+nothing in this harness emits, so a dialog in a pi pane arrives as a chat card read off the screen
+and produces no "waiting for your input" push. Upstream tracks the cause in
+[herdrdev/herdr#4143](https://github.com/herdrdev/herdr/issues/4143).
+
 ## Verification
 
 ```bash
@@ -121,9 +143,10 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7317/api/health?scope
 curl -sI https://ovis.lukapg.dev/api/session | head -1
 ```
 
-Then on the phone: pass Access, install the PWA, pair the device, enable alerts, and check
-that a backgrounded pane's finished turn arrives as a push. If no push arrives, see the plan's
-decision 11: herdr's pi integration reports `working`/`blocked`/`idle` and never `done`.
+Then on the phone: pass Access, install the PWA, pair the device and enable alerts. To see a
+finish alert, close or background the app on every device and let a turn run at least 60 s; a
+short turn sends nothing by design, and a visible app window suppresses every alert (see
+[Alerts](#alerts)). A finish was delivered this way on 2026-11-03.
 
 ## Recovery
 
