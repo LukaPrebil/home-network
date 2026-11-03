@@ -250,6 +250,7 @@ Pre-migration record: until 2026-09-14 the network ran on a flat `192.168.1.0/24
 | Management (10) | any | any | allow |
 | any | Servers (30) `.145` / `.110` | UDP+TCP 53 | allow - shared DNS |
 | DMZ (60) | Servers (30) | backend ports | allow - Traefik proxies VLAN-30 backends |
+| DMZ (60) | VLAN 1 (254), the Mac | TCP 7317 | allow - Traefik proxies the Ovis server on the Mac |
 | Trusted (20) | Servers (30) | any | allow |
 | Trusted (20) | Cameras (50) | any | allow - direct Reolink viewing |
 | Servers (30) | IoT (40), Cameras (50) | any | allow - HA initiates; IoT never initiates inward |

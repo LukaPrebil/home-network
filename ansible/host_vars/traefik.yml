@@ -27,6 +27,14 @@ traefik_cloudflare_dns_api_token: "{{ vault_cloudflare_dns_api_token }}"
 # Domain configuration
 traefik_domain: "lukapg.dev"  # Used in dynamic.yml.j2 for all subdomains
 
+# Ovis - the phone client for the pi sessions running on the Mac. The Mac is
+# not an inventory host (it is not Ansible-managed), so its address lives here;
+# reserve it in the Omada controller so a lease change cannot move the backend.
+# The token is injected by the ovis-token middleware, and the Ovis server also
+# requires it directly, so every client that reaches :7317 needs the same value.
+traefik_ovis_backend: "192.168.254.31:7317"
+traefik_ovis_token: "{{ vault_ovis_token }}"
+
 # Cloudflare real IP extraction (ha.lukapg.dev is Cloudflare-proxied)
 traefik_cloudflare_real_ip_enabled: true
 

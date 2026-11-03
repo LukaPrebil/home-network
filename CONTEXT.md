@@ -706,36 +706,40 @@ _Avoid_: "fallback run" (hides that the data is unverified)
 ### Pi chat remote
 
 **Attach**:
-Connecting the phone to a pi session already running in a TUI at the Mac. One transcript, one writer; desk and phone see the same session by construction. v1 supports attach only.
+Connecting the phone to a pi session already running on the Mac. One transcript, one writer; desk and phone see the same session by construction. In this deployment the unit of attach is a **herdr pane**, so a pi session started outside herdr cannot be attached to.
 _Avoid_: "sync" (implies two transcripts being reconciled) and "open the session file" (attach targets a running process, not a file)
 
 **Spawn**:
-The bridge starting its own headless pi session instead of attaching. A second pi on the same project with a diverged session tree. Goal-state feature, not v1.
+Starting a pi session from the phone instead of attaching to one. A second pi on the same project with a diverged session tree. Available through the app's new-workspace action, not part of the first rollout.
 _Avoid_: "new session" (ambiguous between a fresh attach and a spawn)
 
-**Bridge**:
-The always-on service that pi sessions dial into and the phone talks to. Runs as a Docker container on the containers VM, reachable over the tailnet; serves every host (Mac, dev VM) from one endpoint. Holds the session registry, auth, and notification dispatch.
-_Avoid_: "relay" (it owns registry and auth, not a dumb pass-through); "the server" (every component is a server; the name must say what it does)
+**Ovis server**:
+The process that reads herdr's socket, serves the app, and sends push alerts. Runs on the Mac, because that is where the attached sessions and their panes live; other PCs would join it as remote PCs over SSH.
+_Avoid_: "bridge" (the rejected design: a Docker service sessions dialled into) and "relay" (the vendor's optional end-to-end transport, not ours)
+
+**Gate**:
+What a request must pass before it reaches the Ovis server from outside: Cloudflare Access proves who is asking, a Cloudflare-edge allow-list proves it came through Cloudflare at all, and a bearer **token** injected by Traefik proves it came through our proxy. No one of them substitutes for another.
+_Avoid_: "auth" (hides that three independent checks apply) and "login" (only the Access half is interactive)
+
+**Paired device**:
+A phone or browser the Ovis server itself admitted with a one-time code, holding its own revocable credential. Independent of the Gate, and the only per-device way to cut one phone off without rotating the token.
+_Avoid_: "per-device token" (the token is shared; the per-device thing is the pairing credential)
 
 **Steer**:
-A message injected while the session is streaming. Pi delivers it after the current assistant turn's tool calls finish and before the next LLM call, so the agent adjusts course without the turn ending. Mechanism: `pi.sendUserMessage` with `deliverAs: "steer"`.
+A message injected while pi is streaming. Pi delivers it after the current assistant turn's tool calls finish and before the next LLM call, so the agent adjusts course without the turn ending. Reachable in the app as an in-turn send ("Send now"); there is no dedicated button.
 _Avoid_: "interrupt" (tool calls already running still complete; only the next LLM call changes)
 
 **Follow-up**:
-A message delivered only once the agent has no more tool calls. The "when you are done" path for prompts sent mid-turn. Mechanism: `deliverAs: "followUp"`.
+A message delivered only once the agent has no more tool calls. The "when you are done" path. In the app it exists only as Alt+Enter in the terminal view.
 _Avoid_: "queue" (pi has no single queue; steer lands at the next LLM call, follow-up lands at the end of the work)
 
 **Abort**:
-Ending the running turn from the phone. The session stays attached and keeps everything already in the transcript.
+Ending the running turn from the phone. The session keeps everything already in the transcript, and pi returns queued messages to its editor.
 _Avoid_: "kill the session" (abort ends a turn, not the session)
 
-**Dial-in**:
-The outbound WebSocket from a session's extension to the bridge, carrying the live event stream up and prompts down. Its presence is the session's online status; a drop while the session was working means an interrupted turn.
-_Avoid_: "connection to the session" (the direction is the point: sessions always dial out, nothing listens on the workstation)
-
 **Remote client**:
-The phone-side PWA served by the bridge. Installed to the home screen on the Galaxy S24+; compatible with iOS. Talks to the bridge over the tailnet.
-_Avoid_: "the app" (reads as a native app; v1 ships no native app)
+The phone-side PWA served by the Ovis server at a public hostname behind the Gate. Installed to the home screen on the Galaxy S24+; compatible with iOS. The vendor's native apps are not used.
+_Avoid_: "the app" (reads as a native app; the client here is the browser app)
 
 ## Relationships
 
