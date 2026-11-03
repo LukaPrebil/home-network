@@ -4,11 +4,9 @@
 # seven use their own login. Adding gates to them is a security decision, not
 # codification, so this root declares exactly the one that exists.
 #
-# The policy is inline rather than a separate cloudflare_zero_trust_access_policy
-# resource because v5 treats an application's policies as part of the
-# application: a policy is scoped to one app, has no meaning without it, and
-# declaring it separately splits one object across two resources that can drift
-# against each other.
+# The policy is a reusable account-level object shared with the App Launcher (see
+# app_launcher.tf) and attached here by id. The comment on the resource explains
+# why it cannot be an inline block.
 
 import {
   to = cloudflare_zero_trust_access_application.ovis
@@ -61,13 +59,22 @@ resource "cloudflare_zero_trust_access_application" "ovis" {
   # session_duration, and `app_count` is how Cloudflare reports the attachment.
   policies = [
     {
-      id         = cloudflare_zero_trust_access_policy.ovis_allow.id
+      id         = cloudflare_zero_trust_access_policy.allow_operator.id
       precedence = 1
     },
   ]
 }
 
-resource "cloudflare_zero_trust_access_policy" "ovis_allow" {
+# The policy is the account's original reusable policy, adopted by id rather than
+# recreated. It was the one object both applications already shared before this
+# root existed, so importing it keeps the estate's identity and means the tree
+# manages the object the operator actually has.
+import {
+  to = cloudflare_zero_trust_access_policy.allow_operator
+  id = "8c4bb66b8910ded785480b1599dac8e2/b6eee043-df23-4fbe-8e54-388c2980aa4f"
+}
+
+resource "cloudflare_zero_trust_access_policy" "allow_operator" {
   account_id = var.cloudflare_account_id
 
   name     = "Allow Luka's email"
@@ -86,4 +93,15 @@ resource "cloudflare_zero_trust_access_policy" "ovis_allow" {
       }
     }
   ]
+
+  lifecycle {
+    # Cloudflare stores RDP clipboard rules on every reusable policy, and this
+    # object carries `["text", "file"]` for both directions. The provider's
+    # schema only accepts `["text"]`, so the value cannot be declared - writing
+    # it fails validation, and omitting it plans a removal of a field nobody
+    # configured. Ignoring exactly this one attribute is the narrowest way to
+    # stop that noise; everything that defines the policy's behaviour - decision,
+    # include, name and session_duration - is still tracked.
+    ignore_changes = [connection_rules]
+  }
 }
