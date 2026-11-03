@@ -161,6 +161,17 @@
     cmd: iscsiadm -m node --targetname {{ pds_iscsi_target_iqn }} --portal {{ pds_iscsi_target_ip }} -o update -n node.startup -v automatic
   changed_when: false
 
+- name: Assert the node is configured to log in at boot
+  # The update above is silent when it succeeds and says nothing when a later
+  # discovery recreates the record as manual. Fail the converge instead of
+  # discovering it at the next reboot, when the mount fails and the container
+  # starts against the rootfs stub.
+  ansible.builtin.command:
+    cmd: iscsiadm -m node -T {{ pds_iscsi_target_iqn }} --portal {{ pds_iscsi_target_ip }} -o show
+  register: pds_iscsi_startup_check
+  changed_when: false
+  failed_when: "'node.startup = automatic' not in pds_iscsi_startup_check.stdout"
+
 - name: Wait for iSCSI device to appear  # noqa: no-handler
   # Block-and-wait is the intent: following tasks resolve the device path and
   # format the filesystem; a handler at end-of-play would be too late.
@@ -205,5 +216,9 @@
     path: "{{ pds_iscsi_mount_point }}"
     src: "LABEL=pds-data"
     fstype: ext4
-    opts: _netdev,defaults
+    # x-systemd.requires keeps the mount unit behind iscsid. node.startup is
+    # automatic, so the session returns on boot, but without the ordering the
+    # LABEL= device can still be absent when the mount job runs - which is how
+    # /mnt/pds failed with "Dependency failed" on the 2026-10-31 boot.
+    opts: _netdev,defaults,x-systemd.requires=iscsid.service
     state: mounted

@@ -31,3 +31,13 @@ otbr_thread_channel: 15
 otbr_thread_network_name: "OpenThreadHA"
 otbr_thread_panid: "0x1234"
 otbr_thread_extpanid: "1111111122222222"
+
+# Data paths bind-mounted into containers here. All three are iSCSI zvols from
+# tn-storage, and all three must be mounted before Docker starts: a missing one
+# leaves the container writing into a stub directory on the VM disk, which is how
+# PDS ran from 2026-10-31 to 2026-11-03 without anyone noticing. Consumed by
+# roles/docker, which renders one docker.service drop-in from this list.
+docker_required_mounts:
+  - /mnt/pds
+  - /mnt/uptime-kuma
+  - /mnt/rustfs
