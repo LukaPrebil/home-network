@@ -16,11 +16,10 @@
 #                                       how that hop resolves.
 
 locals {
-  # One address for every public hostname. Named rather than repeated so a move
-  # is one edit, and so the A records below read as a list of names rather than
-  # a list of numbers.
-  lukapg_public_ipv4 = "193.77.212.228"
-
+  # One address for every public hostname. It comes from
+  # TF_VAR_lukapg_public_ipv4 (iac/secrets.sops.yaml) and is marked sensitive so
+  # it never appears in a plan, a PR comment or a CI log: these records are
+  # proxied, and the origin address in a public repository defeats the proxy.
   lukapg_a_records = {
     apex      = "lukapg.dev"
     documents = "documents.lukapg.dev"
@@ -40,7 +39,7 @@ resource "cloudflare_dns_record" "lukapg_a" {
   zone_id = cloudflare_zone.lukapg.id
   name    = each.value
   type    = "A"
-  content = local.lukapg_public_ipv4
+  content = var.lukapg_public_ipv4
   proxied = true
   ttl     = 1
 }

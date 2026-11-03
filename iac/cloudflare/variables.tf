@@ -25,3 +25,15 @@ variable "cloudflare_account_id" {
   nullable    = false
   default     = "8c4bb66b8910ded785480b1599dac8e2"
 }
+
+variable "lukapg_public_ipv4" {
+  description = <<-EOT
+    Origin address behind the proxied lukapg.dev A records. Supplied as
+    TF_VAR_lukapg_public_ipv4 by sops exec-env. Sensitive on purpose: the records
+    are proxied, so publishing the origin in a plan log or a PR comment would
+    hand out the address the proxy exists to hide.
+  EOT
+  type        = string
+  sensitive   = true
+  nullable    = false
+}
