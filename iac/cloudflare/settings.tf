@@ -31,7 +31,7 @@ locals {
   lukapg_settings = {
     ssl              = "strict"
     always_use_https = "on"
-    min_tls_version  = "1.0"
+    min_tls_version  = "1.2"
     tls_1_3          = "on"
     security_level   = "medium"
     orange_to_orange = "off"
@@ -40,7 +40,7 @@ locals {
   tnz_settings = {
     ssl              = "strict"
     always_use_https = "on"
-    min_tls_version  = "1.0"
+    min_tls_version  = "1.2"
     # "zrt" is Cloudflare's Zero Round Trip variant, which is what this zone has
     # had since it was created. Declaring "on" here would plan a change that
     # nobody asked for.
