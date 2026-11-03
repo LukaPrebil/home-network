@@ -18,3 +18,9 @@
   tags:
     - rustfs
     - deploy
+
+- name: Include IAM key tasks
+  ansible.builtin.include_tasks: keys.yml
+  tags:
+    - rustfs
+    - keys

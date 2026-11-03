@@ -40,13 +40,60 @@ rustfs_bind_address: "{{ ansible_host }}"
 # limited to it, and because it is the one bucket the object-store root owns.
 rustfs_state_bucket: "terraform-state"
 
-# Aliases written to the rc client config. `local` is the root credential, used
-# by the readiness check and by this role's own IAM tasks. The consumer keys
-# below it are added by the keys task; each alias is one key.
-rustfs_rc_aliases:
-  - name: local
-    access_key: "{{ rustfs_root_access_key }}"
-    secret_key: "{{ rustfs_root_secret_key }}"
+# Consumer keys. RustFS mints an access-key/secret-key pair per consumer, and
+# each pair carries its own policy - one leaked key cannot reach another
+# bucket. Access keys are usernames and stay in the clear here; the secrets come
+# from SOPS.
+#
+# tf-bootstrap is what the object-store root uses to create the bucket it stores
+# state in; the root credential never reaches OpenTofu. tf-control and tf-ci get
+# the state bucket only. The secret-key rotation procedure is
+# `rc admin user rm <key>` followed by a converge (the role never rewrites an
+# existing secret silently).
+rustfs_state_bucket_policy:
+  Version: "2012-10-17"
+  Statement:
+    - Effect: Allow
+      Action:
+        - "s3:*"
+      Resource:
+        - "arn:aws:s3:::{{ rustfs_state_bucket }}"
+        - "arn:aws:s3:::{{ rustfs_state_bucket }}/*"
+
+rustfs_all_buckets_policy:
+  Version: "2012-10-17"
+  Statement:
+    - Effect: Allow
+      Action:
+        - "s3:*"
+      Resource:
+        - "arn:aws:s3:::*"
+        - "arn:aws:s3:::*/*"
+
+rustfs_keys:
+  - name: tf-bootstrap
+    description: "OpenTofu bootstrap root for the object store (all buckets)"
+    access_key: "tf-bootstrap"
+    secret_key: "{{ vault_rustfs_tf_bootstrap_secret_key }}"
+    document: "{{ rustfs_all_buckets_policy }}"
+  - name: tf-control
+    description: "Operator Terraform root: {{ rustfs_state_bucket }} only"
+    access_key: "tf-control"
+    secret_key: "{{ vault_rustfs_tf_control_secret_key }}"
+    document: "{{ rustfs_state_bucket_policy }}"
+  - name: tf-ci
+    description: "CI Terraform jobs: {{ rustfs_state_bucket }} only"
+    access_key: "tf-ci"
+    secret_key: "{{ vault_rustfs_tf_ci_secret_key }}"
+    document: "{{ rustfs_state_bucket_policy }}"
+
+# Aliases written to the rc client config: `local` for the root credential (the
+# readiness check and this role's own IAM calls), plus one alias per consumer
+# key so the documented commands run verbatim - `rc ls tf-control/terraform-state`.
+rustfs_rc_aliases: >-
+  {{ [{'name': 'local',
+       'access_key': rustfs_root_access_key,
+       'secret_key': rustfs_root_secret_key}] + rustfs_keys }}
 
 # iSCSI configuration
 rustfs_iscsi_target_ip: "{{ truenas_nfs_server }}"
