@@ -718,8 +718,8 @@ The process that reads herdr's socket, serves the app, and sends push alerts. Ru
 _Avoid_: "bridge" (the rejected design: a Docker service sessions dialled into) and "relay" (the vendor's optional end-to-end transport, not ours)
 
 **Gate**:
-The two things a request must pass before it reaches the Ovis server from outside: Cloudflare Access proves who is asking, and a bearer **token** injected by Traefik proves the request came through our proxy. Neither is a substitute for the other.
-_Avoid_: "auth" (hides that two independent checks apply) and "login" (only the Access half is interactive)
+What a request must pass before it reaches the Ovis server from outside: Cloudflare Access proves who is asking, a Cloudflare-edge allow-list proves it came through Cloudflare at all, and a bearer **token** injected by Traefik proves it came through our proxy. No one of them substitutes for another.
+_Avoid_: "auth" (hides that three independent checks apply) and "login" (only the Access half is interactive)
 
 **Paired device**:
 A phone or browser the Ovis server itself admitted with a one-time code, holding its own revocable credential. Independent of the Gate, and the only per-device way to cut one phone off without rotating the token.

@@ -92,6 +92,22 @@ http:
         scheme: https
         permanent: true
 
+    # Cloudflare-edge-only allow-list for the Ovis router. Traefik injects the
+    # Ovis token, so any request that reaches that router is already authorized;
+    # without this list a LAN client could send the Host header itself, skip
+    # Cloudflare Access and be given a shell. Same pinned ranges the real-IP
+    # plugin and the CrowdSec bouncer trust. ipAllowList reads the socket
+    # address by default, which on this path is the Cloudflare edge.
+    cloudflare-only:
+      ipAllowList:
+        sourceRange:
+{% for cidr in traefik_cloudflare_ipv4_ranges %}
+          - "{{ cidr }}"
+{% endfor %}
+{% for cidr in traefik_cloudflare_ipv6_ranges %}
+          - "{{ cidr }}"
+{% endfor %}
+
 {% if traefik_cloudflare_real_ip_enabled | default(false) | bool %}
     # Cloudflare real client IP extraction (traefik-warp plugin)
     # provider: cloudflare auto-fetches the published Cloudflare ranges into
@@ -459,6 +475,7 @@ http:
 {% for mw in _ns.security_mw %}
         - {{ mw }}
 {% endfor %}
+        - cloudflare-only
         - proxy-headers
         - security-headers
         - ovis-token

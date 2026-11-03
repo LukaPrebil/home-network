@@ -28,12 +28,17 @@ phone PWA ──HTTPS──> Cloudflare (Access, WAF) ──> Traefik (192.168.6
 
 ## The gate
 
-Two independent checks, both required:
+Three controls, all required:
 
 1. **Cloudflare Access** proves who is asking. Self-hosted application for
    `ovis.lukapg.dev`, one policy allowing the operator's email, one-month session.
-   Access never injects the token, so it cannot replace step 2.
-2. **The token.** Traefik's `ovis-token` middleware sets
+   Access never injects the token, so it cannot replace step 3.
+2. **Cloudflare-only allow-list.** Traefik's `cloudflare-only` middleware refuses any request
+   that does not arrive from the pinned Cloudflare edge ranges. Without it, anything on the
+   LAN could send `Host: ovis.lukapg.dev` to Traefik, skip Access, and be handed the injected
+   token. It also means the DNS record must stay proxied: a DNS-only record makes every
+   request come from the real client and answers `403`.
+3. **The token.** Traefik's `ovis-token` middleware sets
    `Authorization: Bearer <vault_ovis_token>` on every request it proxies. The browser never
    sees it. A client that reaches `:7317` directly must present the same token.
 
@@ -114,6 +119,7 @@ decision 11: herdr's pi integration reports `working`/`blocked`/`idle` and never
 | --- | --- |
 | `502` from Traefik | the Mac is asleep, off the network, or Ovis is stopped: `herdr plugin action invoke devswha.ovis.status`, then `.start` |
 | `401` on every request | token drift between `vault_ovis_token` and the plugin env file |
+| `403` from Traefik | the request did not come from Cloudflare: the DNS record is DNS-only, or a LAN client sent the Host header itself |
 | Phone lost access | revoke the paired device in Ovis Settings; rotate the token only for a real leak (`sops` edit, then `--tags traefik`) |
 | Access login loop | check the Access policy still lists the email; sessions expire after a month |
 | Chat empty, terminal fine | set `PI_CODING_AGENT_DIR` in the plugin env to the same agent dir the pane's pi uses, then restart Ovis (macOS cannot expose per-process env) |
