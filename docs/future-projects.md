@@ -24,8 +24,14 @@ Deployed — see `ansible/roles/crowdsec/` and the CrowdSec section in `docs/net
 * **How it Fits:** Molecule is a testing framework for Ansible. You would use it locally on your MacBook. It can automatically spin up temporary Docker containers, run your Ansible role against them, run tests to verify the outcome, and then destroy the containers. This is a great way to ensure your automation code is robust.
 
 ---
-## 4. Cloudflare IaC
+## 4. Cloudflare IaC (Completed 2026-11-03)
 
-* **Why:** Cloudflare DNS and Access are configured by hand today (the `ovis` hostname and its Access policy, plus every existing public subdomain). A hand-made policy is invisible to review, and an email or token change leaves nothing to diff.
-* **What to explore:** Terraform (the `cloudflare` provider) or the Cloudflare API for DNS records and Access applications/policies, and whether the existing `traefik_cloudflare_dns_api_token` can be scoped for it.
-* **How it fits:** A `cloudflare/` tree beside `ansible/`, run from the control node, so a new public hostname and its gate land in one commit. Decided 2026-11-03 while planning the Ovis rollout; not scoped yet.
+Both zones and every account object are now declared in `iac/cloudflare/`: 21 DNS records, the two
+zones and their DNSSEC, the `ovis` and App Launcher Access applications with one shared allow policy,
+the Zero Trust organization and its one-time-PIN identity provider, the `lukapg.dev` WAF rules, bot
+management on both zones, the account bulk redirect, and seven zone settings per zone.
+
+The tree plans on a pull request, applies on a merge, and a daily job pushes drift to Loki so a
+dashboard edit cannot outlive the repo silently. The operator runbook - what is declared, how to
+import, and which repository secrets CI still needs - is
+`docs/infrastructure/cloudflare-iac.md`. Decided 2026-11-03 while planning the Ovis rollout.

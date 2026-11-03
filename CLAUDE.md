@@ -20,7 +20,7 @@
 - **Health check after deploy, never in handlers**: every Docker service deployment verifies readiness UNCONDITIONALLY after the deploy task with `ansible.builtin.uri` (30 retries x 5s delay) against a real application endpoint - port-open `wait_for` passes while an app crash-loops behind docker-proxy. Services without an HTTP endpoint use a null-safe `docker_container_info` running-state probe. Use `meta: flush_handlers` before the check when a mounted-config notify must take effect first
 - **Tags on every `include_tasks`**: always apply the role's primary tag to each `include_tasks` call - without it, subtasks are unreachable when running with `--tags`
 - **NFS mount opts come from `nfs_common_opts`** in `group_vars/all/main.yml`. Each role that mounts NFS exposes `<role>_nfs_opts` defaulting to that shared baseline so changes to the baseline (timeouts, automount behavior) propagate everywhere; override per-role only for genuine exceptions.
-- **IaC roots live under `iac/`** and are OpenTofu, never hand-run `terraform`. Every command goes through the SOPS wrapper so credentials reach the provider from the environment and never from a var file or state: `sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/<root> plan'`. Terraform state lives in the `terraform-state` bucket on the RustFS object store (`iac/object-store` owns the bucket), never on disk - a local `terraform.tfstate` means the backend failed to load. See `docs/infrastructure/object-storage.md`.
+- **IaC roots live under `iac/`** and are OpenTofu, never hand-run `terraform`. Every command goes through the SOPS wrapper so credentials reach the provider from the environment and never from a var file or state: `sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/<root> plan'`. Terraform state lives in the `terraform-state` bucket on the RustFS object store (`iac/object-store` owns the bucket), never on disk - a local `terraform.tfstate` means the backend failed to load. See `docs/infrastructure/object-storage.md` for the bucket and `docs/infrastructure/cloudflare-iac.md` for the Cloudflare root.
 - **Guard deploys that depend on NFS**: any deploy task that writes to an NFS-backed path must include the `common.assert_nfs_mount` guard before its first write. Usage: `include_role: name=common tasks_from=assert_nfs_mount` with `common_nfs_mount_path: "{{ target_path }}"`. The guard resolves the containing mount (via `stat -c %m`) and fails fast if it isn't NFS - prevents silently deploying against a local stub directory when the mount is missing.
 
 ## Bootstrap (once per control node)
@@ -99,6 +99,7 @@ Read these files **only when working on the relevant topic** - do not load them 
 |---|---|
 | New Ansible roles, deployment patterns, secrets, provisioning | `docs/infrastructure/ansible-guide.md` |
 | Object storage (RustFS, S3 keys, Terraform state bucket, recovery) | `docs/infrastructure/object-storage.md` |
+| Cloudflare (declared objects, import ids, CI secrets, drift) | `docs/infrastructure/cloudflare-iac.md` |
 | Dev VM (provisioning, dotfiles, Claude config tree, patching) | `docs/infrastructure/dev-vm-setup.md` |
 | Traefik reverse proxy (routing, certs, integration) | `docs/infrastructure/traefik-integration.md` |
 | Monitoring stack (Prometheus, Grafana, Loki, Alloy) | `docs/infrastructure/monitoring-stack.md` |

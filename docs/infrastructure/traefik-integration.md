@@ -260,12 +260,12 @@ The `.lan` domain is configured as an AdGuard DNS rewrite in `roles/adguard/defa
 
 ### Internal-Only Routes (HTTPS via Traefik, no public DNS)
 
-Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reachable at `*.lukapg.dev` URLs that are **only resolvable on the LAN** - public DNS returns NXDOMAIN. Traefik enforces a `lan-only` `ipAllowList` middleware as a defence-in-depth backstop. (Off-LAN access over the tailnet is planned but **not yet deployed** - it needs the Tailscale subnet router + a DNS override; the `lan-only` middleware already pre-allowlists the Tailscale CGNAT ranges below so it will work once that lands.)
+Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reachable at `*.lukapg.dev` URLs that resolve to the estate **only on the LAN**. Public DNS answers these names rather than staying silent: `lukapg.dev` carries a proxied wildcard CNAME to the Porkbun parking host (`*.lukapg.dev -> pixie.porkbun.com`, declared in `iac/cloudflare/dns_lukapg.tf`), so a public resolver answers every name with Cloudflare addresses. What a public client actually gets is Cloudflare's `error code: 526` - the parking origin cannot complete a strict-mode handshake for a name it has no certificate for - so the request never reaches the estate and Traefik is never dialled. Traefik enforces a `lan-only` `ipAllowList` middleware as a defence-in-depth backstop for the day a real public record is added. (Off-LAN access over the tailnet is planned but **not yet deployed** - it needs the Tailscale subnet router + a DNS override; the `lan-only` middleware already pre-allowlists the Tailscale CGNAT ranges below so it will work once that lands.)
 
 Pattern:
 
 1. **AdGuard split-DNS rewrite** (in `roles/adguard/defaults/main.yml`) points the name at Traefik's LAN IP (`192.168.60.142`).
-2. **No Cloudflare A record** for the name. Public resolvers return NXDOMAIN.
+2. **No Cloudflare A record** for the name. The proxied wildcard CNAME answers it publicly with Cloudflare addresses, and the edge fails the handshake (526) instead of reaching the estate - which is why a public `dig` for an admin name answers instead of staying silent.
 3. **Traefik router** in `dynamic.yml.j2` attaches the `lan-only` middleware (alongside `crowdsec`, `proxy-headers`, `security-headers`).
 4. **Self-signed HTTPS upstreams** (Proxmox, TrueNAS, Omada) reference per-router `serversTransport` blocks with `insecureSkipVerify: true`. AdGuard speaks plain HTTP and needs no transport block.
 
