@@ -28,7 +28,7 @@ env:
   TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
   TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
   TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-  LOKI_PUSH_URL: http://192.168.30.140:3100/loki/api/v1/push
+  LOKI_PUSH_URL: http://192.168.30.146:3100/loki/api/v1/push
 
 jobs:
   drift:
@@ -113,11 +113,11 @@ jobs:
             '{
                streams: [
                  {
-                   stream: {job: "tofu-drift", root: "cloudflare", status: $status, run_id: $run},
+                   stream: {job: "tofu-drift", root: "cloudflare", status: $status},
                    values: [[$ts, $summary]]
                  },
                  {
-                   stream: {job: "tofu-drift", root: "cloudflare", status: $status, run_id: $run, kind: "plan"},
+                   stream: {job: "tofu-drift", root: "cloudflare", status: $status, kind: "plan"},
                    values: [[$ts, $plan]]
                  }
                ]

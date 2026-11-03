@@ -135,7 +135,7 @@ removed when the job ends.
 ### Drift
 
 `iac-drift.yml` pushes two streams per run to
-`http://192.168.30.140:3100/loki/api/v1/push`:
+`http://192.168.30.146:3100/loki/api/v1/push`:
 
 - `{job="tofu-drift", status="clean"|"drift"|"error"}`, with the run URL in the line
 - `{job="tofu-drift", kind="plan"}`, with the full plan

@@ -1770,7 +1770,7 @@ groups:
               # runs once a day, so the drift line is either inside the last hour
               # or it is not there at all. `status` is a stream label, which keeps
               # this an index-only query rather than a scan.
-              expr: sum(count_over_time({job="tofu-drift", status="drift"} [1h]))
+              expr: sum(count_over_time({job="tofu-drift", status="drift"} [25h]))
               instant: false
               intervalMs: 60000
               maxDataPoints: 43200
