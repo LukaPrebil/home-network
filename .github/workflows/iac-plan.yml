@@ -1,0 +1,125 @@
+name: iac-plan
+
+# A pull request that touches the IaC roots gets one comment with the plan. The
+# comment is the review artefact: a diff against the account, not a promise.
+#
+# The state lives on the RustFS object store inside the estate, so this runner
+# joins the tailnet as an ephemeral node and reaches the endpoint through the
+# rpi4 subnet router. Nothing here talks to the public internet except the
+# provider API.
+on:
+  pull_request:
+    paths:
+      - 'iac/**'
+
+# Read-only by default. `pull-requests: write` exists only for the comment step;
+# a fork's pull request never receives secrets, so its plan job fails at the
+# credential check below rather than running with no state.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: iac-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The secret names are deliberately the environment variable names OpenTofu
+  # reads, so there is no renaming layer that can silently misspell one.
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
+  TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+  TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+
+jobs:
+  plan:
+    name: tofu plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # This step is the "fail loudly, never skip" contract. A missing secret
+      # leaves the job red with the names of what is absent; the alternative is a
+      # plan computed against no state and a green tick that means nothing.
+      - name: Require every secret this job reads
+        run: |
+          missing=()
+          for name in CLOUDFLARE_API_TOKEN AWS_ACCESS_KEY_ID \
+                      AWS_SECRET_ACCESS_KEY TF_VAR_state_passphrase \
+                      TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::missing repository secrets: ${missing[*]}"
+            echo "Add them under Settings -> Secrets and variables -> Actions."
+            echo "docs/infrastructure/cloudflare-iac.md lists what each one is for."
+            exit 1
+          fi
+
+      # Ephemeral: the node exists for this job and is removed when it ends, so
+      # the tailnet does not accumulate one node per run.
+      - name: Join the tailnet
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          args: --hostname=tofu-plan-${{ github.run_id }}
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.5
+
+      - name: Formatting
+        run: tofu fmt -check -recursive iac/
+
+      - name: Init and validate
+        run: |
+          tofu -chdir=iac/cloudflare init -input=false -no-color
+          tofu -chdir=iac/cloudflare validate -no-color
+
+      # -detailed-exitcode: 0 means the account matches the tree, 2 means there is
+      # a diff to show, anything else is an error. Exit 2 is a passing plan here,
+      # so the code is captured instead of letting `bash -e` fail the step.
+      - name: Plan
+        id: plan
+        run: |
+          rc=0
+          tofu -chdir=iac/cloudflare plan -input=false -no-color -detailed-exitcode \
+            > /tmp/plan.txt 2>&1 || rc=$?
+          cat /tmp/plan.txt
+          case "$rc" in
+            0) echo "changed=false" >> "$GITHUB_OUTPUT"
+               echo "No changes. The account already matches iac/." > /tmp/comment.md ;;
+            2) echo "changed=true" >> "$GITHUB_OUTPUT"
+               {
+                 echo '```diff'
+                 # GitHub caps a comment body at 65536 characters, so the plan is
+                 # cut and says so rather than being rejected.
+                 head -c 58000 /tmp/plan.txt
+                 echo '```'
+                 if [ "$(wc -c < /tmp/plan.txt)" -gt 58000 ]; then
+                   echo
+                   echo "_Plan truncated. The full output is in this job's log._"
+                 fi
+               } > /tmp/comment.md ;;
+            *) echo "::error::tofu plan failed with exit code $rc"
+               cp /tmp/plan.txt /tmp/comment.md
+               exit 1 ;;
+          esac
+          { echo "### iac plan"; echo; cat /tmp/comment.md; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment the plan on the pull request
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          # One comment per pull request: a re-run edits it in place instead of
+          # stacking a second plan under the first.
+          header: tofu-plan
+          path: /tmp/comment.md

@@ -1,0 +1,141 @@
+name: iac-drift
+
+# A dashboard edit that outlives the repo is the failure this workflow exists for.
+# It plans daily, pushes the result to Loki, and Grafana holds two rules: one for
+# "the account drifted" and one for "the drift job stopped reporting at all".
+#
+# The absence rule matters as much as the drift rule. A scheduled job that fails
+# silently looks exactly like a job that found nothing, so the alert is on the
+# missing log line, not only on the drift.
+on:
+  schedule:
+    # 04:10 UTC daily - after midnight in the estate's timezone, before the
+    # morning, and not on the hour where every other cron in the world lands.
+    - cron: "10 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iac-drift
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
+  TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+  TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
+  LOKI_PUSH_URL: http://192.168.30.140:3100/loki/api/v1/push
+
+jobs:
+  drift:
+    name: tofu drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require every secret this job reads
+        run: |
+          missing=()
+          for name in CLOUDFLARE_API_TOKEN AWS_ACCESS_KEY_ID \
+                      AWS_SECRET_ACCESS_KEY TF_VAR_state_passphrase \
+                      TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::missing repository secrets: ${missing[*]}"
+            echo "Add them under Settings -> Secrets and variables -> Actions."
+            echo "docs/infrastructure/cloudflare-iac.md lists what each one is for."
+            exit 1
+          fi
+
+      - name: Join the tailnet
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          args: --hostname=tofu-drift-${{ github.run_id }}
+
+      - name: Install OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.13.5
+
+      - name: Init
+        run: tofu -chdir=iac/cloudflare init -input=false -no-color
+
+      # A clean run pushes `status=clean` and a drifted run pushes `status=drift`
+      # with the plan attached. Both are pushed, because the absence alert keys on
+      # the presence of the line rather than on its content.
+      - name: Plan and report
+        run: |
+          rc=0
+          tofu -chdir=iac/cloudflare plan -input=false -no-color -detailed-exitcode \
+            > /tmp/plan.txt 2>&1 || rc=$?
+          cat /tmp/plan.txt
+
+          case "$rc" in
+            0) status=clean
+               summary="No drift: iac/cloudflare matches the account." ;;
+            2) status=drift
+               summary="Drift detected: the account no longer matches iac/cloudflare.
+          Run \`tofu -chdir=iac/cloudflare plan\` from the control node to see what changed.
+          If the change is one a plan should make, run
+          \`sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/cloudflare apply'\`
+          after reviewing it. If it was a dashboard edit, fix the tree or the
+          dashboard so they agree - the drift is the bug, not this workflow." ;;
+            *) # A failed plan is neither clean nor drift. Push it as its own status
+               # so it cannot masquerade as a clean run, then fail the job.
+               status=error
+               summary="The drift plan failed with exit code $rc. Nothing was verified today." ;;
+          esac
+
+          ts="$(date +%s%N)"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          # jq builds the payload so the plan's quotes, braces and newlines cannot
+          # break the JSON. Loki appends every push to the stream, so the full plan
+          # is queryable later without bloating the alert line.
+          jq -n \
+            --arg ts "$ts" \
+            --arg status "$status" \
+            --arg run "$GITHUB_RUN_ID" \
+            --arg summary "$summary"$'\n\n'"$run_url" \
+            --arg plan "$(head -c 400000 /tmp/plan.txt)" \
+            '{
+               streams: [
+                 {
+                   stream: {job: "tofu-drift", root: "cloudflare", status: $status, run_id: $run},
+                   values: [[$ts, $summary]]
+                 },
+                 {
+                   stream: {job: "tofu-drift", root: "cloudflare", status: $status, run_id: $run, kind: "plan"},
+                   values: [[$ts, $plan]]
+                 }
+               ]
+             }' > /tmp/loki.json
+
+          # No retry loop: if Loki is unreachable the job fails, which is the
+          # signal. A silent retry here would hide exactly the outage the absence
+          # rule is meant to catch.
+          curl -fsS --max-time 30 -X POST \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/loki.json "$LOKI_PUSH_URL"
+
+          { echo "### iac drift: $status"; echo; echo "$summary"; } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then
+            exit 1
+          fi
+
+      # Drift is reported, not corrected. This job never writes: an apply belongs
+      # to a reviewed merge, and a scheduled apply would make the repo's plan
+      # review optional.
