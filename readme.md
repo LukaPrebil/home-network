@@ -14,10 +14,12 @@ ansible-playbook site.yml --check --diff     # Dry run
 ## Repository Structure
 
 - `ansible/` — All Ansible automation (roles, inventory, playbooks)
+- `iac/` — OpenTofu roots and their SOPS-encrypted inputs (object store, Cloudflare)
 - `docs/` — Network architecture, VLANs, IP map, service documentation
 - `esphome/` — ESPHome device configurations (compiled and flashed to microcontrollers)
 
 ## Documentation
 
 - **[Architecture & Network Docs](docs/network-architecture.md)** — Hardware, VLANs, IP assignments, implementation status
+- **[Object storage](docs/infrastructure/object-storage.md)** — RustFS S3 store: keys, Terraform state bucket, recovery
 - **[CLAUDE.md](CLAUDE.md)** — AI agent instructions and project conventions
