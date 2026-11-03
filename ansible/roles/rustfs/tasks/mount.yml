@@ -13,9 +13,31 @@
     state: present
     update_cache: true
 
-- name: Resolve iSCSI disk device path via target IQN
-  ansible.builtin.shell:
-    cmd: readlink -f /dev/disk/by-path/*{{ rustfs_iscsi_target_iqn }}*lun-0
+- name: Find the LUN links exposed for the declared target
+  # The by-path name carries the target IQN and the LUN id. Matching the LUN
+  # rather than pinning lun-0 keeps the name correct when the target later maps
+  # a second LUN, and the count assertion below then catches that case instead
+  # of silently formatting whichever device sorted first.
+  ansible.builtin.find:
+    paths: /dev/disk/by-path
+    patterns: "*{{ rustfs_iscsi_target_iqn }}*lun-*"
+    file_type: link
+  register: rustfs_lun_links
+
+- name: Assert exactly one LUN is mapped for the declared target
+  ansible.builtin.assert:
+    that:
+      - rustfs_lun_links.matched == 1
+    fail_msg: >-
+      Expected one LUN for {{ rustfs_iscsi_target_iqn }} under /dev/disk/by-path,
+      found {{ rustfs_lun_links.matched }}. Refusing to guess which device to
+      format: a second LUN on this target needs this role taught which one holds
+      the object store.
+    quiet: true
+
+- name: Resolve the RustFS LUN device path
+  ansible.builtin.command:
+    cmd: readlink -f {{ rustfs_lun_links.files[0].path }}
   register: rustfs_device_path
   changed_when: false
 
