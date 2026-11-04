@@ -26,6 +26,7 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
+  TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
   TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
   TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
   LOKI_PUSH_URL: http://192.168.30.146:3100/loki/api/v1/push
@@ -44,6 +45,7 @@ jobs:
           missing=()
           for name in CLOUDFLARE_API_TOKEN AWS_ACCESS_KEY_ID \
                       AWS_SECRET_ACCESS_KEY TF_VAR_state_passphrase \
+                      TF_VAR_lukapg_public_ipv4 \
                       TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET; do
             if [ -z "${!name}" ]; then
               missing+=("$name")
