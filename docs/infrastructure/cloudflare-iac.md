@@ -132,6 +132,21 @@ through the existing rpi4 subnet router (which already advertises
 runner joins the tailnet, reads state over the subnet route, and the node is
 removed when the job ends.
 
+### Dependabot
+
+`.github/dependabot.yml` covers two things: the Actions SHAs in
+`.github/workflows/`, and the provider constraints in both `iac/` roots. Weekly, on Monday
+morning.
+
+A Dependabot pull request runs with the **Dependabot** secret scope, not the Actions scope, which
+is why every secret the plan job reads exists twice. A provider bump touches
+`iac/cloudflare/versions.tf`, so the plan job runs and the bump is reviewed against a real plan.
+
+Two things Dependabot does not do here. It updates the constraint, not the lock entry: run
+`tofu init -upgrade` in the branch and commit the regenerated `.terraform.lock.hcl`. And it does not
+touch `tofu_version` in the workflows or the image pins in the Ansible templates, which stay manual
+because they are not manifests Dependabot reads.
+
 ### Drift
 
 `iac-drift.yml` pushes two streams per run to
