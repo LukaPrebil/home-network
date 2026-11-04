@@ -12,6 +12,12 @@ name: iac-apply
 # below are what stop them interleaving. The concurrency group stops two of
 # *these* runs overlapping.
 
+# Workflow-level environment, non-secret only. The OpenTofu version lives here
+# because three workflows run `tofu`, and a bump applied to two of them makes the
+# plan verdict and the applied tree disagree with nothing flagging it.
+env:
+  TOFU_VERSION: 1.13.2
+
 on:
   push:
     branches:
@@ -142,7 +148,7 @@ jobs:
           # 1.13.3, 1.13.4 and 1.13.5 exist as tags only, and the action
           # resolves versions through the releases API, so they fail with
           # "No matching version found". Bump when they publish artifacts.
-          tofu_version: 1.13.2
+          tofu_version: ${{ env.TOFU_VERSION }}
 
       # Plan to a file, then apply exactly that file. Applying the saved plan
       # rather than a fresh one means what lands is what was printed here, even if
@@ -198,7 +204,6 @@ jobs:
             esac
             echo "::endgroup::"
           done
-
 
       # The rollback path is not a revert this workflow can perform: it is
       # `git revert` plus this workflow running again, or an operator apply from

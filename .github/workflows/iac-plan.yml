@@ -13,6 +13,12 @@ name: iac-plan
 # rpi4 subnet router. Nothing here talks to the public internet except the
 # provider API.
 
+# Workflow-level environment, non-secret only. The OpenTofu version lives here
+# because three workflows run `tofu`, and a bump applied to two of them makes the
+# plan verdict and the applied tree disagree with nothing flagging it.
+env:
+  TOFU_VERSION: 1.13.2
+
 on:
   pull_request:
 
@@ -139,7 +145,7 @@ jobs:
           # 1.13.3, 1.13.4 and 1.13.5 exist as tags only, and the action
           # resolves versions through the releases API, so they fail with
           # "No matching version found". Bump when they publish artifacts.
-          tofu_version: 1.13.2
+          tofu_version: ${{ env.TOFU_VERSION }}
 
       - name: Formatting
         if: steps.roots.outputs.roots != ''

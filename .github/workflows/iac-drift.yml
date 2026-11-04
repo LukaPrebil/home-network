@@ -15,6 +15,13 @@ name: iac-drift
 # A matrix rather than the changed-root loop the plan and apply jobs use: drift is
 # not caused by a commit, so every root is checked every run.
 
+# Workflow-level environment, non-secret only. The OpenTofu version lives here
+# because three workflows run `tofu`, and a bump applied to two of them makes the
+# plan verdict and the applied tree disagree with nothing flagging it.
+env:
+  TOFU_VERSION: 1.13.2
+  LOKI_PUSH_URL: http://192.168.30.146:3100/loki/api/v1/push
+
 on:
   schedule:
     # 04:10 UTC daily - after midnight in the estate's timezone, before the
@@ -28,9 +35,6 @@ permissions:
 concurrency:
   group: iac-drift
   cancel-in-progress: false
-
-env:
-  LOKI_PUSH_URL: http://192.168.30.146:3100/loki/api/v1/push
 
 jobs:
   drift:
@@ -117,7 +121,7 @@ jobs:
           # 1.13.3, 1.13.4 and 1.13.5 exist as tags only, and the action
           # resolves versions through the releases API, so they fail with
           # "No matching version found". Bump when they publish artifacts.
-          tofu_version: 1.13.2
+          tofu_version: ${{ env.TOFU_VERSION }}
 
       # A clean run pushes `status=clean` and a drifted run pushes `status=drift`
       # with the plan attached. Both are pushed, because the absence alert keys on
