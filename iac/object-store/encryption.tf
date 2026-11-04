@@ -29,5 +29,12 @@ terraform {
       # unencrypted is treated as tampering rather than read.
       enforced = true
     }
+
+    # A saved plan file carries the same resolved values the state does. It is
+    # not covered by `state {}`, so `plan -out` would write them in the clear.
+    plan {
+      method   = method.aes_gcm.state
+      enforced = true
+    }
   }
 }

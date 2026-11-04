@@ -1756,7 +1756,7 @@ groups:
 
       # 27. The account drifted from the tree
       - uid: alert-tofu-drift
-        title: Cloudflare drift detected
+        title: IaC drift detected
         condition: C
         data:
           - refId: A
@@ -1766,11 +1766,13 @@ groups:
             datasourceUid: loki
             model:
               refId: A
-              # Counted over an hour with a 26h retention of runs in mind: the job
-              # runs once a day, so the drift line is either inside the last hour
-              # or it is not there at all. `status` is a stream label, which keeps
-              # this an index-only query rather than a scan.
-              expr: sum(count_over_time({job="tofu-drift", status="drift"} [25h]))
+              # Counted over 25h so a drift that nobody fixed keeps alerting: the
+              # job runs once a day, so the last drift line stays inside the window
+              # until the next run, and one clean run ages it out within the hour
+              # that follows. `sum by (root)` keeps the root label, which the
+              # annotations below use - a plain `sum` would drop it. `status` and
+              # `root` are stream labels, so this stays an index-only query.
+              expr: sum by (root) (count_over_time({job="tofu-drift", status="drift"} [25h]))
               instant: false
               intervalMs: 60000
               maxDataPoints: 43200
@@ -1810,14 +1812,14 @@ groups:
         execErrState: Error
         for: 0s
         annotations:
-          summary: "Cloudflare no longer matches iac/cloudflare"
-          description: "The nightly drift job found a difference between the account and the tree. Run `tofu -chdir=iac/cloudflare plan` from the control node to see it, or open the run: {{ 'https://github.com/LukaPrebil/home-network/actions/runs/' }}{{ '{{' }} $labels.run_id {{ '}}' }}. The full plan is in Loki: `{job=\"tofu-drift\", kind=\"plan\", run_id=\"{{ '{{' }} $labels.run_id {{ '}}' }}\"}`. Either the dashboard was edited by hand and the tree should be corrected, or the tree changed and the apply did not land - one of the two is a bug."
+          summary: "The account no longer matches iac/{{ '{{' }} $labels.root {{ '}}' }}"
+          description: "The nightly drift job found a difference between the account and iac/{{ '{{' }} $labels.root {{ '}}' }}. Run `tofu -chdir=iac/{{ '{{' }} $labels.root {{ '}}' }} plan` from the control node to see it, or open the latest run: {{ 'https://github.com/LukaPrebil/home-network/actions/workflows/iac-drift.yml' }}. The full plan is in Loki: `{job=\"tofu-drift\", root=\"{{ '{{' }} $labels.root {{ '}}' }}\", kind=\"plan\"}`. Either the dashboard was edited by hand and the tree should be corrected, or the tree changed and the apply did not land - one of the two is a bug."
         labels:
           severity: warning
 
       # 28. The drift job stopped reporting
       - uid: alert-tofu-drift-absent
-        title: Cloudflare drift job is silent
+        title: IaC drift job is silent
         condition: C
         data:
           - refId: A
@@ -1830,7 +1832,13 @@ groups:
               # 30h: one daily run plus a six-hour grace. Anything shorter fires on
               # a late GitHub scheduler, which routinely delays scheduled workflows
               # by a few minutes to an hour.
-              expr: sum(count_over_time({job="tofu-drift"} [30h]))
+              #
+              # Only `clean` and `drift` count as a sighting. An `error` line means
+              # the plan failed and nothing was verified, so counting it would let a
+              # broken job silence the one alert that notices. `kind!="plan"`
+              # excludes the second line each root pushes, which carries the same
+              # status label and would double the count.
+              expr: sum(count_over_time({job="tofu-drift", status=~"clean|drift", kind!="plan"} [30h]))
               instant: false
               intervalMs: 60000
               maxDataPoints: 43200
@@ -1853,7 +1861,12 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - 0
+                      # The number of roots in the drift job's matrix. Two roots
+                      # report once a day, so anything below two means one of them
+                      # did not verify anything - a single silent root is the
+                      # failure this rule exists for, and a plain `< 1` would let
+                      # it hide behind the other. Bump this when the matrix grows.
+                      - 2
                     type: lt
                   operator:
                     type: and
@@ -1870,7 +1883,7 @@ groups:
         execErrState: Error
         for: 5m
         annotations:
-          summary: "The Cloudflare drift job has not reported in 30 hours"
-          description: "No log line with `job=\"tofu-drift\"` has reached Loki since yesterday, so nothing has verified the Cloudflare account against the tree. The usual causes are a disabled workflow, a missing repository secret (the job fails at its credential check and pushes nothing), a Tailscale OAuth client that was revoked so the runner never reaches the object store, or Loki refusing the push. Check the last run: {{ 'https://github.com/LukaPrebil/home-network/actions?query=workflow%3Aiac-drift' }}."
+          summary: "The drift job has not verified every root in 30 hours"
+          description: "Fewer than two `status=clean|drift` lines with `job=\"tofu-drift\"` have reached Loki since yesterday, so at least one IaC root was not verified against its account. The usual causes are a disabled workflow, a missing repository secret (the job fails at its credential check and pushes nothing), a plan that fails and pushes `status=error` instead, a Tailscale OAuth client that was revoked so the runner never reaches the object store, or Loki refusing the push. Check the last run: {{ 'https://github.com/LukaPrebil/home-network/actions?query=workflow%3Aiac-drift' }}."
         labels:
           severity: warning

@@ -260,7 +260,10 @@ The `.lan` domain is configured as an AdGuard DNS rewrite in `roles/adguard/defa
 
 ### Internal-Only Routes (HTTPS via Traefik, no public DNS)
 
-Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reachable at `*.lukapg.dev` URLs that resolve to the estate **only on the LAN**. Public DNS answers these names rather than staying silent: `lukapg.dev` carries a proxied wildcard CNAME to the Porkbun parking host (`*.lukapg.dev -> pixie.porkbun.com`, declared in `iac/cloudflare/dns_lukapg.tf`), so a public resolver answers every name with Cloudflare addresses. What a public client actually gets is Cloudflare's `error code: 526` - the parking origin cannot complete a strict-mode handshake for a name it has no certificate for - so the request never reaches the estate and Traefik is never dialled. Traefik enforces a `lan-only` `ipAllowList` middleware as a defence-in-depth backstop for the day a real public record is added. (Off-LAN access over the tailnet is planned but **not yet deployed** - it needs the Tailscale subnet router + a DNS override; the `lan-only` middleware already pre-allowlists the Tailscale CGNAT ranges below so it will work once that lands.)
+Internal admin UIs (Proxmox, TrueNAS, Omada Controller, AdGuard Home) are reachable at `*.lukapg.dev` URLs that resolve to the estate **only on the LAN**. Public DNS answers these names rather than staying silent: `lukapg.dev` carries a proxied wildcard CNAME to the Porkbun parking host (`*.lukapg.dev -> pixie.porkbun.com`, declared in `iac/cloudflare/dns_lukapg.tf`), so a public resolver answers every name with Cloudflare addresses. What a public client actually gets is Cloudflare's `error code: 526` - the parking origin cannot complete a strict-mode handshake for a name it has no certificate for - so the request never reaches the estate and Traefik is never dialled. Traefik enforces a `lan-only` `ipAllowList` middleware as a defence-in-depth backstop for the day a real public record is added. (Off-LAN access over the tailnet is deployed: `rpi4` advertises `192.168.30.0/24`
+plus `192.168.60.142/32` through the Tailscale subnet router in
+`roles/tailscale`, with the routes approved in the admin console. It depends on
+the tailnet policy file, so it depends on the ACL and not on this middleware.)
 
 Pattern:
 

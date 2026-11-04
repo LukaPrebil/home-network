@@ -28,7 +28,7 @@ provider is `cloudflare/cloudflare` `~> 5.28` (5.28.1), pinned in
 Deliberately not declared: the API tokens (a token in state is a secret in
 state, and the token is needed before the first run), Universal SSL issuance,
 the Free plan subscription, Cloudflare-managed ruleset versions, the domain
-registrations at Porkbun, and Access applications for the other seven public
+registrations at Porkbun, and Access applications for the other eight public
 hostnames - those use their own login, and gating them is a security decision
 rather than codification.
 
@@ -84,7 +84,7 @@ To delete an object through the plan, import it first, apply, then remove the
 resource block and the import block and apply again. Deleting by hand leaves no
 reviewable record of what went.
 
-## Four objects a plan must never replace
+## Six objects a plan must never replace
 
 If a plan wants to **replace** any of these, stop and fix the attributes instead
 of applying:
@@ -96,33 +96,36 @@ of applying:
 - `cloudflare_zero_trust_access_application.app_launcher` - Cloudflare-created;
   a replacement breaks the app list every signed-in user lands on
 
-All four carry `prevent_destroy` as a second line of defence, but a replacement
-is exactly the case that guard does not cover.
+All six carry `prevent_destroy`, and that guard also covers the destroy half of a
+replacement: the plan fails with a lifecycle error before anything runs. Treat a
+plan that reports either error as a stop, not as a hint.
 
 ## CI
 
-Three workflows, all filtered to `paths: ['iac/**']`:
+Three workflows, one per action. None of them filters on `paths` any more: the
+plan job has to run on every pull request so a required status check always
+reports, and it exits green in seconds when no root changed.
 
 | Workflow | Trigger | What it does |
 | --- | --- | --- |
-| `iac-plan.yml` | pull request | `fmt -check`, `init`, `validate`, `plan -detailed-exitcode`, one sticky comment with the plan |
-| `iac-apply.yml` | push to `main` | plan to a file, then apply that file, under `concurrency: {group: tofu-apply, cancel-in-progress: false}` |
-| `iac-drift.yml` | daily 04:10 UTC, manual | plan, push the summary and the full plan to Loki |
+| `iac-plan.yml` | every pull request | derives the changed roots from a git diff, then `fmt -check`, `init -lockfile=readonly`, `validate` and `plan -detailed-exitcode` for each, and posts one sticky comment with a section per root |
+| `iac-apply.yml` | push to `main`, `main` only by hand | derives the changed roots, then plans each to a file and applies that file, under `concurrency: {group: tofu-apply, cancel-in-progress: false}`. `iac/object-store` is skipped: it is applied from the control node |
+| `iac-drift.yml` | daily 04:10 UTC, manual | one matrix leg per root, each pushing its own `root` label, a summary and the plan to Loki |
 
 The merge is the approval gate. There is no separate deploy step.
 
 ### Repository secrets the operator still has to add
 
-None of these exist yet. Every IaC job checks for all six first and fails with
-the missing names rather than skipping silently, so an unconfigured repository
-shows red, not green.
+Every IaC job checks for all seven first and fails with the missing names rather
+than skipping silently, so an unconfigured repository shows red, not green.
 
 | Secret | What it is |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | the same account-owned token as `iac/secrets.sops.yaml` (id `39b4c7e1…`). Scopes: `Zone DNS Write`, `Zone WAF Write`, `Bot Management Write`, `Zone Settings Write`, `Zone Write`, `DNS Read`, `Access: Apps and Policies Write`, `Access: Organizations, Identity Providers, and Groups Write`, `Account Rulesets Write`, `Account Rule Lists Write`. No IP restriction |
+| `CLOUDFLARE_API_TOKEN` | the same account-owned token as `iac/secrets.sops.yaml` (id `39b4c7e1…`). Scopes: `Zone DNS Write`, `Zone WAF Write`, `Bot Management Write`, `Zone Settings Write`, `Zone Write`, `DNS Read`, `Access: Apps and Policies Write`, `Access: Organizations, Identity Providers, and Groups Write`, `Account Rulesets Write`, `Account Filter Lists Edit`. No IP restriction |
 | `AWS_ACCESS_KEY_ID` | the `tf-ci` RustFS key (`terraform-state` bucket only) |
 | `AWS_SECRET_ACCESS_KEY` | its secret |
 | `TF_VAR_STATE_PASSPHRASE` | the same passphrase as `TF_VAR_state_passphrase` in `iac/secrets.sops.yaml` - without it OpenTofu refuses to read the encrypted state |
+| `TF_VAR_LUKAPG_PUBLIC_IPV4` | the same origin address as `TF_VAR_lukapg_public_ipv4` in `iac/secrets.sops.yaml` - the root requires it, so a run without it fails at the variable rather than planning the records against nothing |
 | `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client for an ephemeral `tag:ci` node |
 | `TS_OAUTH_SECRET` | its secret |
 
@@ -149,20 +152,29 @@ because they are not manifests Dependabot reads.
 
 ### Drift
 
-`iac-drift.yml` pushes two streams per run to
+`iac-drift.yml` runs one matrix leg per root and pushes two streams per leg to
 `http://192.168.30.146:3100/loki/api/v1/push`:
 
-- `{job="tofu-drift", status="clean"|"drift"|"error"}`, with the run URL in the line
-- `{job="tofu-drift", kind="plan"}`, with the full plan
+- `{job="tofu-drift", root="<root>", status="clean"|"drift"|"error"}`, with the
+  run URL in the line
+- `{job="tofu-drift", root="<root>", status="<same>", kind="plan"}`, with the plan
+
+The run id is deliberately **not** a stream label: a per-run label would mint a
+new stream every night. The URL travels in the summary line instead, and the plan
+is selected by `root` and `status`.
 
 Grafana holds both rules in the **IaC Drift** group
 (`ansible/roles/monitoring_stack/templates/grafana-alerting-rules.yml.j2`):
 
-- `alert-tofu-drift` - fires on a `status="drift"` line in the last hour, and its
-  description links the run and the Loki query holding the plan
-- `alert-tofu-drift-absent` - fires when no `job="tofu-drift"` line arrives in 30
-  hours. A scheduled job that stopped running looks exactly like a job that keeps
-  finding nothing, so silence alerts on its own
+- `alert-tofu-drift` - fires per root on a `status="drift"` line, and its
+  description names the root, the command to run and the Loki query holding the
+  plan
+- `alert-tofu-drift-absent` - fires when fewer than one `status="clean"|"drift"`
+  line per root has arrived in 30 hours. A scheduled job that stopped running
+  looks exactly like a job that keeps finding nothing, so silence alerts on its
+  own. It counts only `clean` and `drift`, because an `error` line means nothing
+  was verified: letting it count would silence the one alert that notices a broken
+  job.
 
 ## Verifying by hand
 
@@ -228,9 +240,11 @@ does:
 
 The nine `lukapg.dev` A records point at one origin address, supplied as
 `TF_VAR_lukapg_public_ipv4` from `iac/secrets.sops.yaml` and declared `sensitive`, so no plan,
-comment or CI log prints it. That closes future leakage only: the address was committed once in the
-pull request that introduced this root, and GitHub keeps pull-request refs permanently, so it is
-published and is treated as known.
+comment or CI log prints it, and neither root's saved plan file carries it in the
+clear (`plan {}` in both `encryption.tf`). That closes future leakage only: the address was
+committed once in `afa4de7` ("feat(iac): import the lukapg.dev records"), which is not an
+ancestor of `main` but is still reachable through a pull-request ref, and GitHub keeps those
+permanently. It is published and is treated as known.
 
 The accepted position is defence in depth rather than concealment. Only `ovis` carries the
 `cloudflare-only` middleware, so a client that knows the address can send `Host: ha.lukapg.dev`
@@ -254,3 +268,9 @@ DNS changes.
 - **A dashboard edit that drifted**: it will appear as a difference in the next
   plan. Either correct the tree (a reviewed PR) or revert the dashboard change -
   the drift is the bug, not the alert.
+- **An object deleted out of band while its resource is still in state**: the
+  plan tries to create it and the retained `import` block fails first with
+  "cannot import non-existent remote object", so the recreate never appears. Delete
+  that one `import` block, apply the recreate, then put the block back. The blocks
+  are insurance against a lost state, not a guarantee that every plan is a full
+  description of intent.
