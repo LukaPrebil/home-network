@@ -1,4 +1,4 @@
-# Version updates for the two places this repo pins something.
+# Version updates for the two things this repo pins.
 #
 # GitHub Actions are pinned to commit SHAs with the release tag in a trailing
 # comment, and Dependabot understands that shape: it bumps the SHA and rewrites
@@ -6,11 +6,15 @@
 # in the lock file; Dependabot updates the constraint, and `tofu init -upgrade`
 # in the pull request is what moves the lock entry.
 #
-# Both secrets scopes (Actions and Dependabot) hold the tokens the plan job
-# reads, because a Dependabot pull request only ever sees the Dependabot scope.
-# Anything touching iac/** runs the plan job, so a provider bump is reviewed
-# against a real plan before it merges. Apply is not triggered by a workflow
-# change, only by iac/**, which is why a bump to a workflow file cannot deploy.
+# Both secret scopes (Actions and Dependabot) hold the tokens the plan job reads,
+# because a Dependabot pull request only ever sees the Dependabot scope. Anything
+# touching iac/** runs the plan job, so a provider bump is reviewed against a real
+# plan before it merges. Apply is not triggered by a workflow change, only by
+# iac/**, which is why a bump to a workflow file cannot deploy.
+#
+# No open-pull-requests-limit: updates are rare enough here that a cap would only
+# queue work behind itself. `directories` with a glob covers every root under
+# iac/, including one added later.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -20,7 +24,6 @@ updates:
       day: monday
       time: "06:00"
       timezone: Europe/Ljubljana
-    open-pull-requests-limit: 3
     commit-message:
       prefix: chore(ci)
     groups:
@@ -29,23 +32,12 @@ updates:
           - "*"
 
   - package-ecosystem: terraform
-    directory: /iac/cloudflare
+    directories:
+      - "/iac/*"
     schedule:
       interval: weekly
       day: monday
       time: "06:00"
       timezone: Europe/Ljubljana
-    open-pull-requests-limit: 2
-    commit-message:
-      prefix: chore(iac)
-
-  - package-ecosystem: terraform
-    directory: /iac/object-store
-    schedule:
-      interval: weekly
-      day: monday
-      time: "06:00"
-      timezone: Europe/Ljubljana
-    open-pull-requests-limit: 2
     commit-message:
       prefix: chore(iac)
