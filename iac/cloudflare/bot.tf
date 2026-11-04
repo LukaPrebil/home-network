@@ -9,6 +9,10 @@
 # The two zones are declared separately rather than with a for_each because bot
 # management is a per-zone object and a future divergence (fighting mode off on
 # the rehearsal zone, say) should be one edit, not a conditional.
+#
+# This resource's Delete is a no-op in the provider, like the zone settings: a
+# removed resource block succeeds, forgets the state and leaves the account's
+# value untouched, so it ends drift coverage rather than reverting anything.
 
 import {
   to = cloudflare_bot_management.lukapg

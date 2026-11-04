@@ -10,7 +10,8 @@
 #
 # This file is separate from access.tf because the launcher is the one
 # Cloudflare-created object in the tree. If the provider ever stops handling it
-# cleanly, removing this file is the whole rollback.
+# cleanly, removing this file is not the whole rollback: the resource carries
+# `prevent_destroy`, so the lifecycle block has to go first.
 
 import {
   to = cloudflare_zero_trust_access_application.app_launcher
@@ -48,4 +49,12 @@ resource "cloudflare_zero_trust_access_application" "app_launcher" {
       precedence = 1
     },
   ]
+
+  lifecycle {
+    # Cloudflare created this object when Zero Trust was first enabled, and a
+    # replacement breaks the page every signed-in user lands on. The doc names it
+    # as one of the objects a plan must never replace, so the guard belongs here
+    # and not only in the prose.
+    prevent_destroy = true
+  }
 }
