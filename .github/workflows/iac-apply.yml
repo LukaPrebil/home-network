@@ -66,13 +66,12 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
-          args: --accept-routes --hostname=tofu-apply-${{ github.run_id }}
+          args: --hostname=tofu-apply-${{ github.run_id }}
 
-      # Linux nodes do not accept subnet routes by default, so the ephemeral
-      # runner cannot reach VLAN 30 without --accept-routes, even with the ACL
-      # grant in place. Docs: features/subnet-routers, "use the --accept-routes
-      # flag". The reachability check below turns a routing failure into its own
-      # error instead of a confusing timeout from tofu init.
+      # The action already passes --accept-routes to `tailscale up`, so adding
+      # it to args fails with "flag provided multiple times". What was missing
+      # was proof that the route works, so this probe turns a routing failure
+      # into its own error instead of a confusing timeout from tofu init.
       - name: Check the tailnet path to the object store
         env:
           S3_ENDPOINT: http://192.168.30.140:9000
