@@ -62,7 +62,24 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
-          args: --hostname=tofu-drift-${{ github.run_id }}
+          args: --accept-routes --hostname=tofu-drift-${{ github.run_id }}
+
+      # Linux nodes do not accept subnet routes by default, so the ephemeral
+      # runner cannot reach VLAN 30 without --accept-routes, even with the ACL
+      # grant in place. Docs: features/subnet-routers, "use the --accept-routes
+      # flag". The reachability check below turns a routing failure into its own
+      # error instead of a confusing timeout from tofu init.
+      - name: Check the tailnet path to the object store
+        env:
+          S3_ENDPOINT: http://192.168.30.140:9000
+        run: |
+          code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$S3_ENDPOINT" || true)
+          if [ "$code" = "000" ]; then
+            echo "::error::cannot reach $S3_ENDPOINT over the tailnet. Check the tag:ci grant for tcp:9000 and that the node accepted the subnet route."
+            tailscale status || true
+            exit 1
+          fi
+          echo "object store reachable over the tailnet (HTTP $code)"
 
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
