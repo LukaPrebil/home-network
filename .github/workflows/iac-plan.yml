@@ -11,6 +11,12 @@ on:
   pull_request:
     paths:
       - 'iac/**'
+      # A workflow edit is itself a change worth planning against: without this,
+      # a broken pipeline can only be discovered by pushing an unrelated iac/
+      # change.
+      - '.github/workflows/iac-plan.yml'
+      - '.github/workflows/iac-apply.yml'
+      - '.github/workflows/iac-drift.yml'
 
 # Read-only by default. `pull-requests: write` exists only for the comment step;
 # a fork's pull request never receives secrets, so its plan job fails at the

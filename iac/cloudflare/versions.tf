@@ -18,4 +18,4 @@ terraform {
   }
 }
 
-# Triggered a fresh plan run after the CI auth fixes; safe to keep.
+# Comment-only edit; here so a push touches iac/ and triggers the plan job.
