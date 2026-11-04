@@ -109,19 +109,26 @@ jobs:
       - name: Formatting
         run: tofu fmt -check -recursive iac/
 
+      # -lockfile=readonly keeps the committed .terraform.lock.hcl authoritative:
+      # a constraint-only Dependabot bump must not be able to resolve a newer
+      # provider inside the runner, or the plan is reviewed against a version
+      # nobody pinned and the effect only appears at the next -upgrade.
       - name: Init and validate
         run: |
-          tofu -chdir=iac/cloudflare init -input=false -no-color
+          tofu -chdir=iac/cloudflare init -input=false -no-color -lockfile=readonly
           tofu -chdir=iac/cloudflare validate -no-color
 
       # -detailed-exitcode: 0 means the account matches the tree, 2 means there is
       # a diff to show, anything else is an error. Exit 2 is a passing plan here,
       # so the code is captured instead of letting `bash -e` fail the step.
+      # -lock-timeout: an operator plan from the control node and this job both
+      # write the same state object, so they queue instead of one failing on the
+      # lock the moment they overlap.
       - name: Plan
         id: plan
         run: |
           rc=0
-          tofu -chdir=iac/cloudflare plan -input=false -no-color -detailed-exitcode \
+          tofu -chdir=iac/cloudflare plan -input=false -no-color -lock-timeout=5m -detailed-exitcode \
             > /tmp/plan.txt 2>&1 || rc=$?
           cat /tmp/plan.txt
           case "$rc" in

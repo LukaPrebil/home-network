@@ -96,8 +96,10 @@ jobs:
           # "No matching version found". Bump when they publish artifacts.
           tofu_version: 1.13.2
 
+      # -lockfile=readonly: same reason as the plan job. The version that lands
+      # is the version the pull request planned against.
       - name: Init
-        run: tofu -chdir=iac/cloudflare init -input=false -no-color
+        run: tofu -chdir=iac/cloudflare init -input=false -no-color -lockfile=readonly
 
       # Plan to a file, then apply exactly that file. Applying the saved plan
       # rather than a fresh one means what lands is what was printed here, even if
@@ -106,7 +108,7 @@ jobs:
         id: plan
         run: |
           rc=0
-          tofu -chdir=iac/cloudflare plan -input=false -no-color -detailed-exitcode \
+          tofu -chdir=iac/cloudflare plan -input=false -no-color -lock-timeout=5m -detailed-exitcode \
             -out=/tmp/apply.tfplan > /tmp/plan.txt 2>&1 || rc=$?
           cat /tmp/plan.txt
           case "$rc" in
@@ -117,7 +119,7 @@ jobs:
 
       - name: Apply
         if: steps.plan.outputs.changed == 'true'
-        run: tofu -chdir=iac/cloudflare apply -input=false -no-color /tmp/apply.tfplan
+        run: tofu -chdir=iac/cloudflare apply -input=false -no-color -lock-timeout=5m /tmp/apply.tfplan
 
       # The rollback path is not a revert this workflow can perform: it is
       # `git revert` plus this workflow running again, or an operator apply from

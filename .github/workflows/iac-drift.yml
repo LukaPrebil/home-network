@@ -92,8 +92,10 @@ jobs:
           # "No matching version found". Bump when they publish artifacts.
           tofu_version: 1.13.2
 
+      # -lockfile=readonly keeps the committed lockfile authoritative, so the
+      # drift verdict is computed against the provider version the tree pins.
       - name: Init
-        run: tofu -chdir=iac/cloudflare init -input=false -no-color
+        run: tofu -chdir=iac/cloudflare init -input=false -no-color -lockfile=readonly
 
       # A clean run pushes `status=clean` and a drifted run pushes `status=drift`
       # with the plan attached. Both are pushed, because the absence alert keys on
@@ -101,7 +103,7 @@ jobs:
       - name: Plan and report
         run: |
           rc=0
-          tofu -chdir=iac/cloudflare plan -input=false -no-color -detailed-exitcode \
+          tofu -chdir=iac/cloudflare plan -input=false -no-color -lock-timeout=5m -detailed-exitcode \
             > /tmp/plan.txt 2>&1 || rc=$?
           cat /tmp/plan.txt
 
