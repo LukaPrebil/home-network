@@ -1,25 +1,23 @@
 name: iac-plan
 
-# A pull request that touches the IaC roots gets one comment with the plan. The
-# comment is the review artefact: a diff against the account, not a promise.
+# A pull request that touches IaC gets one comment with the plan for every root it
+# changed. The comment is the review artefact: a diff against the account, not a
+# promise.
+#
+# There is deliberately no `paths:` filter. The job has to run on every pull
+# request so that a required status check is always reported; it exits green in
+# seconds when no root changed, because the first real step is a diff.
 #
 # The state lives on the RustFS object store inside the estate, so this runner
 # joins the tailnet as an ephemeral node and reaches the endpoint through the
 # rpi4 subnet router. Nothing here talks to the public internet except the
 # provider API.
+
 on:
   pull_request:
-    paths:
-      - 'iac/**'
-      # A workflow edit is itself a change worth planning against: without this,
-      # a broken pipeline can only be discovered by pushing an unrelated iac/
-      # change.
-      - '.github/workflows/iac-plan.yml'
-      - '.github/workflows/iac-apply.yml'
-      - '.github/workflows/iac-drift.yml'
 
 # Read-only by default. `pull-requests: write` exists only for the comment step;
-# a fork's pull request never receives secrets, so its plan job fails at the
+# a fork's pull request never receives secrets, so its plan fails at the
 # credential check below rather than running with no state.
 permissions:
   contents: read
@@ -28,17 +26,6 @@ permissions:
 concurrency:
   group: iac-plan-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  # The secret names are deliberately the environment variable names OpenTofu
-  # reads, so there is no renaming layer that can silently misspell one.
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
-  TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
-  TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-  TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
 
 jobs:
   plan:
@@ -52,11 +39,52 @@ jobs:
           # The GITHUB_TOKEN extraheader otherwise stays in .git/config while
           # third-party actions and provider code run in this workspace.
           persist-credentials: false
+          # The changed-root diff compares the base commit to the merge commit,
+          # and a shallow clone does not contain the base.
+          fetch-depth: 0
+
+      # Which roots does this pull request actually touch? A root is a directory
+      # under iac/. A file such as iac/secrets.sops.yaml is not one, and a diff
+      # that only touches it plans nothing.
+      - name: Detect changed roots
+        id: roots
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          roots=''
+          for dir in $(git diff --name-only "$base" "$GITHUB_SHA" -- iac/ \
+                       | cut -d/ -f2 | sort -u); do
+            if [ -d "iac/$dir" ]; then
+              roots="${roots:+$roots }$dir"
+            fi
+          done
+          echo "roots=$roots" >> "$GITHUB_OUTPUT"
+          if [ -z "$roots" ]; then
+            echo "No IaC root changed. Nothing to plan."
+          else
+            echo "Changed roots: $roots"
+            # The comment step runs on failure too, so the body has to exist
+            # before anything else can fail. The plan step overwrites it.
+            printf '_The plan did not run. See the job log._\n' > /tmp/comment.md
+          fi
 
       # This step is the "fail loudly, never skip" contract. A missing secret
       # leaves the job red with the names of what is absent; the alternative is a
       # plan computed against no state and a green tick that means nothing.
+      #
+      # The secrets are declared on this step and the ones below, not at workflow
+      # scope: a workflow-level env puts every credential in the environment of
+      # every step, including checkout, the tailnet action, the OpenTofu installer
+      # and the comment action.
       - name: Require every secret this job reads
+        if: steps.roots.outputs.roots != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
+          TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
         run: |
           missing=()
           for name in CLOUDFLARE_API_TOKEN AWS_ACCESS_KEY_ID \
@@ -77,6 +105,7 @@ jobs:
       # Ephemeral: the node exists for this job and is removed when it ends, so
       # the tailnet does not accumulate one node per run.
       - name: Join the tailnet
+        if: steps.roots.outputs.roots != ''
         uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
@@ -90,6 +119,7 @@ jobs:
       # is what the first two attempts at this step did. The probe below is the
       # part that was genuinely missing: proof the subnet route resolves.
       - name: Check the tailnet path to the object store
+        if: steps.roots.outputs.roots != ''
         env:
           S3_ENDPOINT: http://192.168.30.140:9000
         run: |
@@ -102,6 +132,7 @@ jobs:
           echo "object store reachable over the tailnet (HTTP $code)"
 
       - name: Install OpenTofu
+        if: steps.roots.outputs.roots != ''
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
           # 1.13.2 is the newest 1.13 release with a published GitHub release;
@@ -111,52 +142,130 @@ jobs:
           tofu_version: 1.13.2
 
       - name: Formatting
+        if: steps.roots.outputs.roots != ''
         run: tofu fmt -check -recursive iac/
 
+      # One plan per changed root, in one job, so a required status check has a
+      # single name to require. The loop also keeps a root out of the run that the
+      # pull request never touched: a merge that only changes iac/object-store
+      # must not reconcile Cloudflare drift nobody reviewed.
+      #
       # -lockfile=readonly keeps the committed .terraform.lock.hcl authoritative:
       # a constraint-only Dependabot bump must not be able to resolve a newer
-      # provider inside the runner, or the plan is reviewed against a version
-      # nobody pinned and the effect only appears at the next -upgrade.
-      - name: Init and validate
-        run: |
-          tofu -chdir=iac/cloudflare init -input=false -no-color -lockfile=readonly
-          tofu -chdir=iac/cloudflare validate -no-color
-
+      # provider inside the runner.
+      #
       # -detailed-exitcode: 0 means the account matches the tree, 2 means there is
-      # a diff to show, anything else is an error. Exit 2 is a passing plan here,
-      # so the code is captured instead of letting `bash -e` fail the step.
+      # a diff to show, anything else is an error. Exit 2 is a passing plan here.
+      #
       # -lock-timeout: an operator plan from the control node and this job both
       # write the same state object, so they queue instead of one failing on the
       # lock the moment they overlap.
-      - name: Plan
+      - name: Plan each changed root
         id: plan
+        if: steps.roots.outputs.roots != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
+          TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
         run: |
-          rc=0
-          tofu -chdir=iac/cloudflare plan -input=false -no-color -lock-timeout=5m -detailed-exitcode \
-            > /tmp/plan.txt 2>&1 || rc=$?
-          cat /tmp/plan.txt
-          case "$rc" in
-            0) echo "changed=false" >> "$GITHUB_OUTPUT"
-               echo "No changes. The account already matches iac/." > /tmp/comment.md ;;
-            2) echo "changed=true" >> "$GITHUB_OUTPUT"
-               {
-                 echo '```diff'
-                 # GitHub caps a comment body at 65536 characters, so the plan is
-                 # cut and says so rather than being rejected.
-                 head -c 58000 /tmp/plan.txt
-                 echo '```'
-                 if [ "$(wc -c < /tmp/plan.txt)" -gt 58000 ]; then
-                   echo
-                   echo "_Plan truncated. The full output is in this job's log._"
-                 fi
-               } > /tmp/comment.md ;;
-            *) echo "::error::tofu plan failed with exit code $rc"
-               cp /tmp/plan.txt /tmp/comment.md
-               exit 1 ;;
-          esac
-          { echo "### iac plan"; echo; cat /tmp/comment.md; } >> "$GITHUB_STEP_SUMMARY"
+          set -o pipefail
+          # GitHub caps a comment body at 65536 characters, so each plan is cut
+          # and says so rather than the comment being rejected.
+          cap=48000
+          failed=0
+          changed=false
+          : > /tmp/comment.md
 
+          for root in ${{ steps.roots.outputs.roots }}; do
+            # Each root sees only the credentials it consumes. The step-level env
+            # is the union; unsetting here keeps the other vendor's token out of
+            # the environment OpenTofu and its providers execute in.
+            case "$root" in
+              cloudflare) ;;
+              object-store)
+                unset CLOUDFLARE_API_TOKEN TF_VAR_lukapg_public_ipv4 ;;
+              *)
+                echo "::error::iac/$root has no entry in this workflow's root list"
+                exit 1 ;;
+            esac
+
+            echo "### $root" >> /tmp/comment.md
+            echo >> /tmp/comment.md
+
+            rc=0
+            tofu -chdir="iac/$root" init -input=false -no-color -lockfile=readonly \
+              > /tmp/init.txt 2>&1 || rc=$?
+            if [ "$rc" != 0 ]; then
+              cat /tmp/init.txt
+              {
+                echo '```'
+                head -c "$cap" /tmp/init.txt
+                echo '```'
+              } >> /tmp/comment.md
+              failed=1
+              continue
+            fi
+            tofu -chdir="iac/$root" validate -no-color >> /tmp/init.txt 2>&1 || rc=$?
+            if [ "$rc" != 0 ]; then
+              cat /tmp/init.txt
+              {
+                echo '```'
+                head -c "$cap" /tmp/init.txt
+                echo '```'
+              } >> /tmp/comment.md
+              failed=1
+              continue
+            fi
+
+            rc=0
+            tofu -chdir="iac/$root" plan -input=false -no-color -lock-timeout=5m \
+              -detailed-exitcode > /tmp/plan.txt 2>&1 || rc=$?
+            cat /tmp/plan.txt
+            case "$rc" in
+              0) echo "No changes. The account already matches iac/$root." >> /tmp/comment.md ;;
+              2) changed=true
+                 {
+                   echo '```diff'
+                   head -c "$cap" /tmp/plan.txt
+                   echo '```'
+                   if [ "$(wc -c < /tmp/plan.txt)" -gt "$cap" ]; then
+                     echo
+                     echo "_Plan truncated. The full output is in this job's log._"
+                   fi
+                 } >> /tmp/comment.md ;;
+              *) failed=1
+                 echo "::error::tofu plan failed for iac/$root with exit code $rc"
+                 {
+                   echo '```'
+                   head -c "$cap" /tmp/plan.txt
+                   echo '```'
+                 } >> /tmp/comment.md ;;
+            esac
+            echo >> /tmp/comment.md
+          done
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          if [ "$failed" = 1 ] && [ ! -s /tmp/comment.md ]; then
+            printf 'The plan did not run. See the job log.\n' > /tmp/comment.md
+          fi
+          {
+            echo "### iac plan"
+            echo
+            echo "_Computed from commit ${GITHUB_SHA:0:7}._"
+            echo
+            cat /tmp/comment.md
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$failed" = 1 ]; then
+            exit 1
+          fi
+
+      # Posted even when a plan failed, so a stale comment can never stand in for
+      # the current head: the body either holds today's plans or the error that
+      # replaced them.
       - name: Comment the plan on the pull request
+        if: always() && steps.roots.outputs.roots != ''
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           # One comment per pull request: a re-run edits it in place instead of
