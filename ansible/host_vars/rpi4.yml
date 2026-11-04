@@ -36,6 +36,7 @@ tailscale_hostname: rpi4
 tailscale_advertise_tags: "tag:subnet-router"
 tailscale_accept_dns: false        # rpi4 is on the LAN; AdGuard is direct
 tailscale_accept_routes: false     # don't accept tailnet-pushed routes (no self-loop)
+tailscale_subnet_router: true
 tailscale_advertise_routes:
   - "192.168.30.0/24"
   - "192.168.60.142/32"  # Traefik LXC (DMZ)
