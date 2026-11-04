@@ -39,6 +39,10 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The GITHUB_TOKEN extraheader otherwise stays in .git/config while
+          # third-party actions and provider code run in this workspace.
+          persist-credentials: false
 
       - name: Require every secret this job reads
         run: |
