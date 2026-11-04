@@ -29,5 +29,14 @@ terraform {
       # unencrypted is treated as tampering rather than read.
       enforced = true
     }
+
+    # A saved plan carries the same values the state does, including the origin
+    # address behind var.lukapg_public_ipv4: sensitive redacts console and
+    # comment output, not a plan file on disk. Encrypting the plan context is
+    # the only thing that covers `plan -out`, which the apply workflow uses.
+    plan {
+      method   = method.aes_gcm.state
+      enforced = true
+    }
   }
 }
