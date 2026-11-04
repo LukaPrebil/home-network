@@ -17,3 +17,5 @@ terraform {
     }
   }
 }
+
+# Triggered a fresh plan run after the CI auth fixes; safe to keep.
