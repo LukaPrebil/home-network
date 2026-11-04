@@ -15,3 +15,21 @@ repos:
       # --redact matters locally: it keeps a detected secret out of terminal
       # scrollback and shell history when the hook reports the finding.
       - id: gitleaks
+
+  # The IaC roots have no other local gate: a badly formatted .tf file is
+  # accepted by `tofu validate`, so it reaches a pull request and turns the CI
+  # formatting step red for something a hook could have fixed locally.
+  #
+  # `local` rather than a third-party hook so the check runs the same `tofu`
+  # binary the operator runs, at the same version the workflows pin. It formats
+  # the whole root rather than the staged files, because `tofu fmt` needs the
+  # directory to resolve nothing at all - and a recursive check over iac/ is the
+  # exact command CI runs, so local and CI cannot disagree.
+  - repo: local
+    hooks:
+      - id: tofu-fmt
+        name: tofu fmt (iac/)
+        entry: tofu fmt -check -recursive iac/
+        language: system
+        files: '^iac/.*\.tf$'
+        pass_filenames: false

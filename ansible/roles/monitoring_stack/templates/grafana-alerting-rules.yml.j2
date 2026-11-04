@@ -1735,3 +1735,142 @@ groups:
           description: "More than 3 Matter nodes have gone unavailable in 15 minutes, which is a path problem rather than a device problem. Check the border router host first: `sysctl net.ipv6.conf.eth0.accept_ra` must be 2 on the containers VM and `ip -6 route get fd11:1111:1122:2222:<rpi4 address>` must resolve, because the Thread on-link prefix route is what carries device replies back to matter-server. If the route is missing the fix is a networkctl reload on containers, then `docker restart matter-server` on rpi4, since its retry backoff stretches to hours. See docs/infrastructure/otbr-thread-recovery.md and the 2026-09-30 incident note."
         labels:
           severity: warning
+
+  # ============================================================
+  # IaC Drift (Loki, pushed by .github/workflows/iac-drift.yml)
+  # ============================================================
+  #
+  # The daily drift job plans both Cloudflare zones against the tree and pushes
+  # one log line per run to Loki: `status=drift` when the account no longer
+  # matches, `status=clean` when it does, `status=error` when the plan itself
+  # failed. The full plan is pushed as a second line with `kind="plan"`.
+  #
+  # Two rules, and the second is the one that makes the first trustworthy: a
+  # scheduled job that stops running looks exactly like a job that keeps finding
+  # nothing, so the silence has to alert on its own.
+  - orgId: 1
+    name: IaC Drift
+    folder: Alerts
+    interval: 5m
+    rules:
+
+      # 27. The account drifted from the tree
+      - uid: alert-tofu-drift
+        title: Cloudflare drift detected
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              # Counted over an hour with a 26h retention of runs in mind: the job
+              # runs once a day, so the drift line is either inside the last hour
+              # or it is not there at all. `status` is a stream label, which keeps
+              # this an index-only query rather than a scan.
+              expr: sum(count_over_time({job="tofu-drift", status="drift"} [25h]))
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              queryType: range
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        # No data is the normal state 23 hours out of 24 - the drift line expires
+        # from the query window long before the next run. Absence is rule 28's
+        # job, so this one stays silent when there is nothing to count.
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Cloudflare no longer matches iac/cloudflare"
+          description: "The nightly drift job found a difference between the account and the tree. Run `tofu -chdir=iac/cloudflare plan` from the control node to see it, or open the run: {{ 'https://github.com/LukaPrebil/home-network/actions/runs/' }}{{ '{{' }} $labels.run_id {{ '}}' }}. The full plan is in Loki: `{job=\"tofu-drift\", kind=\"plan\", run_id=\"{{ '{{' }} $labels.run_id {{ '}}' }}\"}`. Either the dashboard was edited by hand and the tree should be corrected, or the tree changed and the apply did not land - one of the two is a bug."
+        labels:
+          severity: warning
+
+      # 28. The drift job stopped reporting
+      - uid: alert-tofu-drift-absent
+        title: Cloudflare drift job is silent
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 108000
+              to: 0
+            datasourceUid: loki
+            model:
+              refId: A
+              # 30h: one daily run plus a six-hour grace. Anything shorter fires on
+              # a late GitHub scheduler, which routinely delays scheduled workflows
+              # by a few minutes to an hour.
+              expr: sum(count_over_time({job="tofu-drift"} [30h]))
+              instant: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              queryType: range
+          - refId: B
+            datasourceUid: "__expr__"
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+        # A dropped `count_over_time` result surfaces as no data, and no data is
+        # exactly the condition being alerted on. OK here would make the rule
+        # unable to ever fire.
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "The Cloudflare drift job has not reported in 30 hours"
+          description: "No log line with `job=\"tofu-drift\"` has reached Loki since yesterday, so nothing has verified the Cloudflare account against the tree. The usual causes are a disabled workflow, a missing repository secret (the job fails at its credential check and pushes nothing), a Tailscale OAuth client that was revoked so the runner never reaches the object store, or Loki refusing the push. Check the last run: {{ 'https://github.com/LukaPrebil/home-network/actions?query=workflow%3Aiac-drift' }}."
+        labels:
+          severity: warning

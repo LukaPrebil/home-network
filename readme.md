@@ -22,4 +22,5 @@ ansible-playbook site.yml --check --diff     # Dry run
 
 - **[Architecture & Network Docs](docs/network-architecture.md)** — Hardware, VLANs, IP assignments, implementation status
 - **[Object storage](docs/infrastructure/object-storage.md)** — RustFS S3 store: keys, Terraform state bucket, recovery
+- **[Cloudflare IaC](docs/infrastructure/cloudflare-iac.md)** — Both zones as code: records, Access, WAF, settings, drift alerts
 - **[CLAUDE.md](CLAUDE.md)** — AI agent instructions and project conventions
