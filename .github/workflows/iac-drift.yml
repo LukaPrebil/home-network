@@ -84,7 +84,11 @@ jobs:
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
-          tofu_version: 1.13.5
+          # 1.13.2 is the newest 1.13 release with a published GitHub release;
+          # 1.13.3, 1.13.4 and 1.13.5 exist as tags only, and the action
+          # resolves versions through the releases API, so they fail with
+          # "No matching version found". Bump when they publish artifacts.
+          tofu_version: 1.13.2
 
       - name: Init
         run: tofu -chdir=iac/cloudflare init -input=false -no-color
