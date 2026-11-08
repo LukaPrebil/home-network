@@ -99,6 +99,15 @@
     line: 'node.session.auth.password = {{ iscsi_chap_secret }}'
   no_log: true
 
+- name: Set iSCSI automatic login default in iscsid.conf
+  # Discovery rewrites every node record on the portal from this file, so the
+  # role that discovers last decides node.startup for the other targets. See
+  # the matching task in roles/pds/tasks/iscsi.yml for the 2026-11-08 failure.
+  ansible.builtin.lineinfile:
+    path: /etc/iscsi/iscsid.conf
+    regexp: '^#?\s*node.startup\s*=.*$'
+    line: 'node.startup = automatic'
+
 - name: Discover iSCSI targets on TrueNAS
   ansible.builtin.command:
     cmd: iscsiadm -m discovery -t sendtargets -p {{ rustfs_iscsi_target_ip }}
@@ -166,6 +175,17 @@
   ansible.builtin.command:
     cmd: iscsiadm -m node --targetname {{ rustfs_iscsi_target_iqn }} --portal {{ rustfs_iscsi_target_ip }} -o update -n node.startup -v automatic
   changed_when: false
+
+- name: Assert every iSCSI node is configured to log in at boot
+  # Across all node records, not just this role's: a later discovery rewrites
+  # the other roles' records, so a per-target check passes while the fleet is
+  # broken. -o show prints the CHAP password, hence no_log.
+  ansible.builtin.command:
+    cmd: iscsiadm -m node -o show
+  register: rustfs_iscsi_startup_check
+  changed_when: false
+  no_log: true
+  failed_when: "'node.startup = manual' in rustfs_iscsi_startup_check.stdout"
 
 - name: Wait for iSCSI device to appear  # noqa: no-handler
   # Block-and-wait is the intent: following tasks resolve the device path and

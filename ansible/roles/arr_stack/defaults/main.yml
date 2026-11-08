@@ -2,13 +2,15 @@
 # Arr Stack role default variables
 
 # Component versions (using linuxserver.io images)
-arr_stack_prowlarr_version: "version-2.5.2.5491"
-arr_stack_sonarr_version: "version-4.0.19.2979"
-arr_stack_radarr_version: "version-6.3.0.10514"
-arr_stack_bazarr_version: "version-v1.6.0"
-arr_stack_qbittorrent_version: "5.2.3"
-arr_stack_seerr_version: "v3.4.1"
-arr_stack_flaresolverr_version: "v3.5.0"
+# qbittorrent and the arr stack move together: qBittorrent 5.x changes its
+# WebUI auth surface and each arr ships a matching fix.
+arr_stack_prowlarr_version: "version-2.7.0.5723"
+arr_stack_sonarr_version: "version-4.0.20.3014"
+arr_stack_radarr_version: "version-6.4.4.10685"
+arr_stack_bazarr_version: "version-v1.6.2"
+arr_stack_qbittorrent_version: "5.3.0"
+arr_stack_seerr_version: "v3.5.1"
+arr_stack_flaresolverr_version: "v3.5.2"
 
 # Base directories
 # Configs (Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent SQLite) live on the local VM

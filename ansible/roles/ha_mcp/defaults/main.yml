@@ -1,5 +1,5 @@
 ---
-ha_mcp_version: "8.3.0"
+ha_mcp_version: "9.1.1"
 ha_mcp_image: "ghcr.io/homeassistant-ai/ha-mcp:{{ ha_mcp_version }}"
 # On local rootfs (M-09): ha-mcp.env holds the Home Assistant admin token and
 # must not sit on the LAN-readable NFS export.
