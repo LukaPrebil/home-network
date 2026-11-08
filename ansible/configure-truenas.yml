@@ -662,3 +662,90 @@
           - ""
           - "Access TrueNAS: http://{{ hostvars['tn-storage'].ansible_host }}"
           - "=============================================="
+
+# smartd is the only disk-health watcher on this box: TrueNAS 25.10 removed the
+# SMART UI and did not migrate the existing tests to cron (0 cron jobs, 0 test
+# schedules), so this daemon is what reports a failing disk.
+#
+# The stock unit refuses to start under a VM - "ConditionVirtualization=no" -
+# and this TrueNAS is a KVM guest. Its disks are passthrough (Vi550 SATA SSDs,
+# WD Red SN700 NVMe) and do answer SMART: `smartctl -H /dev/sdc` returns PASSED.
+# So the guard blocks a daemon that ran fine before 25.10.
+#
+# Run: ansible-playbook configure-truenas.yml --tags smartd
+#
+# Re-run after every TrueNAS update. An update installs a fresh boot
+# environment and carries only the config database, so /etc drop-ins do not
+# survive it. If this needs to survive on its own, the appliance-native route is
+# System -> Advanced -> Init/Shutdown Scripts, which lives in the config DB.
+- name: Keep smartd running on a virtualized TrueNAS
+  hosts: tn-storage
+  become: true
+  tags:
+    - smartd
+    - truenas
+  tasks:
+    - name: Create the smartmontools drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/smartmontools.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Clear the ConditionVirtualization guard
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/smartmontools.service.d/10-allow-vm.conf
+        content: |
+          # Managed by Ansible (ansible/configure-truenas.yml, --tags smartd).
+          # An empty assignment removes the unit's own ConditionVirtualization=no,
+          # which is unmet inside a KVM guest even though its disks expose SMART.
+          [Unit]
+          ConditionVirtualization=
+        mode: '0644'
+      register: smartd_dropin
+
+    - name: Enable and start smartmontools
+      ansible.builtin.systemd:
+        name: smartmontools
+        enabled: true
+        state: started
+        daemon_reload: true
+        # daemon_reload covers the drop-in; the explicit flag keeps the intent
+        # readable when only the unit file changed.
+      register: smartd_service
+
+    - name: Read the smartd unit state
+      # service_facts rather than the systemd task's own status: on the first
+      # apply the registered status can still read 'activating', which failed
+      # this play the first time it ran. Retry until the daemon settles.
+      ansible.builtin.service_facts:
+      register: smartd_facts
+      until: smartd_facts.ansible_facts.services['smartmontools.service'].state == 'running'
+      retries: 6
+      delay: 3
+      changed_when: false
+
+    - name: Confirm smartd is running
+      ansible.builtin.assert:
+        that:
+          - smartd_facts.ansible_facts.services['smartmontools.service'].state == 'running'
+        fail_msg: >-
+          smartmontools is
+          {{ smartd_facts.ansible_facts.services['smartmontools.service'].state }}
+          after the drop-in. Check `systemctl status smartmontools` on the
+          appliance: the condition may have been re-added upstream.
+
+    - name: Show the disks smartd is monitoring
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          journalctl -u smartmontools --since '-2 min' --no-pager | grep -cE 'Device: /dev/' || true
+        executable: /bin/bash
+      register: smartd_devices
+      changed_when: false
+
+    - name: Report smartd status
+      ansible.builtin.debug:
+        msg:
+          - "smartmontools: {{ smartd_facts.ansible_facts.services['smartmontools.service'].state }}"
+          - "device lines logged since start: {{ smartd_devices.stdout | trim }}"
+          - "drop-in changed: {{ smartd_dropin is changed }}"
