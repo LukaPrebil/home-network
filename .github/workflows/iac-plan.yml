@@ -273,15 +273,40 @@ jobs:
             exit 1
           fi
 
-      # Always posted, including when no root changed: the sticky header has to be
+      # Always posted, including when no root changed: the header has to be
       # overwritten every run, or a pull request that drops its iac/ changes leaves
       # the previous plan standing as the review artefact for a tree that no
       # longer exists.
+      #
+      # Written against the API directly rather than with a sticky-comment action.
+      # The action this replaced reported success while doing nothing at all: the
+      # step logged its inputs, produced no output, and left the previous
+      # comment's timestamp untouched, so the review artefact went stale in
+      # silence. Every path here logs what it did.
       - name: Comment the plan on the pull request
         if: always()
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          # One comment per pull request: a re-run edits it in place instead of
-          # stacking a second plan under the first.
-          header: tofu-plan
-          path: /tmp/comment.md
+          script: |
+            const fs = require('node:fs');
+            const marker = '<!-- sticky:tofu-plan -->';
+            let body = '_The plan step produced no output. See the job log._';
+            if (fs.existsSync('/tmp/comment.md') && fs.statSync('/tmp/comment.md').size > 0) {
+              body = fs.readFileSync('/tmp/comment.md', 'utf8').trimEnd();
+            }
+            // The commit is in the body so a reader can tell a fresh plan from a
+            // stale one without opening the run.
+            body += `\n\n_Computed from commit ${context.sha.slice(0, 7)}._\n\n${marker}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              core.info(`Updated comment ${existing.id} on #${issue_number}.`);
+            } else {
+              const created = await github.rest.issues.createComment({ owner, repo, issue_number, body });
+              core.info(`Created comment ${created.data.id} on #${issue_number}.`);
+            }
