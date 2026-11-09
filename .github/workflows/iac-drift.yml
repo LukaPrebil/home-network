@@ -102,17 +102,25 @@ jobs:
       # either through `args` fails with "flag provided multiple times", which
       # is what the first two attempts at this step did. The probe below is the
       # part that was genuinely missing: proof the subnet route resolves.
-      - name: Check the tailnet path to the object store
+      - name: Check the tailnet path to the estate
         env:
           S3_ENDPOINT: http://192.168.30.140:9000
+          LOKI_ENDPOINT: http://192.168.30.146:3100/ready
         run: |
-          code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$S3_ENDPOINT" || true)
-          if [ "$code" = "000" ]; then
-            echo "::error::cannot reach $S3_ENDPOINT over the tailnet. Check the tag:ci grant for tcp:9000 and that the node accepted the subnet route."
+          failed=0
+          for target in "$S3_ENDPOINT" "$LOKI_ENDPOINT"; do
+            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$target" || true)
+            if [ "$code" = "000" ]; then
+              echo "::error::cannot reach $target over the tailnet. Check the tag:ci grant and that the node accepted the subnet route."
+              failed=1
+            else
+              echo "$target reachable over the tailnet (HTTP $code)"
+            fi
+          done
+          if [ "$failed" = 1 ]; then
             tailscale status || true
             exit 1
           fi
-          echo "object store reachable over the tailnet (HTTP $code)"
 
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
@@ -179,10 +187,11 @@ jobs:
           ts="$(date +%s%N)"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
-          # 150000 bytes: comfortably inside the ingester limit even after JSON
-          # escaping expands every newline, and the truncation note is what tells
-          # a reader the full output is in the run log.
-          cap=150000
+          # 120000 bytes. The ingester limit is 256 KiB with truncation off, and
+          # JSON escaping expands every newline to two characters, so the cap
+          # leaves room for text that is mostly line breaks rather than mostly
+          # plan. The truncation note is what tells a reader where the rest is.
+          cap=120000
           if [ "$(wc -c < /tmp/plan.txt)" -gt "$cap" ]; then
             plan="$(head -c "$cap" /tmp/plan.txt)"$'\n'"... truncated at $cap bytes. Full output: $run_url"
           else

@@ -118,10 +118,11 @@
 # on the run that performed the enrolment. A key left behind by an interrupted
 # first run stayed there. Removing it on every converge is idempotent and cheap.
 - name: Remove a staged tailscale auth key left by an interrupted run
+  # No check-mode guard: `file: state=absent` is check-mode safe, and leaving the
+  # guard on would hide a stray key from `--check --diff` instead of reporting it.
   ansible.builtin.file:
     path: /run/tailscale-authkey
     state: absent
-  when: not ansible_check_mode
   no_log: true
   tags: tailscale
 
@@ -179,7 +180,7 @@
       - (tailscale_status_after.stdout | from_json).BackendState == "Running"
     fail_msg: >-
       tailscale on {{ inventory_hostname }} is not Running after convergence
-      (backend state: {{ (tailscale_status_after.stdout | default('{}') | from_json).BackendState | default('unknown') }}).
+      (backend state: {{ (tailscale_status_after.stdout | default('{}', true) | from_json).BackendState | default('unknown') }}).
       A node in NeedsLogin needs a fresh auth key: mint one in the admin console
       and set the matching vault variable, then converge again.
     quiet: true

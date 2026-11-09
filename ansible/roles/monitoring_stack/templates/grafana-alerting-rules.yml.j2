@@ -1813,7 +1813,7 @@ groups:
         for: 0s
         annotations:
           summary: "The account no longer matches iac/{{ '{{' }} $labels.root {{ '}}' }}"
-          description: "The nightly drift job found a difference between the account and iac/{{ '{{' }} $labels.root {{ '}}' }}. Run `tofu -chdir=iac/{{ '{{' }} $labels.root {{ '}}' }} plan` from the control node to see it, or open the latest run: {{ 'https://github.com/LukaPrebil/home-network/actions/workflows/iac-drift.yml' }}. The full plan is in Loki: `{job=\"tofu-drift\", root=\"{{ '{{' }} $labels.root {{ '}}' }}\", kind=\"plan\"}`. Either the dashboard was edited by hand and the tree should be corrected, or the tree changed and the apply did not land - one of the two is a bug."
+          description: "The nightly drift job found a difference between the account and iac/{{ '{{' }} $labels.root {{ '}}' }}. Run `tofu -chdir=iac/{{ '{{' }} $labels.root {{ '}}' }} plan` from the control node to see it, or open the latest run: https://github.com/LukaPrebil/home-network/actions/workflows/iac-drift.yml. The full plan is in Loki: `{job=\"tofu-drift\", root=\"{{ '{{' }} $labels.root {{ '}}' }}\", kind=\"plan\"}`. Either the dashboard was edited by hand and the tree should be corrected, or the tree changed and the apply did not land - one of the two is a bug."
         labels:
           severity: warning
 
@@ -1884,6 +1884,6 @@ groups:
         for: 5m
         annotations:
           summary: "The drift job has not verified every root in 30 hours"
-          description: "Fewer than two `status=clean|drift` lines with `job=\"tofu-drift\"` have reached Loki since yesterday, so at least one IaC root was not verified against its account. The usual causes are a disabled workflow, a missing repository secret (the job fails at its credential check and pushes nothing), a plan that fails and pushes `status=error` instead, a Tailscale OAuth client that was revoked so the runner never reaches the object store, or Loki refusing the push. Check the last run: {{ 'https://github.com/LukaPrebil/home-network/actions?query=workflow%3Aiac-drift' }}."
+          description: "Fewer than two `status=clean|drift` lines with `job=\"tofu-drift\"` have reached Loki since yesterday, so at least one IaC root was not verified against its account. The usual causes are a disabled workflow, a missing repository secret (the job fails at its credential check and pushes nothing), a plan that fails and pushes `status=error` instead, a Tailscale OAuth client that was revoked so the runner never reaches the object store, or Loki refusing the push. Check the last run: https://github.com/LukaPrebil/home-network/actions?query=workflow%3Aiac-drift."
         labels:
           severity: warning

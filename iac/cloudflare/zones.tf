@@ -43,9 +43,9 @@ resource "cloudflare_zone" "tnz" {
 resource "cloudflare_zone_dnssec" "lukapg" {
   zone_id = cloudflare_zone.lukapg.id
 
-  # `status` is the only field this root sets. The key tag, algorithm, digest
-  # and DS record are computed by Cloudflare and would only be noise in the
-  # diff.
+  # The key tag, algorithm, digest and DS record are computed by Cloudflare and
+  # would only be noise in the diff, so `status` plus the one per-zone flag below
+  # are all this resource sets.
   status = "active"
 
   # lukapg.dev reports multi-signer DNSSEC on and tnz.social reports it off, so

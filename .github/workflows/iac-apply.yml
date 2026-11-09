@@ -170,17 +170,30 @@ jobs:
           TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
           TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
         run: |
-          set -o pipefail
+          # The log group is closed on every exit path, not only the happy one: an
+          # open group folds the rollback notice into the failed root's output.
+          group_open=false
+          close_group() {
+            if [ "$group_open" = true ]; then
+              echo "::endgroup::"
+              group_open=false
+            fi
+          }
+          trap close_group EXIT
+
+          # The credentials a root must not see are unset below. The union is
+          # restored at the top of every iteration, so which root sees which
+          # credential does not depend on the order the roots happen to arrive in.
+          token="$CLOUDFLARE_API_TOKEN"
+          ipv4="$TF_VAR_lukapg_public_ipv4"
 
           for root in ${{ steps.roots.outputs.roots }}; do
-            # Each root sees only the credentials it consumes. The step-level env
-            # is the union; unsetting here keeps the other vendor's token out of
-            # the environment OpenTofu and its providers execute in.
+            CLOUDFLARE_API_TOKEN="$token"; export CLOUDFLARE_API_TOKEN
+            TF_VAR_lukapg_public_ipv4="$ipv4"; export TF_VAR_lukapg_public_ipv4
             case "$root" in
               cloudflare) ;;
               object-store)
                 echo "iac/object-store is applied from the control node, not here. Skipping."
-                unset CLOUDFLARE_API_TOKEN TF_VAR_lukapg_public_ipv4
                 continue ;;
               *)
                 echo "::error::iac/$root has no entry in this workflow's root list"
@@ -188,6 +201,7 @@ jobs:
             esac
 
             echo "::group::$root"
+            group_open=true
             rc=0
             tofu -chdir="iac/$root" init -input=false -no-color -lockfile=readonly \
               || exit 1
@@ -202,7 +216,7 @@ jobs:
               *) echo "::error::tofu plan failed for iac/$root with exit code $rc"
                  exit 1 ;;
             esac
-            echo "::endgroup::"
+            close_group
           done
 
       # The rollback path is not a revert this workflow can perform: it is

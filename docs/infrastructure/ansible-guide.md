@@ -16,9 +16,10 @@ SSH access to all managed hosts must be configured with key-based auth. The shar
 ```
 ansible/
 ├── site.yml                  # Main entrypoint - maps roles to hosts with tags
-├── ansible.cfg               # Config: inventory path, vault_password_file, SSH settings
-├── secrets.yml               # Ansible Vault encrypted secrets (vault_* variables)
-├── .vault_pass               # Vault password file (git-ignored, referenced in ansible.cfg)
+├── ansible.cfg               # Config: inventory path, SOPS vars plugin, SSH settings
+├── group_vars/all/
+│   └── secrets.sops.yml      # SOPS/age encrypted secrets (vault_* variables)
+├── secrets.example.yml       # Every expected key, placeholders only
 ├── inventory/hosts.yml       # Static inventory - all hosts and group hierarchy
 ├── group_vars/               # Variables scoped to host groups
 │   ├── all.yml               # Global: DNS servers, NFS paths, timezone, common packages
@@ -102,7 +103,8 @@ Fleet host keys are pinned in the repo-tracked `ansible/known_hosts`, matched by
 
 ## Running Playbooks
 
-Vault password is read from `.vault_pass` via `ansible.cfg`. Never use `--ask-vault-pass`.
+Secrets are decrypted by the SOPS vars plugin configured in `ansible.cfg`; there is no
+vault password and no `--ask-vault-pass`. See **Secrets** below.
 
 ```bash
 # Full convergence (all hosts, all roles)

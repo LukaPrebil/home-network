@@ -129,11 +129,18 @@ than skipping silently, so an unconfigured repository shows red, not green.
 | `TS_OAUTH_CLIENT_ID` | Tailscale OAuth client for an ephemeral `tag:ci` node |
 | `TS_OAUTH_SECRET` | its secret |
 
-The Tailscale client needs a grant that lets `tag:ci` reach `192.168.30.140:9000`
-through the existing rpi4 subnet router (which already advertises
-`192.168.30.0/24`). No new node on the containers VM and no port forward: the
-runner joins the tailnet, reads state over the subnet route, and the node is
-removed when the job ends.
+The Tailscale client needs two grants through the existing rpi4 subnet router
+(which advertises `192.168.30.0/24` plus `192.168.60.142/32`):
+
+| Destination | Used by |
+| --- | --- |
+| `192.168.30.140:9000` | every job - the object store holding all roots' state |
+| `192.168.30.146:3100` | `iac-drift.yml` only - the Loki push |
+
+No new node on the containers VM and no port forward: the runner joins the
+tailnet, reaches both over the subnet route, and the node is removed when the job
+ends. Every job probes both endpoints before it runs `tofu`, so a missing grant
+fails with the endpoint named instead of surfacing later as a bare `curl: (7)`.
 
 ### Dependabot
 
@@ -169,8 +176,9 @@ Grafana holds both rules in the **IaC Drift** group
 - `alert-tofu-drift` - fires per root on a `status="drift"` line, and its
   description names the root, the command to run and the Loki query holding the
   plan
-- `alert-tofu-drift-absent` - fires when fewer than one `status="clean"|"drift"`
-  line per root has arrived in 30 hours. A scheduled job that stopped running
+- `alert-tofu-drift-absent` - fires when fewer than two `status="clean"|"drift"`
+  lines have arrived in 30 hours in total, one per root in the matrix. The number
+  is the root count, so it has to be bumped when the drift matrix grows. A scheduled job that stopped running
   looks exactly like a job that keeps finding nothing, so silence alerts on its
   own. It counts only `clean` and `drift`, because an `error` line means nothing
   was verified: letting it count would silence the one alert that notices a broken

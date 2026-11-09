@@ -13,12 +13,6 @@ name: iac-plan
 # rpi4 subnet router. Nothing here talks to the public internet except the
 # provider API.
 
-# Workflow-level environment, non-secret only. The OpenTofu version lives here
-# because three workflows run `tofu`, and a bump applied to two of them makes the
-# plan verdict and the applied tree disagree with nothing flagging it.
-env:
-  TOFU_VERSION: 1.13.2
-
 on:
   pull_request:
 
@@ -32,6 +26,12 @@ permissions:
 concurrency:
   group: iac-plan-${{ github.ref }}
   cancel-in-progress: true
+
+# Workflow-level environment, non-secret only. The OpenTofu version lives here
+# because three workflows run `tofu`, and a bump applied to two of them makes the
+# plan verdict and the applied tree disagree with nothing flagging it.
+env:
+  TOFU_VERSION: 1.13.2
 
 jobs:
   plan:
@@ -66,10 +66,11 @@ jobs:
           echo "roots=$roots" >> "$GITHUB_OUTPUT"
           if [ -z "$roots" ]; then
             echo "No IaC root changed. Nothing to plan."
+            printf '_No IaC root changed in this pull request._\n' > /tmp/comment.md
           else
             echo "Changed roots: $roots"
-            # The comment step runs on failure too, so the body has to exist
-            # before anything else can fail. The plan step overwrites it.
+            # The comment step always runs, so the body has to exist before
+            # anything else can fail. The plan step overwrites it.
             printf '_The plan did not run. See the job log._\n' > /tmp/comment.md
           fi
 
@@ -77,7 +78,7 @@ jobs:
       # leaves the job red with the names of what is absent; the alternative is a
       # plan computed against no state and a green tick that means nothing.
       #
-      # The secrets are declared on this step and the ones below, not at workflow
+      # The secrets are declared on this step and the one below, not at workflow
       # scope: a workflow-level env puts every credential in the environment of
       # every step, including checkout, the tailnet action, the OpenTofu installer
       # and the comment action.
@@ -124,18 +125,29 @@ jobs:
       # either through `args` fails with "flag provided multiple times", which
       # is what the first two attempts at this step did. The probe below is the
       # part that was genuinely missing: proof the subnet route resolves.
-      - name: Check the tailnet path to the object store
+      #
+      # Both endpoints are probed: the state bucket, and Loki, which the drift job
+      # pushes to and needs its own tag:ci grant for.
+      - name: Check the tailnet path to the estate
         if: steps.roots.outputs.roots != ''
         env:
           S3_ENDPOINT: http://192.168.30.140:9000
+          LOKI_ENDPOINT: http://192.168.30.146:3100/ready
         run: |
-          code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$S3_ENDPOINT" || true)
-          if [ "$code" = "000" ]; then
-            echo "::error::cannot reach $S3_ENDPOINT over the tailnet. Check the tag:ci grant for tcp:9000 and that the node accepted the subnet route."
+          failed=0
+          for target in "$S3_ENDPOINT" "$LOKI_ENDPOINT"; do
+            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$target" || true)
+            if [ "$code" = "000" ]; then
+              echo "::error::cannot reach $target over the tailnet. Check the tag:ci grant and that the node accepted the subnet route."
+              failed=1
+            else
+              echo "$target reachable over the tailnet (HTTP $code)"
+            fi
+          done
+          if [ "$failed" = 1 ]; then
             tailscale status || true
             exit 1
           fi
-          echo "object store reachable over the tailnet (HTTP $code)"
 
       - name: Install OpenTofu
         if: steps.roots.outputs.roots != ''
@@ -167,7 +179,6 @@ jobs:
       # write the same state object, so they queue instead of one failing on the
       # lock the moment they overlap.
       - name: Plan each changed root
-        id: plan
         if: steps.roots.outputs.roots != ''
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -176,25 +187,46 @@ jobs:
           TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
           TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
         run: |
-          set -o pipefail
-          # GitHub caps a comment body at 65536 characters, so each plan is cut
-          # and says so rather than the comment being rejected.
-          cap=48000
+          # GitHub caps one comment body at 65536 characters. The budget is shared
+          # across roots: a per-root cap let two roots post 96000 characters
+          # between them, which is the case this exists to prevent.
+          comment_cap=58000
+          budget=$comment_cap
           failed=0
-          changed=false
           : > /tmp/comment.md
 
+          # Append a fenced block, respecting the shared budget.
+          append_block() {
+            local file="$1" take
+            take=$(( budget < 48000 ? budget : 48000 ))
+            if [ "$take" -le 0 ]; then
+              printf '_Comment budget reached. The remaining output is in this job log._\n' >> /tmp/comment.md
+              return
+            fi
+            { printf '```\n'; head -c "$take" "$file"; printf '```\n'; } >> /tmp/comment.md
+            if [ "$(wc -c < "$file")" -gt "$take" ]; then
+              printf '\n_Truncated. The full output is in this job log._\n' >> /tmp/comment.md
+            fi
+            budget=$(( comment_cap - $(wc -c < /tmp/comment.md) ))
+          }
+
+          # The credentials a root must not see are unset below. The union is
+          # restored at the top of every iteration, so which root sees which
+          # credential does not depend on the order the roots happen to arrive in.
+          token="$CLOUDFLARE_API_TOKEN"
+          ipv4="$TF_VAR_lukapg_public_ipv4"
+
           for root in ${{ steps.roots.outputs.roots }}; do
-            # Each root sees only the credentials it consumes. The step-level env
-            # is the union; unsetting here keeps the other vendor's token out of
-            # the environment OpenTofu and its providers execute in.
+            CLOUDFLARE_API_TOKEN="$token"; export CLOUDFLARE_API_TOKEN
+            TF_VAR_lukapg_public_ipv4="$ipv4"; export TF_VAR_lukapg_public_ipv4
             case "$root" in
               cloudflare) ;;
               object-store)
                 unset CLOUDFLARE_API_TOKEN TF_VAR_lukapg_public_ipv4 ;;
               *)
                 echo "::error::iac/$root has no entry in this workflow's root list"
-                exit 1 ;;
+                failed=1
+                continue ;;
             esac
 
             echo "### $root" >> /tmp/comment.md
@@ -202,57 +234,31 @@ jobs:
 
             rc=0
             tofu -chdir="iac/$root" init -input=false -no-color -lockfile=readonly \
-              > /tmp/init.txt 2>&1 || rc=$?
-            if [ "$rc" != 0 ]; then
-              cat /tmp/init.txt
-              {
-                echo '```'
-                head -c "$cap" /tmp/init.txt
-                echo '```'
-              } >> /tmp/comment.md
-              failed=1
-              continue
+              > "/tmp/$root.init.txt" 2>&1 || rc=$?
+            if [ "$rc" = 0 ]; then
+              tofu -chdir="iac/$root" validate -no-color >> "/tmp/$root.init.txt" 2>&1 || rc=$?
             fi
-            tofu -chdir="iac/$root" validate -no-color >> /tmp/init.txt 2>&1 || rc=$?
+            cat "/tmp/$root.init.txt"
             if [ "$rc" != 0 ]; then
-              cat /tmp/init.txt
-              {
-                echo '```'
-                head -c "$cap" /tmp/init.txt
-                echo '```'
-              } >> /tmp/comment.md
+              append_block "/tmp/$root.init.txt"
               failed=1
               continue
             fi
 
             rc=0
             tofu -chdir="iac/$root" plan -input=false -no-color -lock-timeout=5m \
-              -detailed-exitcode > /tmp/plan.txt 2>&1 || rc=$?
-            cat /tmp/plan.txt
+              -detailed-exitcode > "/tmp/$root.plan.txt" 2>&1 || rc=$?
+            cat "/tmp/$root.plan.txt"
             case "$rc" in
               0) echo "No changes. The account already matches iac/$root." >> /tmp/comment.md ;;
-              2) changed=true
-                 {
-                   echo '```diff'
-                   head -c "$cap" /tmp/plan.txt
-                   echo '```'
-                   if [ "$(wc -c < /tmp/plan.txt)" -gt "$cap" ]; then
-                     echo
-                     echo "_Plan truncated. The full output is in this job's log._"
-                   fi
-                 } >> /tmp/comment.md ;;
+              2) append_block "/tmp/$root.plan.txt" ;;
               *) failed=1
                  echo "::error::tofu plan failed for iac/$root with exit code $rc"
-                 {
-                   echo '```'
-                   head -c "$cap" /tmp/plan.txt
-                   echo '```'
-                 } >> /tmp/comment.md ;;
+                 append_block "/tmp/$root.plan.txt" ;;
             esac
             echo >> /tmp/comment.md
           done
 
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
           if [ "$failed" = 1 ] && [ ! -s /tmp/comment.md ]; then
             printf 'The plan did not run. See the job log.\n' > /tmp/comment.md
           fi
@@ -267,11 +273,12 @@ jobs:
             exit 1
           fi
 
-      # Posted even when a plan failed, so a stale comment can never stand in for
-      # the current head: the body either holds today's plans or the error that
-      # replaced them.
+      # Always posted, including when no root changed: the sticky header has to be
+      # overwritten every run, or a pull request that drops its iac/ changes leaves
+      # the previous plan standing as the review artefact for a tree that no
+      # longer exists.
       - name: Comment the plan on the pull request
-        if: always() && steps.roots.outputs.roots != ''
+        if: always()
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           # One comment per pull request: a re-run edits it in place instead of
