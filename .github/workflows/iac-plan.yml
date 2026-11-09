@@ -249,12 +249,17 @@ jobs:
             tofu -chdir="iac/$root" plan -input=false -no-color -lock-timeout=5m \
               -detailed-exitcode > "/tmp/$root.plan.txt" 2>&1 || rc=$?
             cat "/tmp/$root.plan.txt"
+
+            # The comment gets the plan text verbatim, whatever the exit code
+            # said. A clean root's text already reads "No changes", so no branch
+            # needs to decide what the reviewer is told - and no branch can tell
+            # them "No changes" for a plan that printed a diff, which is what the
+            # previous version did. rc only decides the step's own verdict.
+            append_block "/tmp/$root.plan.txt"
             case "$rc" in
-              0) echo "No changes. The account already matches iac/$root." >> /tmp/comment.md ;;
-              2) append_block "/tmp/$root.plan.txt" ;;
+              0|2) ;;
               *) failed=1
-                 echo "::error::tofu plan failed for iac/$root with exit code $rc"
-                 append_block "/tmp/$root.plan.txt" ;;
+                 echo "::error::tofu plan failed for iac/$root with exit code $rc" ;;
             esac
             echo >> /tmp/comment.md
           done
