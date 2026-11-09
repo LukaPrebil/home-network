@@ -1,12 +1,27 @@
 name: iac-drift
 
 # A dashboard edit that outlives the repo is the failure this workflow exists for.
-# It plans daily, pushes the result to Loki, and Grafana holds two rules: one for
-# "the account drifted" and one for "the drift job stopped reporting at all".
+# It plans every root daily, pushes one result per root to Loki, and Grafana holds
+# two rules: one for "the account drifted" and one for "the drift job stopped
+# reporting at all".
 #
 # The absence rule matters as much as the drift rule. A scheduled job that fails
 # silently looks exactly like a job that found nothing, so the alert is on the
-# missing log line, not only on the drift.
+# missing log line, not only on the drift. That is also why the absence rule
+# counts only `status="clean"|"drift"`: an `error` line means nothing was
+# verified, and treating it as a sighting would silence the one alert that would
+# otherwise notice.
+#
+# A matrix rather than the changed-root loop the plan and apply jobs use: drift is
+# not caused by a commit, so every root is checked every run.
+
+# Workflow-level environment, non-secret only. The OpenTofu version lives here
+# because three workflows run `tofu`, and a bump applied to two of them makes the
+# plan verdict and the applied tree disagree with nothing flagging it.
+env:
+  TOFU_VERSION: 1.13.2
+  LOKI_PUSH_URL: http://192.168.30.146:3100/loki/api/v1/push
+
 on:
   schedule:
     # 04:10 UTC daily - after midnight in the estate's timezone, before the
@@ -21,26 +36,40 @@ concurrency:
   group: iac-drift
   cancel-in-progress: false
 
-env:
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
-  TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
-  TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-  TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-  LOKI_PUSH_URL: http://192.168.30.146:3100/loki/api/v1/push
-
 jobs:
   drift:
-    name: tofu drift
+    name: tofu drift (${{ matrix.root }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      # One failing root must not stop the others from reporting: a single broken
+      # plan would otherwise leave every other root unverified and unmentioned.
+      fail-fast: false
+      matrix:
+        root:
+          - cloudflare
+          - object-store
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The GITHUB_TOKEN extraheader otherwise stays in .git/config while
+          # third-party actions and provider code run in this workspace.
+          persist-credentials: false
 
+      # The secrets are declared on this step and the one below, not at workflow
+      # scope: a workflow-level env puts every credential in the environment of
+      # every step, including checkout, the tailnet action and the OpenTofu
+      # installer.
       - name: Require every secret this job reads
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
+          TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
+          TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
         run: |
           missing=()
           for name in CLOUDFLARE_API_TOKEN AWS_ACCESS_KEY_ID \
@@ -64,24 +93,34 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
-          hostname: tofu-drift-${{ github.run_id }}
+          # One node per root: the matrix legs run in parallel and two nodes
+          # cannot share a hostname on a tailnet.
+          hostname: tofu-drift-${{ matrix.root }}-${{ github.run_id }}
 
       # The action builds the `tailscale up` flags itself, including
       # --accept-routes and --hostname, so both belong in its inputs. Passing
       # either through `args` fails with "flag provided multiple times", which
       # is what the first two attempts at this step did. The probe below is the
       # part that was genuinely missing: proof the subnet route resolves.
-      - name: Check the tailnet path to the object store
+      - name: Check the tailnet path to the estate
         env:
           S3_ENDPOINT: http://192.168.30.140:9000
+          LOKI_ENDPOINT: http://192.168.30.146:3100/ready
         run: |
-          code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$S3_ENDPOINT" || true)
-          if [ "$code" = "000" ]; then
-            echo "::error::cannot reach $S3_ENDPOINT over the tailnet. Check the tag:ci grant for tcp:9000 and that the node accepted the subnet route."
+          failed=0
+          for target in "$S3_ENDPOINT" "$LOKI_ENDPOINT"; do
+            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$target" || true)
+            if [ "$code" = "000" ]; then
+              echo "::error::cannot reach $target over the tailnet. Check the tag:ci grant and that the node accepted the subnet route."
+              failed=1
+            else
+              echo "$target reachable over the tailnet (HTTP $code)"
+            fi
+          done
+          if [ "$failed" = 1 ]; then
             tailscale status || true
             exit 1
           fi
-          echo "object store reachable over the tailnet (HTTP $code)"
 
       - name: Install OpenTofu
         uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
@@ -90,57 +129,96 @@ jobs:
           # 1.13.3, 1.13.4 and 1.13.5 exist as tags only, and the action
           # resolves versions through the releases API, so they fail with
           # "No matching version found". Bump when they publish artifacts.
-          tofu_version: 1.13.2
-
-      - name: Init
-        run: tofu -chdir=iac/cloudflare init -input=false -no-color
+          tofu_version: ${{ env.TOFU_VERSION }}
 
       # A clean run pushes `status=clean` and a drifted run pushes `status=drift`
       # with the plan attached. Both are pushed, because the absence alert keys on
       # the presence of the line rather than on its content.
+      #
+      # Every line has to fit Loki's `max_line_size`, which the estate leaves at
+      # the 256 KiB default with truncation off: an oversized entry is rejected,
+      # not cut, so a single large plan would fail the whole push and report
+      # nothing at all. The plan is therefore capped below that.
       - name: Plan and report
+        env:
+          ROOT: ${{ matrix.root }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_state_passphrase: ${{ secrets.TF_VAR_STATE_PASSPHRASE }}
+          TF_VAR_lukapg_public_ipv4: ${{ secrets.TF_VAR_LUKAPG_PUBLIC_IPV4 }}
         run: |
+          # Each root sees only the credentials it consumes.
+          case "$ROOT" in
+            cloudflare) ;;
+            object-store) unset CLOUDFLARE_API_TOKEN TF_VAR_lukapg_public_ipv4 ;;
+            *) echo "::error::iac/$ROOT has no entry in this workflow's root list"
+               exit 1 ;;
+          esac
+
+          # -lockfile=readonly keeps the committed lockfile authoritative, so the
+          # drift verdict is computed against the provider version the tree pins.
           rc=0
-          tofu -chdir=iac/cloudflare plan -input=false -no-color -detailed-exitcode \
+          tofu -chdir="iac/$ROOT" init -input=false -no-color -lockfile=readonly \
             > /tmp/plan.txt 2>&1 || rc=$?
+          if [ "$rc" = 0 ]; then
+            rc=0
+            tofu -chdir="iac/$ROOT" plan -input=false -no-color -lock-timeout=5m \
+              -detailed-exitcode >> /tmp/plan.txt 2>&1 || rc=$?
+          fi
           cat /tmp/plan.txt
 
           case "$rc" in
             0) status=clean
-               summary="No drift: iac/cloudflare matches the account." ;;
+               summary="No drift: iac/$ROOT matches the account." ;;
             2) status=drift
-               summary="Drift detected: the account no longer matches iac/cloudflare.
-          Run \`tofu -chdir=iac/cloudflare plan\` from the control node to see what changed.
+               summary="Drift detected: the account no longer matches iac/$ROOT.
+          Run \`tofu -chdir=iac/$ROOT plan\` from the control node to see what changed.
           If the change is one a plan should make, run
-          \`sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/cloudflare apply'\`
+          \`sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/$ROOT apply'\`
           after reviewing it. If it was a dashboard edit, fix the tree or the
           dashboard so they agree - the drift is the bug, not this workflow." ;;
             *) # A failed plan is neither clean nor drift. Push it as its own status
                # so it cannot masquerade as a clean run, then fail the job.
                status=error
-               summary="The drift plan failed with exit code $rc. Nothing was verified today." ;;
+               summary="The drift plan for iac/$ROOT failed with exit code $rc. Nothing was verified today." ;;
           esac
 
           ts="$(date +%s%N)"
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
+          # 120000 bytes. The ingester limit is 256 KiB with truncation off, and
+          # JSON escaping expands every newline to two characters, so the cap
+          # leaves room for text that is mostly line breaks rather than mostly
+          # plan. The truncation note is what tells a reader where the rest is.
+          cap=120000
+          if [ "$(wc -c < /tmp/plan.txt)" -gt "$cap" ]; then
+            plan="$(head -c "$cap" /tmp/plan.txt)"$'\n'"... truncated at $cap bytes. Full output: $run_url"
+          else
+            plan="$(cat /tmp/plan.txt)"
+          fi
+
           # jq builds the payload so the plan's quotes, braces and newlines cannot
-          # break the JSON. Loki appends every push to the stream, so the full plan
-          # is queryable later without bloating the alert line.
+          # break the JSON. Loki appends every push to the stream, so the full
+          # plan is queryable later without bloating the alert line.
+          #
+          # No `run_id` label on purpose: a per-run label would mint a new stream
+          # every night. The run URL lives in the summary line instead, and the
+          # alert query selects the plan by root and status.
           jq -n \
             --arg ts "$ts" \
+            --arg root "$ROOT" \
             --arg status "$status" \
-            --arg run "$GITHUB_RUN_ID" \
             --arg summary "$summary"$'\n\n'"$run_url" \
-            --arg plan "$(head -c 400000 /tmp/plan.txt)" \
+            --arg plan "$plan" \
             '{
                streams: [
                  {
-                   stream: {job: "tofu-drift", root: "cloudflare", status: $status},
+                   stream: {job: "tofu-drift", root: $root, status: $status},
                    values: [[$ts, $summary]]
                  },
                  {
-                   stream: {job: "tofu-drift", root: "cloudflare", status: $status, kind: "plan"},
+                   stream: {job: "tofu-drift", root: $root, status: $status, kind: "plan"},
                    values: [[$ts, $plan]]
                  }
                ]
@@ -153,7 +231,7 @@ jobs:
             -H 'Content-Type: application/json' \
             --data-binary @/tmp/loki.json "$LOKI_PUSH_URL"
 
-          { echo "### iac drift: $status"; echo; echo "$summary"; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### iac drift: $ROOT $status"; echo; echo "$summary"; } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then
             exit 1

@@ -25,6 +25,12 @@
 # Two applies are used on purpose: the import first (nothing changes), then
 # min_tls_version on its own so the handshake test afterwards cannot be blamed on
 # anything else in the same apply.
+#
+# Removing an entry is not the way to hand a setting back to the dashboard: this
+# resource's Delete is a no-op in the provider, so dropping the entry succeeds,
+# forgets the value and keeps the account's value in place - no drift is ever
+# reported for it again. Delete the entry only when the intent is to stop
+# watching the setting.
 
 locals {
   # Six string-valued settings, shared shape, per-zone values.

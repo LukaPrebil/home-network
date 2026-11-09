@@ -49,6 +49,12 @@ keys.txt
 **/.terraform/
 **/*.tfstate
 **/*.tfstate.backup
+# A saved plan is a binary blob of resolved values - including anything marked
+# sensitive in the tree, which redaction covers in a log but not in a file.
+# The roots encrypt the plan context, but ignoring the files is the guard that
+# does not depend on the encryption block being reached first.
+**/*.tfplan
+**/*.tfplan.json
 **/crash.log
 
 # Local artifacts

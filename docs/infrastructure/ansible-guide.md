@@ -16,9 +16,10 @@ SSH access to all managed hosts must be configured with key-based auth. The shar
 ```
 ansible/
 ├── site.yml                  # Main entrypoint - maps roles to hosts with tags
-├── ansible.cfg               # Config: inventory path, vault_password_file, SSH settings
-├── secrets.yml               # Ansible Vault encrypted secrets (vault_* variables)
-├── .vault_pass               # Vault password file (git-ignored, referenced in ansible.cfg)
+├── ansible.cfg               # Config: inventory path, SOPS vars plugin, SSH settings
+├── group_vars/all/
+│   └── secrets.sops.yml      # SOPS/age encrypted secrets (vault_* variables)
+├── secrets.example.yml       # Every expected key, placeholders only
 ├── inventory/hosts.yml       # Static inventory - all hosts and group hierarchy
 ├── group_vars/               # Variables scoped to host groups
 │   ├── all.yml               # Global: DNS servers, NFS paths, timezone, common packages
@@ -102,7 +103,8 @@ Fleet host keys are pinned in the repo-tracked `ansible/known_hosts`, matched by
 
 ## Running Playbooks
 
-Vault password is read from `.vault_pass` via `ansible.cfg`. Never use `--ask-vault-pass`.
+Secrets are decrypted by the SOPS vars plugin configured in `ansible.cfg`; there is no
+vault password and no `--ask-vault-pass`. See **Secrets** below.
 
 ```bash
 # Full convergence (all hosts, all roles)
@@ -138,27 +140,31 @@ Role structure: `tasks/main.yml` includes subtasks (`directories.yml`, `deploy.y
 
 ## Secrets
 
-All secrets in `secrets.yml`, encrypted with Ansible Vault. Variable naming: `vault_` prefix.
+All secrets live in `group_vars/all/secrets.sops.yml`, encrypted with SOPS and an
+age recipient (ADR 0006). Variable naming keeps the `vault_` prefix.
 
 ```yaml
-# In secrets.yml (encrypted)
-vault_database_password: "actual-secret"
+# In secrets.sops.yml (encrypted values, readable key names)
+vault_database_password: ENC[AES256_GCM,data:...,type:str]
 
 # In role defaults or group_vars (plaintext reference)
 db_password: "{{ vault_database_password }}"
 ```
 
-**Initial setup** (one-time):
-```bash
-echo "your-vault-password" > .vault_pass && chmod 600 .vault_pass
-ansible-vault encrypt secrets.yml
-```
+**Initial setup** (once per control node): the private age key lives at
+`~/.config/sops/age/keys.txt` and never enters git. `.sops.yaml` holds only the
+public recipient, which is safe to commit.
 
 **Managing secrets**:
 ```bash
-ansible-vault edit secrets.yml    # Edit encrypted file
-ansible-vault view secrets.yml    # View without editing
+sops ansible/group_vars/all/secrets.sops.yml      # edit in place
+sops -d group_vars/all/secrets.sops.yml           # read
+sops exec-env iac/secrets.sops.yaml 'tofu ...'    # run a command with the IaC keys
 ```
+
+The `sops` CLI is not told about the key path by `ansible.cfg` (that setting is
+for the Ansible vars plugin only), so a bare `sops` invocation needs
+`SOPS_AGE_KEY_FILE=~/.config/sops/age/keys.txt` exported.
 
 **Dollar sign escaping**: Docker Compose env vars containing `$` must be escaped for Docker's interpolation:
 ```yaml

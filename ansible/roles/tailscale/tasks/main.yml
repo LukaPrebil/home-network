@@ -10,26 +10,27 @@
 #   --auth-key=file:..., keeping it out of argv, process env, and
 #   /var/log/auth.log; the file is removed right after enrolment
 
-# IP forwarding is required when this host is a subnet router. Gated on
-# the advertise_routes var so non-router hosts (dev) are unaffected.
-- name: Enable IPv4 forwarding for Tailscale subnet routing
+# IP forwarding is required only while this host actually advertises routes.
+# Gated on the router flag so a router whose route list has been emptied turns
+# forwarding back off instead of leaving it on with nothing to route.
+- name: Set IPv4 forwarding for Tailscale subnet routing
   ansible.posix.sysctl:
     name: net.ipv4.ip_forward
-    value: '1'
+    value: "{{ '1' if tailscale_advertise_routes | length > 0 else '0' }}"
     sysctl_file: /etc/sysctl.d/99-tailscale-subnet-router.conf
     state: present
     reload: true
-  when: tailscale_advertise_routes | length > 0
+  when: tailscale_subnet_router
   tags: tailscale
 
-- name: Enable IPv6 forwarding for Tailscale subnet routing
+- name: Set IPv6 forwarding for Tailscale subnet routing
   ansible.posix.sysctl:
     name: net.ipv6.conf.all.forwarding
-    value: '1'
+    value: "{{ '1' if tailscale_advertise_routes | length > 0 else '0' }}"
     sysctl_file: /etc/sysctl.d/99-tailscale-subnet-router.conf
     state: present
     reload: true
-  when: tailscale_advertise_routes | length > 0
+  when: tailscale_subnet_router
   tags: tailscale
 
 - name: Install and start tailscale (real-run only)
@@ -112,21 +113,76 @@
         {% for arg in tailscale_extra_args %}{{ arg }} {% endfor %}
       no_log: true
       changed_when: true
-  always:
-    - name: Remove tailscale auth key file
-      ansible.builtin.file:
-        path: /run/tailscale-authkey
-        state: absent
-      no_log: true
 
-# tailscale up is gated on BackendState != Running, so once a host is
-# enrolled, route changes via the up command are never reapplied. Use
-# tailscale set to apply --advertise-routes idempotently on every run.
-# `tailscale set` is itself idempotent (no-op when routes already match);
-# `changed_when: false` keeps Ansible noise low.
+# A block's `when` is inherited by its `always`, so the cleanup used to run only
+# on the run that performed the enrolment. A key left behind by an interrupted
+# first run stayed there. Removing it on every converge is idempotent and cheap.
+- name: Remove a staged tailscale auth key left by an interrupted run
+  # No check-mode guard: `file: state=absent` is check-mode safe, and leaving the
+  # guard on would hide a stray key from `--check --diff` instead of reporting it.
+  ansible.builtin.file:
+    path: /run/tailscale-authkey
+    state: absent
+  no_log: true
+  tags: tailscale
+
+# `tailscale up` is gated on BackendState != Running, so once a host is enrolled,
+# every preference passed to `up` is frozen at that first run. `tailscale set`
+# reapplies them idempotently: it is a no-op when the values already match, and
+# `changed_when: false` keeps Ansible quiet.
+#
+# Not included: --advertise-tags. `tailscale set` has no such flag - tags are
+# assigned by the auth key at enrolment and are otherwise a console decision, so
+# changing `tailscale_advertise_tags` on an enrolled host requires a re-auth.
+- name: Apply node preferences (idempotent re-runs)
+  ansible.builtin.command:
+    cmd: >-
+      tailscale set
+      --hostname={{ tailscale_hostname }}
+      --accept-dns={{ 'true' if tailscale_accept_dns else 'false' }}
+      --accept-routes={{ 'true' if tailscale_accept_routes else 'false' }}
+  when:
+    - not ansible_check_mode
+    - tailscale_status_check.rc == 0
+    - (tailscale_status_check.stdout | from_json).BackendState == "Running"
+  changed_when: false
+  tags: tailscale
+
+# Gated on the router flag rather than on the route list being non-empty: an
+# empty list now means "stop advertising", which is a real state to converge to.
+# `--advertise-routes=` with no value is how the CLI withdraws the routes.
 - name: Apply advertised subnet routes (idempotent re-runs)
   ansible.builtin.command:
     cmd: tailscale set --advertise-routes={{ tailscale_advertise_routes | join(',') }}
-  when: tailscale_advertise_routes | length > 0
+  when:
+    - not ansible_check_mode
+    - tailscale_subnet_router
+    - tailscale_status_check.rc == 0
+    - (tailscale_status_check.stdout | from_json).BackendState == "Running"
   changed_when: false
+  tags: tailscale
+
+# The play used to end on a `changed_when: false` command with no post-condition,
+# so a host that was left in NeedsLogin reported success. Read the state again and
+# fail loudly instead.
+- name: Read the tailscale backend state after convergence
+  ansible.builtin.command: tailscale status --json
+  register: tailscale_status_after
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  tags: tailscale
+
+- name: Assert the node is logged in to the tailnet
+  ansible.builtin.assert:
+    that:
+      - tailscale_status_after.rc == 0
+      - (tailscale_status_after.stdout | from_json).BackendState == "Running"
+    fail_msg: >-
+      tailscale on {{ inventory_hostname }} is not Running after convergence
+      (backend state: {{ (tailscale_status_after.stdout | default('{}', true) | from_json).BackendState | default('unknown') }}).
+      A node in NeedsLogin needs a fresh auth key: mint one in the admin console
+      and set the matching vault variable, then converge again.
+    quiet: true
+  when: not ansible_check_mode
   tags: tailscale
