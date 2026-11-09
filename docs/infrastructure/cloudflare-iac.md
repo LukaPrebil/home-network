@@ -139,7 +139,8 @@ The Tailscale client needs two grants through the existing rpi4 subnet router
 
 No new node on the containers VM and no port forward: the runner joins the
 tailnet, reaches both over the subnet route, and the node is removed when the job
-ends. Every job probes both endpoints before it runs `tofu`, so a missing grant
+ends. The drift job probes both endpoints before it runs `tofu`; plan and apply
+probe only the object store, which is the only host they touch. A missing grant
 fails with the endpoint named instead of surfacing later as a bare `curl: (7)`.
 
 ### Dependabot
