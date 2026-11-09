@@ -1,10 +1,8 @@
 # Bot management, identical on both zones
 #
-# Three settings are the actual decision; the rest of the API surface is echoed
-# computed state that this root does not own. `ai_bots_protection = "block"` is
-# the one that matters: it is what stops a scraper that is not on the WAF's
-# user-agent list, and it is why the AI-bot rule in waf.tf has anything left to
-# block.
+# The settings below are the actual decision; the rest of the API surface is
+# echoed computed state that this root does not own. The one control that used to
+# live here and no longer can is covered in the note before the resources.
 #
 # The two zones are declared separately rather than with a for_each because bot
 # management is a per-zone object and a future divergence (fighting mode off on
@@ -24,6 +22,22 @@ import {
   id = "f097b5d7910b67d2f644219fc01ff7c1"
 }
 
+# `ai_bots_protection` is deliberately not declared.
+#
+# It reads as a per-zone switch, but Cloudflare has migrated the control to the
+# per-vendor `ai_agents` block (anthropic_agent, openai_agent, google_agent,
+# instinct, muse). The old field is now *derived* from that block: a write of
+# "block" is accepted and then immediately reported back as "disabled", which is
+# why an apply fails with "provider produced an unexpected new value" and the
+# plan can never converge. Measured on both zones on 2026-11-09.
+#
+# The pinned provider (5.28.1) has no `ai_agents` attribute at all, so the intent
+# - keep AI crawlers out - cannot be expressed here yet. It is expressed at the
+# edge instead: the AI-crawler rule in waf.tf blocks the four user agents by name,
+# and it is the control that actually holds. Declare `ai_agents` here once a
+# provider release models it; until then an undeclared field is honest, whereas a
+# declared "disabled" would read as a decision to allow crawlers.
+
 resource "cloudflare_bot_management" "lukapg" {
   zone_id = cloudflare_zone.lukapg.id
 
@@ -31,10 +45,7 @@ resource "cloudflare_bot_management" "lukapg" {
   # definitely automated. Free-plan equivalent of a managed rule.
   fight_mode = true
   # Run the JS detections as well, which raises the cost of a headless scraper.
-  enable_js = true
-  # Block AI bots outright rather than letting them crawl and rate-limit later.
-  ai_bots_protection = "block"
-
+  enable_js               = true
   crawler_protection      = "enabled"
   content_bots_protection = "disabled"
   ai_training             = "disallow"
@@ -50,9 +61,8 @@ resource "cloudflare_bot_management" "lukapg" {
 resource "cloudflare_bot_management" "tnz" {
   zone_id = cloudflare_zone.tnz.id
 
-  fight_mode         = true
-  enable_js          = true
-  ai_bots_protection = "block"
+  fight_mode = true
+  enable_js  = true
 
   crawler_protection      = "enabled"
   content_bots_protection = "disabled"
