@@ -250,12 +250,18 @@ jobs:
               -detailed-exitcode > "/tmp/$root.plan.txt" 2>&1 || rc=$?
             cat "/tmp/$root.plan.txt"
 
-            # The comment gets the plan text verbatim, whatever the exit code
-            # said. A clean root's text already reads "No changes", so no branch
-            # needs to decide what the reviewer is told - and no branch can tell
-            # them "No changes" for a plan that printed a diff, which is what the
-            # previous version did. rc only decides the step's own verdict.
-            append_block "/tmp/$root.plan.txt"
+            # The comment gets the plan text from the plan file, whatever the exit
+            # code said. A clean root's text already reads "No changes", so no
+            # branch needs to decide what the reviewer is told - and no branch can
+            # tell them "No changes" for a plan that printed a diff, which is what
+            # the previous version did. rc only decides the step's own verdict.
+            #
+            # The only lines removed are the per-resource refresh notices: they
+            # are output of reading the account, not part of the plan, and they
+            # bury a clean verdict under fifty lines.
+            sed -E '/: Refreshing state\.\.\./d; /^Read complete after/d' \
+              "/tmp/$root.plan.txt" > "/tmp/$root.comment.txt"
+            append_block "/tmp/$root.comment.txt"
             case "$rc" in
               0|2) ;;
               *) failed=1
