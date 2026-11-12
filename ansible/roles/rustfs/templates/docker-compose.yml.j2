@@ -11,6 +11,10 @@ services:
     image: {{ rustfs_image }}
     container_name: {{ rustfs_container_name }}
     restart: unless-stopped
+    # Not the 10 s default: docker then SIGKILLs a process that is mid-write on a
+    # crash-consistent filesystem, and every credential edit recreates this
+    # container. See rustfs_stop_grace_period.
+    stop_grace_period: {{ rustfs_stop_grace_period }}
     # Explicit rather than relying on the image default: the bind mount is
     # chowned to these ids, so the two have to agree
     user: "{{ rustfs_run_uid }}:{{ rustfs_run_gid }}"
@@ -24,8 +28,11 @@ services:
     env_file:
       - {{ rustfs_base_dir }}/rustfs.env
     healthcheck:
-      # Liveness only. The deploy verifies readiness with an authenticated S3
-      # call; this keeps autoheal able to restart a wedged process.
+      # Liveness only - this answers while the data directory could still be a
+      # stub or a blank zvol. The deploy's authenticated bucket listing is the
+      # readiness check, and it is the only signal that proves the data is
+      # there. Nothing auto-restarts a wedged rustfs: the service carries no
+      # autoheal label, so detection is `docker logs rustfs`.
       test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
       interval: 30s
       timeout: 5s

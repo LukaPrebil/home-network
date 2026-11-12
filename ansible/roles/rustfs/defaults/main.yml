@@ -40,6 +40,18 @@ rustfs_bind_address: "{{ ansible_host }}"
 # limited to it, and because it is the one bucket the object-store root owns.
 rustfs_state_bucket: "terraform-state"
 
+# SigV4 signing string. The provider, the S3 backend and every rc alias sign with
+# `us-east-1`, which is also the server's own default - declared here so the one
+# assumption that would break every credential path at once lives in the tree
+# rather than in an image default. Changing it means changing all four.
+rustfs_region: "us-east-1"
+
+# Docker's default is 10 s and then SIGKILL, on a process writing to a
+# crash-consistent XFS volume whose snapshots the runbook already says may need
+# xfs_repair. Routine converges are the most likely corruptor, so the service
+# gets long enough to finish its writes.
+rustfs_stop_grace_period: "30s"
+
 # Consumer keys. RustFS mints an access-key/secret-key pair per consumer, and
 # each pair carries its own policy - one leaked key cannot reach another
 # bucket. Access keys are usernames and stay in the clear here; the secrets come
