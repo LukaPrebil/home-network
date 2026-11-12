@@ -66,11 +66,14 @@
     name: "{{ rustfs_rc_image }}"
     source: pull
 
-- name: Verify RustFS answers an authenticated S3 call
+- name: Verify RustFS answers an authenticated S3 call and has the state bucket
   # A port probe proves nothing: docker-proxy keeps the port open while the
   # server crash-loops behind it. This lists buckets with the root credential,
   # so it exercises the published endpoint, the credential path and the data
   # directory in one call, and it fails loudly when the container is stopped.
+  # Listing alone is not enough either: an authenticated list succeeds with zero
+  # buckets, which is exactly what a blank or newly-mounted zvol looks like. The
+  # bucket assertion is what distinguishes a mounted volume from a stub.
   ansible.builtin.command:
     argv:
       - docker
@@ -84,7 +87,9 @@
       - ls
       - local/
   register: rustfs_ready
-  until: rustfs_ready.rc == 0
+  until: >-
+    rustfs_ready.rc == 0
+    and rustfs_state_bucket in (rustfs_ready.stdout | default(''))
   retries: 30
   delay: 5
   changed_when: false
