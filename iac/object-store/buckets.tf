@@ -22,4 +22,12 @@ resource "aws_s3_bucket_versioning" "state" {
   versioning_configuration {
     status = "Enabled"
   }
+
+  # A replace would suspend versioning on the bucket that holds the rollback
+  # history. Existing versions survive a suspend, so this is not a data-loss
+  # guard: it is here so the rollback path cannot disappear without someone
+  # removing this block on purpose.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
