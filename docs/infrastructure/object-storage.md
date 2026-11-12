@@ -53,7 +53,7 @@ the container's uid so no secret is ever in a command line:
 ```bash
 # on the containers VM (192.168.30.140)
 R() { docker run --rm -i --env XDG_CONFIG_HOME=/cfg \
-  --volume /opt/rustfs/rc:/cfg/rc:ro rustfs/rc:v0.1.36 "$@"; }
+  --volume /opt/rustfs/rc:/cfg/rc:ro rustfs/rc:v0.1.37 "$@"; }
 ```
 
 Aliases in `/opt/rustfs/rc/config.toml`: `local` (root credential), plus one per
@@ -63,7 +63,10 @@ secrets.
 ## Keys
 
 RustFS mints an access-key/secret-key pair per consumer, and each pair carries
-its own policy. One leaked key reaches exactly one bucket.
+its own policy. Every key below reaches one bucket, except `tf-bootstrap`, which
+keeps an all-bucket policy because it exists to create the bucket it later
+stores state in. That exception is why the claim here is not "one leaked key
+reaches one bucket".
 
 | Alias / key | Policy | Used by |
 | --- | --- | --- |
@@ -80,9 +83,11 @@ cd ansible && ansible-playbook site.yml --tags rustfs --limit containers
 ```
 
 The role creates a user only when it is absent and never rewrites an existing
-secret. To rotate a consumer key: `R admin user rm local tf-control`, update the
-SOPS value, converge. The bootstrap key rotation additionally requires updating
-`AWS_SECRET_ACCESS_KEY` in `iac/secrets.sops.yaml`.
+secret. To rotate a consumer key: `R admin user rm tf-control` (repeat for
+`tf-ci`), update the SOPS value, converge. `local` is the root credential from
+`rustfs.env`, not an IAM user, so it is not in that list. The bootstrap key
+rotation additionally requires updating `AWS_SECRET_ACCESS_KEY` in
+`iac/secrets.sops.yaml`.
 
 ## Verifying the service
 
@@ -98,9 +103,10 @@ cd ansible && ansible-playbook site.yml --tags rustfs --limit containers
 ```
 
 The converge is idempotent: a second run reports `changed=0`. Its readiness step
-is an authenticated S3 bucket listing, not a port or `/health` probe - `curl
-:9000/health` answers `200` with a wrong credential too, so it proves nothing
-about the credential path or the data directory.
+is an authenticated S3 bucket listing that also asserts `terraform-state` is in
+it, not a port or `/health` probe - `curl :9000/health` answers `200` with a
+wrong credential too, and `R ls local/` alone succeeds against a blank or
+unmounted zvol, which is the failure it exists to catch.
 
 ## Terraform state
 
@@ -146,13 +152,27 @@ sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan -json' \
 
 ### Bootstrapping a new root (chicken and egg)
 
-The bucket must exist before a backend can point at it:
+The bucket must exist before a backend can point at it. Every command carries
+the `sops exec-env` wrapper, including the first `init` against the local
+backend: the plan and apply need the S3 credentials, and every command needs the
+state passphrase. `-input=false` matters for the wrapped runs, because
+`sops exec-env` holds stdin and an interactive prompt would wait forever.
 
-1. Write the root without `backend.tf`, `tofu init`, `tofu plan`, `tofu apply`
-   (implicit local backend).
-2. Add `backend.tf`, then `tofu init -migrate-state -force-copy`.
-3. Delete the leftover `terraform.tfstate` and `terraform.tfstate.backup`;
-   `tofu plan` now reads and writes the bucket.
+```bash
+# 1. with no backend.tf in the root
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store init -input=false'
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan -input=false'
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store apply -input=false'
+# 2. add backend.tf, then migrate the state into the bucket it just created
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store init -input=false -migrate-state -force-copy'
+# 3. delete the leftover terraform.tfstate and terraform.tfstate.backup, then
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan -input=false'
+```
+
+The root carries `import` blocks for `terraform-state` and its versioning, so
+the apply in step 1 adopts the existing bucket instead of creating an empty one.
+That is also the recovery path when the state object goes missing - see
+"The state object is missing or corrupt" below.
 
 There is no `terraform.tfstate` on disk in steady state. One appearing means the
 backend failed to load - investigate, do not commit it (it is gitignored).
@@ -171,7 +191,13 @@ sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store force-unlock <
 ### Rolling back a bad state write
 
 Versioning makes the previous state object recoverable. Stop CI and any running
-apply first - restoring state under a live plan corrupts both.
+apply first - restoring state under a live plan corrupts both. There is no
+lockfile to disable CI: turn the workflows off, restore, turn them back on.
+
+```bash
+gh workflow disable iac-apply.yml
+gh workflow disable iac-drift.yml
+```
 
 ```bash
 R bucket version list --json local/terraform-state/object-store.tfstate \
@@ -182,6 +208,31 @@ R undo --version-id <full-version-id> local/terraform-state/object-store.tfstate
 **Use the full ID from `--json`.** The human-readable `bucket version list`
 truncates version IDs to 8 characters, and those truncated IDs are rejected with
 `InvalidArgument`.
+
+When the state reads back the way you expect, turn CI on again:
+
+```bash
+gh workflow enable iac-apply.yml
+gh workflow enable iac-drift.yml
+```
+
+### The state object is missing or corrupt
+
+The bucket is healthy but `object-store.tfstate` is gone, truncated, or fails to
+decrypt. Nothing needs restoring by hand: the root's `import` blocks adopt the
+bucket and its versioning by name, and `prevent_destroy` cannot help here because
+an empty state is not a destroy.
+
+```bash
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store init -input=false'
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan -input=false'   # 2 to import, 0 to add
+sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store apply -input=false'
+```
+
+Read the plan before applying it. `2 to import` is the recovery; `2 to add` means
+the import block is missing or its id is wrong, and applying it would create a
+second, empty bucket. If a readable older version exists, the versioning rollback
+above restores the state with the outputs and nothing to import.
 
 ## Growing the zvol
 
@@ -220,6 +271,19 @@ still reports the old size before `xfs_growfs`.
    sudo systemctl start mnt-rustfs.mount
    findmnt -no FSTYPE,SOURCE /mnt/rustfs        # xfs /dev/sdX
    ```
+4. Bring the store and its data back, then prove both:
+   ```bash
+   sudo systemctl start docker                  # the mount stop took it down too
+   sudo docker start rustfs                     # `docker stop` left it explicitly stopped
+   R ls local/                                  # terraform-state is in the list
+   sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan -input=false'   # no changes
+   ```
+   `restart: unless-stopped` does not revive the container, because
+   `docker stop` records an explicit stop. The daemon is down as well: the
+   service's `RequiresMountsFor=/mnt/rustfs` drop-in pulls `docker.service`
+   down with the mount, so starting the container before the daemon fails.
+   `findmnt` alone is not the end of the procedure - it proves the filesystem,
+   not the data.
 
 If `findmnt` reports the device without a filesystem, or the mount fails with a
 corrupt-structure error, `xfs_repair -n /dev/sdX` first (read-only), then
@@ -234,10 +298,41 @@ mount/unit layout, but the first snapshot lands at the first 00:00 after the
 zvol was created, and no restore has been rehearsed. Rehearse it once before
 trusting it with anything that is not reproducible.
 
+A rollback moves the IAM database back with the bucket, so a consumer key
+rotated after the snapshot no longer matches
+`ansible/group_vars/all/secrets.sops.yml` and every `tofu` run answers `403`. The
+role never rewrites an existing secret. Fix it the way rotation does: remove the
+user (`R admin user rm tf-control`, repeat for `tf-ci`), converge on containers,
+then re-run `R ls local/`.
+
 ### From bucket versioning (bad object, zvol healthy)
 
 Already covered under "Rolling back a bad state write" - the same
 `version list` / `undo` pair restores any versioned object.
+
+### The passphrase or the age key is lost
+
+Unrecoverable by construction: `encryption.tf` enforces `aes_gcm`, so the state
+object is ciphertext without `TF_VAR_state_passphrase`, and
+`iac/secrets.sops.yaml` is ciphertext without `~/.config/sops/age/keys.txt`.
+There is no escrow copy of either in this repository.
+
+What remains is a rebuild. It loses no user data, because the bucket holds
+state, not content. Delete the `object-store.tfstate` object from the bucket,
+keep the bucket, and follow "The state object is missing or corrupt" - the
+import blocks re-adopt it. Every other root needs the same treatment, because
+its state is encrypted with the same lost passphrase. The Ansible secrets under
+`ansible/group_vars/all/*.sops.yml` are encrypted to the same age key and are
+lost with it, so the converge that recreates `tf-ci` and the `rc` aliases needs a
+fresh key first.
+
+### The bootstrap credential was rotated
+
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `iac/secrets.sops.yaml` are
+the pair every `tofu` run uses. After a rotation on the store, update both values
+there and converge on containers so the `rc` aliases follow. CI reads the same
+pair from repository secrets, so update those in the same pass, or the plan job
+fails with `403` while local runs succeed.
 
 ## Behaviours worth knowing
 
@@ -247,9 +342,11 @@ Already covered under "Rolling back a bad state write" - the same
 - **The image logs to `/logs` inside the container** (`RUSTFS_OBS_LOG_DIRECTORY`
   is set in the image), so container logs are the only log surface and they do
   not touch the host filesystem. `docker logs rustfs` it is.
-- **`region = "us-east-1"` is a signing label, not a location.** SigV4 needs a region string,
-  RustFS defaults `RUSTFS_REGION` to `us-east-1`, and the provider, the backend and the `rc`
-  aliases all use the same value so they cannot disagree. Nothing is sent to AWS and the bytes
+- **`region = "us-east-1"` is a signing label, not a location.** SigV4 needs a region string.
+  The role sets `RUSTFS_REGION` (`rustfs_region`) to `us-east-1` explicitly rather than
+  leaving it to the image default, because the provider, the backend and every `rc` alias
+  sign with the same value and a silent disagreement breaks every credential path at once.
+  Nothing is sent to AWS and the bytes
   stay on the zvol. Setting the server to `eu-central-1` works only if the provider, the backend
   and every alias change with it; it buys clarity and nothing else.
 - **`/health` needs no credential.** It is a liveness endpoint; the deploy's
