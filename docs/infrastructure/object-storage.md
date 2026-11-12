@@ -155,8 +155,9 @@ sops exec-env iac/secrets.sops.yaml 'tofu -chdir=iac/object-store plan -json' \
 The bucket must exist before a backend can point at it. Every command carries
 the `sops exec-env` wrapper, including the first `init` against the local
 backend: the plan and apply need the S3 credentials, and every command needs the
-state passphrase. `-input=false` matters for the wrapped runs, because
-`sops exec-env` holds stdin and an interactive prompt would wait forever.
+state passphrase. `-input=false` keeps each wrapped run non-interactive, which
+matters in CI: a prompted `tofu init` under `sops exec-env` waits on stdin and
+hangs with no output.
 
 ```bash
 # 1. with no backend.tf in the root
