@@ -54,17 +54,29 @@ Uses a persistent notification (in-HA, not push) with a fixed `notification_id`.
 ## Mold Risk Notification
 
 ```
-Trigger: time_pattern every 30 minutes
-Condition: template checks if any binary_sensor.nevarnost_plesni_* has been on for >2 hours (last_changed filter)
+Triggers: time_pattern every 30 minutes (id: sweep)
+          event mobile_app_notification_action, action SNOOZE_MOLD_DAY, tag mold_risk (id: snooze)
 Actions (choose):
-  → rooms at sustained risk: push notification via script.notify_home_users_dynamic
+  → Prekini za danes tapped: set mold_risk_snoozed_until to 08:00 tomorrow,
+    clear_notification, turn off input_boolean.mold_risk_active
+  → rooms at sustained risk, after 08:00, not snoozed: push via script.notify_home_users_dynamic
     Title: "Nevarnost plesni"
     Message: lists rooms at risk + actionable advice (ventilate, check furniture, bathroom exhaust)
-    Tag: mold_risk (live update, sticky, alert_once), deep link: /climate
-  → no risk + notification was active: clear_notification + turn off input_boolean.mold_risk_active
+    Tag: mold_risk (sticky, alert_once), deep link: /climate
+    Button: "Prekini za danes" (SNOOZE_MOLD_DAY)
+    Then: turn on input_boolean.mold_risk_active, set mold_risk_snoozed_until to now + 2 h
+  → notification active and no sustained risk left: clear_notification + turn off the active flag
 ```
 
 The 2-hour threshold filters transient humidity spikes from showers and cooking, which typically dissipate within 30–90 minutes. Only sustained condensation risk triggers a notification.
+
+### Quiet hours, debounce and the day button
+
+Nothing is pushed before 08:00. A native `condition: time` with `after: 08:00:00` gates only the send; the clear branch still runs at night.
+
+Every send pushes `input_datetime.mold_risk_snoozed_until` 2 hours out. `alert_once` silences updates to a notification that still exists, but it does not cover a fresh send after the previous one was cleared. A room that hovers around its dew point therefore used to clear and re-notify, buzzing each time. The 2-hour stamp blocks that: an episode that resumes sooner than 2 hours after the last send stays silent.
+
+`Prekini za danes` sets the same helper to 08:00 tomorrow, clears the notification, and clears the active flag. It covers the rest of the day plus the quiet night. The snooze is a timestamp, not an `input_boolean`, so it expires by itself with no midnight reset automation. The shed is unconditioned and stays at risk all winter; the button exists so that risk can be acknowledged instead of re-announced.
 
 ### How it works
 
@@ -80,3 +92,4 @@ Each room has a template binary sensor (`binary_sensor.nevarnost_plesni_*`, labe
 
 - 12× `binary_sensor.nevarnost_plesni_*` — template binary sensors (device_class: moisture, label: mold_danger)
 - `input_boolean.mold_risk_active` — tracks whether a notification is currently showing
+- `input_datetime.mold_risk_snoozed_until` — no mold push before this moment (2 h debounce or 08:00 tomorrow)
