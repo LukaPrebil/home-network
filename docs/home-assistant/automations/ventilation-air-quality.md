@@ -60,6 +60,9 @@ every other notification and rate-limited both phones on 2026-11-16. At 15 minut
 costs about 64. Keep any future cadence change inside the budget: `4 x hours active` per
 notification type.
 
+The same `/15` cadence applies to `automation.update_utility_climate_notification`, which
+live-updates the urgent utility climate notification.
+
 ## Notification
 
 - **Tag**: `air_quality_alert`
