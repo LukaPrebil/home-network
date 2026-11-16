@@ -216,8 +216,26 @@ task log must show `truenas-nfs-gate: storage ready after Ns`, and
 `pve-autostart-reconcile.service` must finish clean with
 `all onboot guests running (pass 1/6)`.
 
-**This has not been done.** As of 2026-08-08 the two halves were verified
-separately without a reboot:
+**Done once, 2026-11-08.** The reboot ran as part of the update campaign that
+also moved n5p to `pve-manager 9.2.26` and kernel `7.0.14-28-pve`, so the boot
+also exercised the new kernel. Result:
+
+- `truenas-nfs-gate: storage ready after 65s` in the `qmstart:100` log. The
+  write probe waited out the grace period and returned before its 600 s cap.
+- `pve-autostart-reconcile: all onboot guests running (pass 1/6)`, then
+  `Deactivated successfully`. The reconciler had nothing to do.
+- All four VMs (100, 102, 111, 148) and all seven LXCs (206, 210-215) came up
+  unattended. The 9001 template stayed stopped, as intended.
+- HA answered `200` and the controller, Immich, Paperless, PDS, Uptime Kuma,
+  Jellyfin, Grafana, Prometheus, Traefik, Omada and AdGuard all came back on
+  their own. Paperless and Omada needed about 90 s to bind their ports; both
+  were up before the reconciler finished, so no alert should be tuned to the
+  first seconds after a boot.
+- Every iSCSI zvol on the containers VM logged in automatically and was mounted
+  by label. The device letters swap between boots (`sdb`/`sdc`/`sdd`); only the
+  labels are stable.
+
+Earlier the two halves had only been verified separately, without a reboot:
 
 - The gate was tested against a real 90 s grace period on a throwaway NFS
   export, where the old `showmount` probe went green after 1 s and the new
@@ -226,6 +244,7 @@ separately without a reboot:
 - The reconciler was tested on n5p: a no-op run exits on pass 1, and stopping
   media (CT 215) is detected and started on pass 1.
 
-What remains unproven is the two halves working together through a real
-`startall`, and the gate's behaviour against TrueNAS specifically rather than a
-stand-in server.
+What that leaves unproven is the same chain after a genuine power event, where
+the BIOS AC-restore setting, WoL arming and a cold TrueNAS boot all take part.
+A clean shutdown-and-boot is not the same as power returning to a machine that
+went dark.
