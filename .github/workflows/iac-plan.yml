@@ -126,28 +126,20 @@ jobs:
       # is what the first two attempts at this step did. The probe below is the
       # part that was genuinely missing: proof the subnet route resolves.
       #
-      # Both endpoints are probed: the state bucket, and Loki, which the drift job
-      # pushes to and needs its own tag:ci grant for.
-      - name: Check the tailnet path to the estate
+      # The object store is the only host this job needs: it reads state and never
+      # talks to Loki. The drift job, which pushes there, probes both.
+      - name: Check the tailnet path to the object store
         if: steps.roots.outputs.roots != ''
         env:
           S3_ENDPOINT: http://192.168.30.140:9000
-          LOKI_ENDPOINT: http://192.168.30.146:3100/ready
         run: |
-          failed=0
-          for target in "$S3_ENDPOINT" "$LOKI_ENDPOINT"; do
-            code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$target" || true)
-            if [ "$code" = "000" ]; then
-              echo "::error::cannot reach $target over the tailnet. Check the tag:ci grant and that the node accepted the subnet route."
-              failed=1
-            else
-              echo "$target reachable over the tailnet (HTTP $code)"
-            fi
-          done
-          if [ "$failed" = 1 ]; then
+          code=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "$S3_ENDPOINT" || true)
+          if [ "$code" = "000" ]; then
+            echo "::error::cannot reach $S3_ENDPOINT over the tailnet. Check the tag:ci grant for tcp:9000 and that the node accepted the subnet route."
             tailscale status || true
             exit 1
           fi
+          echo "object store reachable over the tailnet (HTTP $code)"
 
       - name: Install OpenTofu
         if: steps.roots.outputs.roots != ''
