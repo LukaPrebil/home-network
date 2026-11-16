@@ -8,7 +8,7 @@ drier than indoor air.
 | Entity | Type | Purpose |
 |--------|------|---------|
 | `automation.remind_to_ventilate` | Automation | Sends the initial notification |
-| `automation.update_ventilation_notification` | Automation | Re-sends every 2 min for live update |
+| `automation.update_ventilation_notification` | Automation | Re-sends every 15 min for live update |
 | `automation.clear_ventilation_notification` | Automation | Clears, and snoozes on Urejeno |
 | `input_boolean.ventilation_reminder_active` | Helper | Whether a notification is displayed |
 | `input_datetime.ventilation_snoozed_until` | Helper | Suppresses sends until this moment |
@@ -48,7 +48,9 @@ Trigger: 07:30 / 12:30 / 19:30 OR good_to_ventilate turns on
   -> Send sticky live-update notification
   -> Turn on input_boolean.ventilation_reminder_active
 
-Every 2 minutes, same conditions: re-send with the current humidity (same tag)
+Every 15 minutes, same conditions: re-send with the current humidity (same tag).
+The cadence is a push budget decision - see the Push Budget section in
+[ventilation-air-quality](ventilation-air-quality.md), the 500/device/day cap is shared.
 
 Clear on any of:
   humidity below 50 | good_to_ventilate off | a ventilation_window opens

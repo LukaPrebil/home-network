@@ -100,6 +100,16 @@ data:
 | 3D printer | `mdi:printer-3d` |
 | Utility climate | `mdi:home-thermometer` |
 
+## Push Rate Limit
+
+The Companion app allows **500 push notifications per device per day**. The counter is shared by
+every notification on the account and lives on the push server. `live_update`, `alert_once`,
+`persistent` and `sticky` do not bypass it; only critical alerts and notification commands do.
+
+So a long-lived live-update notification must throttle itself. `time_pattern minutes: /2` for a
+16-hour condition costs ~490 pushes and leaves nothing for real alerts - that rate-limited both
+phones on 2026-11-16. Prefer `/15` or coarser, and count the worst case before shortening it.
+
 ## Live Update Notification Pattern
 
 For automations that need live-updating notifications, use these `data` keys:

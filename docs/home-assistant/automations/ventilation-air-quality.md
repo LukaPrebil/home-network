@@ -7,7 +7,7 @@ Notifies home users to open windows when the living room air quality monitor rep
 | Entity | Type | Purpose |
 |--------|------|---------|
 | `automation.remind_air_quality` | Automation | Sends initial notification on trigger |
-| `automation.update_air_quality_notification` | Automation | Re-sends every 2 min for live update |
+| `automation.update_air_quality_notification` | Automation | Re-sends every 15 min for live update |
 | `automation.clear_air_quality_notification` | Automation | Clears on improvement, tap, or swipe |
 | `input_boolean.air_quality_reminder_active` | Helper | Tracks whether notification is active |
 | `input_datetime.air_quality_snooze_until` | Helper | Snooze timestamp after user dismiss |
@@ -29,7 +29,7 @@ Triggers (either):
   → Send sticky live-update notification via script.notify_home_users_dynamic
   → Turn on input_boolean.air_quality_reminder_active
 
-Every 2 minutes (while boolean is on + air quality still poor+):
+Every 15 minutes (while boolean is on + air quality still poor+):
   → Re-send notification with updated CO2/PM2.5 values (same tag = in-place update)
 
 Clear triggers (any of):
@@ -47,6 +47,21 @@ Clear actions:
 ## Debouncing
 
 Both the trigger and clear automations use `for: "00:05:00"` on their state triggers. The sensor oscillates rapidly at the good/poor boundary (366 transitions in 7 days, many lasting 10–30 seconds). Without debouncing, each bounce fires or clears the notification, creating spam. The 5-minute `for` duration filters out noise while remaining responsive to real air quality changes.
+
+## Push Budget
+
+The re-send cadence is a push budget decision, not only a UX one. Every re-send is a fresh push
+against the Companion app limit of **500 notifications per device per day**, shared by all
+notifications on the account. `live_update: true` updates the notification in place but still
+counts.
+
+A 16-hour poor-air-quality day at the old 2-minute cadence cost about 490 pushes, which starved
+every other notification and rate-limited both phones on 2026-11-16. At 15 minutes the same day
+costs about 64. Keep any future cadence change inside the budget: `4 x hours active` per
+notification type.
+
+The same `/15` cadence applies to `automation.update_utility_climate_notification`, which
+live-updates the urgent utility climate notification.
 
 ## Notification
 
