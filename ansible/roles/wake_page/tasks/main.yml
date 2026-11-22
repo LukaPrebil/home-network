@@ -32,6 +32,15 @@
     mode: '0644'
   notify: Restart wake page
 
+- name: Render the wake page
+  ansible.builtin.template:
+    src: page.html.j2
+    dest: "{{ wake_page_page_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart wake page
+
 - name: Render the wake page configuration
   ansible.builtin.template:
     src: config.json.j2

@@ -37,6 +37,7 @@ wake_page_hosts: []
 
 wake_page_user: wake-page
 wake_page_lib_dir: /usr/local/lib/wake-page
+wake_page_page_path: "{{ wake_page_lib_dir }}/page.html"
 wake_page_config_dir: /etc/wake-page
 
 # Publication. Serve puts the page on the ts.net name inside the tailnet only;

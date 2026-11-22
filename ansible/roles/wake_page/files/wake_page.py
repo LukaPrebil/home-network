@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import pathlib
 import socket
 import threading
 import time
@@ -27,93 +28,6 @@ PACKET_REPEATS = 16
 # an hour, and "reachable" must not describe a probe from before the host went
 # down again. Past this age the monitor is dropped and /status probes live.
 STALE_PROBE_SECONDS = 5.0
-
-PAGE = b"""<!doctype html>
-<html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Wake</title>
-<style>
-  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px;
-         background: #111; color: #eee; }
-  h1 { font-size: 18px; font-weight: 600; margin: 0 0 20px; }
-  .host { border: 1px solid #333; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-  .name { font-size: 20px; font-weight: 600; }
-  .state { margin: 8px 0 16px; color: #9aa; }
-  .state.up { color: #6c6; }
-  button { font-size: 18px; padding: 16px; width: 100%; border-radius: 10px;
-           border: 0; background: #2d6cdf; color: #fff; }
-  button:active { background: #2456b0; }
-  .foot { color: #667; font-size: 13px; margin-top: 16px; }
-</style>
-<h1>Wake</h1>
-<div id="hosts"></div>
-<div class="foot" id="foot"></div>
-<script>
-const hosts = document.getElementById('hosts');
-const foot = document.getElementById('foot');
-let seen = new Map();
-
-function render(rows) {
-  hosts.textContent = '';
-  for (const row of rows) {
-    const card = document.createElement('div');
-    card.className = 'host';
-    const name = document.createElement('div');
-    name.className = 'name';
-    name.textContent = row.host;
-    const state = document.createElement('div');
-    state.className = 'state' + (row.reachable ? ' up' : '');
-    const before = seen.get(row.host);
-    state.textContent = describe(row, before);
-    const button = document.createElement('button');
-    button.textContent = 'Wake ' + row.host;
-    button.onclick = () => wake(row.host);
-    card.append(name, state, button);
-    hosts.append(card);
-  }
-}
-
-function describe(row, before) {
-  if (row.reachable) {
-    const when = row.reachable_after !== null ? ' after ' + row.reachable_after + 's' : '';
-    return 'reachable' + when;
-  }
-  if (row.monitoring) {
-    return 'unreachable, probing (' + row.attempts + ' checks so far)';
-  }
-  if (before === 'monitoring') {
-    return 'gave up after ' + row.attempts + ' checks';
-  }
-  return 'unreachable';
-}
-
-async function refresh() {
-  try {
-    const res = await fetch('/status');
-    const data = await res.json();
-    seen = new Map(data.hosts.map((row) => [row.host, row.monitoring ? 'monitoring' : 'idle']));
-    render(data.hosts);
-    foot.textContent = 'checked ' + new Date().toLocaleTimeString();
-  } catch (err) {
-    foot.textContent = 'status unavailable: ' + err;
-  }
-}
-
-async function wake(host) {
-  foot.textContent = 'waking ' + host;
-  await fetch('/wake?host=' + encodeURIComponent(host), { method: 'POST' });
-  await refresh();
-}
-
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) refresh();
-});
-refresh();
-</script>
-</html>
-"""
-
 
 def parse_mac(mac: str) -> bytes:
     """Return the six raw bytes of a MAC given in colon or dash form."""
@@ -293,6 +207,13 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def send_page(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(self.server.page)))
+        self.end_headers()
+        self.wfile.write(self.server.page)
+
     def do_GET(self) -> None:  # noqa: N802 - name fixed by BaseHTTPRequestHandler
         if not self.authorized():
             LOG.info("refused path=%s reason=no-identity", self.path)
@@ -302,11 +223,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"hosts": self.server.registry.status()})
             return
         if self.path in ("/", "/index.html"):
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(PAGE)))
-            self.end_headers()
-            self.wfile.write(PAGE)
+            self.send_page()
             return
         self.send_json({"error": "not found"}, 404)
 
@@ -334,9 +251,13 @@ def main() -> None:
     )
     with open(args.config, encoding="utf-8") as handle:
         settings = json.load(handle)
+    # Rendered by the role from templates/page.html.j2. Read once: the unit is
+    # restarted when the template changes, so a reload path would never run.
+    page = pathlib.Path(settings["page_path"]).read_bytes()
 
     server = ThreadingHTTPServer((settings["listen"], settings["port"]), Handler)
     server.settings = settings
+    server.page = page
     server.registry = Registry(settings)
     LOG.info(
         "listening on %s:%d hosts=%s",
