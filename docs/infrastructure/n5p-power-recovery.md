@@ -74,6 +74,115 @@ wakeonlan <n5p-nic-mac>       # n5p primary NIC MAC
 Verify the NIC is armed (on n5p): `ethtool enp197s0 | grep Wake-on` should
 show `Wake-on: g`.
 
+## Wake from the phone
+
+The `wake_page` role (tag `wake-page`) runs a small service on rpi4 that sends
+the magic packet and reports whether n5p came back. Tailscale Serve publishes it
+inside the tailnet at <https://rpi4.tail9aa5b5.ts.net/>, which is worth adding to
+the phone home screen: one tap opens the page, one more sends the packet.
+
+The page makes one claim: `reachable` means a TCP connection to n5p's
+`pveproxy` on port 8006 opened, so Proxmox is answering. It does not report guest
+state. After a wake it probes at 2, 6, 14 and 29 seconds, then every 30 seconds,
+and stops at the first answer or after 10 minutes. The probe runs on rpi4, not in
+the browser, so locking the phone or closing the tab does not lose the outcome.
+While a probe cycle is running the open page re-reads `/status` every 3 seconds,
+and stops when the cycle ends.
+
+The service binds `127.0.0.1` and authorises on the `Tailscale-User-Login`
+header that Serve injects, so nothing off-host reaches it and nothing off-host
+can spoof that header. A process running on rpi4 itself can, and that is accepted:
+the worst it can do is send a magic packet. If the phone's Tailscale app is
+disconnected, the page does not load at all.
+
+Wake itself is proven only as far as the packet leaving rpi4: whether the NIC
+and the BIOS act on it from a powered-off state has not been tested yet. Until
+someone taps Wake with n5p genuinely off, treat the tap as unproven rather than
+working.
+
+Prerequisite, once per tailnet: Serve needs HTTPS certificates. Without them the
+converge stops on an assertion that prints the consent URL to open in a browser.
+
+```bash
+cd ansible && ansible-playbook site.yml --tags wake-page --limit rpi4
+```
+
+The converge checks the page twice: once on loopback after the restart, and once
+from the control node as a tailnet peer, because Serve answers `403` to a request
+that does not arrive from a tailnet device. A control node outside the tailnet
+skips the second check and says so instead of reporting a false green.
+
+### When the page does not load
+
+Check these in order, on rpi4 over SSH:
+
+```bash
+systemctl status wake-page --no-pager          # process up?
+sudo journalctl -u wake-page -n 30 --no-pager   # startup errors, refused requests
+sudo tailscale serve status                    # route still published?
+curl -s -H "Tailscale-User-Login: LukaPrebil@github" \
+     http://127.0.0.1:8099/status               # app answers, bypassing Serve
+```
+
+A `403` in the journal means the request reached the service without Serve's
+header, so the problem is the publication, not the app. A `502` from the browser
+means Serve is up but the unit is not.
+
+To withdraw the page, on rpi4: `sudo tailscale serve --https=443 off` removes
+that port from the tailnet, and `sudo tailscale serve reset` clears every serve
+route on the host. Neither touches this repo, whose role re-publishes on the
+next converge, so also remove the `wake_page` role from `ansible/site.yml` and
+stop the unit: `sudo systemctl disable --now wake-page`.
+
+## Shell from the phone
+
+rpi4 is the only node that stays up when n5p is off, so it is the only host that
+advertises Tailscale SSH (`tailscale_ssh: true` in `ansible/host_vars/rpi4.yml`).
+Access needs no key on the phone: Tailscale authenticates the connection from the
+phone's tailnet identity, and the policy rule below decides who may log in.
+
+Connect from any SSH client on the phone to `rpi4.tail9aa5b5.ts.net` as `luka`.
+The client must accept an SSH server that offers no authentication. A client that
+refuses it can connect as `luka+password` and enter any password, which the
+Tailscale SSH docs recommend for exactly this case.
+
+Authorisation lives in the tailnet policy file at
+<https://login.tailscale.com/admin/acls>, which the admin console owns and this
+repo does not manage:
+
+```json
+"ssh": [
+  {
+    "action": "accept",
+    "src": ["LukaPrebil@github"],
+    "dst": ["tag:subnet-router"],
+    "users": ["luka"]
+  }
+]
+```
+
+`accept` is deliberate. Check mode delivers its sign-in URL as an SSH auth
+banner, and Android clients are known to swallow that banner and hang
+(connectbot/connectbot#1150), which is the wrong failure for a recovery path.
+The cost is that any device already logged into the tailnet as
+`LukaPrebil@github` reaches a shell without a prompt, so keep screen locks on and
+leave tailnet key expiry enabled.
+
+A tag cannot be a `check` source, and the rule above is pinned to one login and
+one destination tag on purpose: `autogroup:member` or `autogroup:nonroot` would
+widen it to every future member and every non-root account on rpi4.
+
+Confirm the rule reached the node, not just the editor. The control plane sends
+each node only the rules that match it, so rpi4 must be asked, and the laptop's
+netmap will never show this one:
+
+```bash
+sudo tailscale debug netmap | python3 -c 'import sys,json;print(json.load(sys.stdin)["SSHPolicy"])'
+```
+
+A live rule shows `"accept": true` with `"sshUsers": {"luka": "luka"}`. Before
+the save lands, the same command shows the default `holdAndDelegate` rule alone.
+
 ## Two traps in `startall`
 
 Both bit on 2026-08-08 and both are worth knowing before reading any task log:

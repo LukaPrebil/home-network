@@ -40,4 +40,18 @@ tailscale_subnet_router: true
 tailscale_advertise_routes:
   - "192.168.30.0/24"
   - "192.168.60.142/32"  # Traefik LXC (DMZ)
+# Shell access from the phone during an outage: rpi4 is the only always-on node,
+# so it is the one host that must accept a tailnet SSH login. Access is granted
+# by the ssh rule in the tailnet policy file, not by a key on the phone.
+tailscale_ssh: true
+
+# Wake page: who may press the button, and which hosts it can wake. The probe
+# target is n5p's pveproxy: when it answers, the hypervisor is back, which is the
+# only claim the page makes.
+wake_page_allow_login: "LukaPrebil@github"
+wake_page_hosts:
+  - name: n5p
+    mac: "38:05:25:32:36:c8"  # enp197s0, the NIC wol-arm.service keeps armed
+    probe_host: "{{ hostvars['n5p'].ansible_host }}"
+    probe_port: 8006
 tailscale_authkey: "{{ vault_tailscale_router_auth_key }}"

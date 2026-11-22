@@ -1,0 +1,13 @@
+{
+  "listen": "{{ wake_page_listen }}",
+  "port": {{ wake_page_port }},
+  "allow_login": {{ wake_page_allow_login | to_json }},
+  "broadcast": {{ wake_page_broadcast | to_json }},
+  "wol_ports": {{ wake_page_wol_ports | to_json }},
+  "probe_timeout": {{ wake_page_probe_timeout }},
+  "backoff_seconds": {{ wake_page_backoff_seconds | to_json }},
+  "poll_seconds": {{ wake_page_poll_seconds }},
+  "window_seconds": {{ wake_page_window_seconds }},
+  "page_path": {{ wake_page_page_path | to_json }},
+  "hosts": {{ wake_page_hosts | to_json }}
+}

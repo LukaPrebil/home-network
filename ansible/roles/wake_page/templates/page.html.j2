@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wake</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px;
+         background: #111; color: #eee; }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 20px; }
+  .host { border: 1px solid #333; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .name { font-size: 20px; font-weight: 600; }
+  .state { margin: 8px 0 16px; color: #9aa; }
+  .state.up { color: #6c6; }
+  button { font-size: 18px; padding: 16px; width: 100%; border-radius: 10px;
+           border: 0; background: #2d6cdf; color: #fff; }
+  button:active { background: #2456b0; }
+  .foot { color: #667; font-size: 13px; margin-top: 16px; }
+</style>
+<h1>Wake</h1>
+{% for host in wake_page_hosts %}
+<div class="host">
+  <div class="name">{{ host.name }}</div>
+  <div class="state" id="state-{{ host.name }}">checking</div>
+  <button type="button" data-host="{{ host.name }}">Wake {{ host.name }}</button>
+</div>
+{% endfor %}
+<div class="foot" id="foot"></div>
+<script>
+const cards = [...document.querySelectorAll('button[data-host]')];
+const foot = document.getElementById('foot');
+const stateOf = (name) => document.getElementById('state-' + name);
+let previous = new Map();
+
+function describe(row, before) {
+  if (row.reachable) {
+    const when = row.reachable_after !== null ? ' after ' + row.reachable_after + 's' : '';
+    return ['reachable' + when, true];
+  }
+  if (row.monitoring) {
+    return ['unreachable, probing (' + row.attempts + ' checks so far)', false];
+  }
+  if (before === 'monitoring') {
+    return ['gave up after ' + row.attempts + ' checks', false];
+  }
+  return ['unreachable', false];
+}
+
+function render(rows) {
+  const next = new Map();
+  for (const row of rows) {
+    next.set(row.host, row.monitoring ? 'monitoring' : 'idle');
+    const el = stateOf(row.host);
+    if (!el) continue;
+    const [text, up] = describe(row, previous.get(row.host));
+    el.textContent = text;
+    el.classList.toggle('up', up);
+  }
+  previous = next;
+}
+
+let timer = null;
+let lastBusy = false;
+
+function schedule(busy) {
+  clearTimeout(timer);
+  timer = null;
+  if (busy && !document.hidden) {
+    timer = setTimeout(refresh, 3000);
+  }
+}
+
+async function refresh() {
+  try {
+    const data = await (await fetch('/status')).json();
+    render(data.hosts);
+    foot.textContent = 'checked ' + new Date().toLocaleTimeString();
+    lastBusy = data.hosts.some((row) => row.monitoring);
+  } catch (err) {
+    // The probe runs on rpi4, so one failed read does not end the cycle: keep
+    // polling on the last known busy state and let the server catch up. Serve
+    // answers 502 across a unit restart, which is exactly this case.
+    foot.textContent = 'status unavailable: ' + err;
+  }
+  schedule(lastBusy);
+}
+
+async function wake(host) {
+  foot.textContent = 'waking ' + host;
+  let res;
+  try {
+    res = await fetch('/wake?host=' + encodeURIComponent(host), { method: 'POST' });
+  } catch (err) {
+    foot.textContent = 'wake failed: ' + err;
+    return;
+  }
+  if (!res.ok) {
+    foot.textContent = 'wake refused: HTTP ' + res.status + ' ' + (await res.text());
+    return;
+  }
+  await refresh();
+}
+
+for (const card of cards) {
+  card.addEventListener('click', () => wake(card.dataset.host));
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    clearTimeout(timer);
+    timer = null;
+  } else {
+    refresh();
+  }
+});
+
+refresh();
+</script>
+</html>

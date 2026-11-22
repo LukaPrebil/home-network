@@ -1,0 +1,21 @@
+# Managed by ansible roles/wake_page. Published to the tailnet by Tailscale
+# Serve, which is what injects the identity header the service authorises on.
+[Unit]
+Description=Wake-on-LAN page for the always-on node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ wake_page_user }}
+Group={{ wake_page_user }}
+ExecStart=/usr/bin/python3 {{ wake_page_lib_dir }}/wake_page.py --config {{ wake_page_config_dir }}/config.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

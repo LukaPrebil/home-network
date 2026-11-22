@@ -13,6 +13,7 @@ Installs the Tailscale apt repo + client and enrols the host on first run.
 | `tailscale_authkey` | `""` | Vault'd one-shot key; empty value skips `tailscale up` |
 | `tailscale_extra_args` | `[]` | Extra flags to pass to `tailscale up` |
 | `tailscale_advertise_routes` | `[]` | LAN subnets this host advertises (e.g. `["192.168.30.0/24"]`). Non-empty triggers IP-forwarding sysctl. |
+| `tailscale_ssh` | `false` | Advertise Tailscale SSH on port 22 for tailnet traffic. Needs a matching `ssh` rule in the tailnet policy file; the LAN sshd keeps working. |
 
 ## Outputs
 
@@ -40,3 +41,12 @@ Installs the Tailscale apt repo + client and enrols the host on first run.
 - After first enrol, route changes from `tailscale_advertise_routes` are
   reapplied via `tailscale set --advertise-routes=...` on every run; the
   initial `tailscale up` call short-circuits once the daemon is Running.
+- **Tailscale SSH** (`tailscale_ssh: true`) applies in both paths: `--ssh` on
+  the first `tailscale up`, and `--ssh=false|true` on the idempotent
+  `tailscale set`. Advertising SSH generates a host key and intercepts port 22
+  for tailnet traffic only, so `sshd_config` and `authorized_keys` keep serving
+  the LAN. It does nothing until the tailnet policy file grants an `ssh` rule
+  for the login, the destination and the host user. Authorisation there comes
+  from tailnet identity, so a host with `tailscale_ssh: true` and no rule stays
+  reachable only over the LAN. Running `tailscale set --ssh` drops any SSH
+  session already open to the host's tailnet address.

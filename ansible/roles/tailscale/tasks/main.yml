@@ -110,6 +110,7 @@
         {% if tailscale_advertise_routes | length > 0 %}--advertise-routes={{ tailscale_advertise_routes | join(',') }}{% endif %}
         --accept-dns={{ 'true' if tailscale_accept_dns else 'false' }}
         --accept-routes={{ 'true' if tailscale_accept_routes else 'false' }}
+        --ssh={{ 'true' if tailscale_ssh else 'false' }}
         {% for arg in tailscale_extra_args %}{{ arg }} {% endfor %}
       no_log: true
       changed_when: true
@@ -141,6 +142,7 @@
       --hostname={{ tailscale_hostname }}
       --accept-dns={{ 'true' if tailscale_accept_dns else 'false' }}
       --accept-routes={{ 'true' if tailscale_accept_routes else 'false' }}
+      --ssh={{ 'true' if tailscale_ssh else 'false' }}
   when:
     - not ansible_check_mode
     - tailscale_status_check.rc == 0

@@ -1,0 +1,229 @@
+---
+# Wake page: sends the n5p magic packet and reports whether it came back.
+#
+# Native systemd unit rather than a container, so the recovery path does not
+# depend on the Docker daemon that also runs Matter Server on this host.
+
+- name: Create the wake page service account
+  ansible.builtin.user:
+    name: "{{ wake_page_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    state: present
+
+- name: Create the wake page directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ wake_page_lib_dir }}"
+    - "{{ wake_page_config_dir }}"
+
+- name: Install the wake page backend
+  ansible.builtin.copy:
+    src: wake_page.py
+    dest: "{{ wake_page_lib_dir }}/wake_page.py"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart wake page
+
+- name: Render the wake page
+  ansible.builtin.template:
+    src: page.html.j2
+    dest: "{{ wake_page_page_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart wake page
+
+- name: Render the wake page configuration
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ wake_page_config_dir }}/config.json"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart wake page
+
+- name: Install the wake page unit
+  ansible.builtin.template:
+    src: wake-page.service.j2
+    dest: /etc/systemd/system/wake-page.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart wake page
+
+- name: Enable and start the wake page
+  # Not dry-runnable on first provision: check mode simulates the unit template
+  # above (the file is never written), so systemd has no service to enable.
+  when: not ansible_check_mode
+  ansible.builtin.systemd:
+    name: wake-page
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Flush handlers before the readiness check
+  ansible.builtin.meta: flush_handlers
+
+
+# Read-only probe. Publishing rewrites tailscaled state, so it only runs when
+# the config does not already point at this service.
+- name: Read the Tailscale Serve configuration
+  ansible.builtin.command: tailscale serve status --json
+  register: wake_page_serve_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Publish the wake page to the tailnet
+  # `tailscale serve` waits on stdin when HTTPS certificates are not enabled for
+  # the tailnet, and prints a consent URL while it waits. The timeout keeps a
+  # converge from hanging on that, and the assert below surfaces the URL.
+  ansible.builtin.command: >-
+    timeout 30 tailscale serve --bg --https={{ wake_page_serve_port }}
+    {{ wake_page_serve_target }}
+  register: wake_page_serve_publish
+  changed_when: true
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - wake_page_serve_status.rc != 0 or wake_page_serve_target not in wake_page_serve_status.stdout
+
+- name: Assert the wake page is published
+  ansible.builtin.assert:
+    that: wake_page_serve_publish.rc == 0
+    fail_msg: >-
+      tailscale serve did not publish {{ wake_page_serve_target }}.
+      {{ wake_page_serve_publish.stdout | default('') | trim }}
+      Open the login.tailscale.com/f/serve URL printed above in a browser to
+      enable Serve for this tailnet, then converge again.
+    quiet: true
+  when:
+    - wake_page_serve_publish.rc is defined
+    - wake_page_serve_publish.rc != 0
+
+- name: Check the wake page answers on loopback
+  ansible.builtin.uri:
+    url: "{{ wake_page_serve_target }}/status"
+    headers:
+      Tailscale-User-Login: "{{ wake_page_allow_login }}"
+    status_code: 200
+  register: wake_page_health
+  until: wake_page_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+
+# The phone loads the ts.net name through Serve, not loopback, and Serve only
+# accepts real tailnet peers: from the node itself the same request answers 403.
+# Loopback alone would leave a converge green while the entry point is dead.
+- name: Read the node tailnet address
+  ansible.builtin.command: tailscale ip -4
+  register: wake_page_tailnet_ip
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Read the node tailnet DNS name
+  ansible.builtin.command: tailscale status --json
+  register: wake_page_node_status
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Read the published page host
+  ansible.builtin.set_fact:
+    wake_page_published_host: "{{ (wake_page_node_status.stdout | from_json).Self.DNSName | regex_replace('\\.$', '') }}"
+  when: not ansible_check_mode
+
+- name: Compose the published page URL
+  ansible.builtin.set_fact:
+    wake_page_published_url: >-
+      https://{{ wake_page_published_host }}{{ '' if wake_page_serve_port | int == 443 else ':' ~ wake_page_serve_port }}
+  when: not ansible_check_mode
+
+- name: Find a tailscale CLI on the control node
+  # Not on PATH under a non-login shell, so the location is probed instead of
+  # assumed. The play runs become, and root has no need for this tailnet.
+  become: false
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  delegate_to: localhost
+  loop:
+    - /usr/local/bin/tailscale
+    - /opt/homebrew/bin/tailscale
+    - /usr/bin/tailscale
+  register: wake_page_control_cli
+  check_mode: false
+
+- name: Check whether this control node shares the tailnet
+  become: false
+  ansible.builtin.command: >-
+    {{ (wake_page_control_cli.results | selectattr('stat.exists') | map(attribute='item') | list | first) }}
+    status --json
+  delegate_to: localhost
+  register: wake_page_control_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: wake_page_control_cli.results | selectattr('stat.exists') | list | length > 0
+
+- name: Check the published page answers from a tailnet peer
+  # A page body is not wanted, only the code: a 403 or 502 means Serve or the
+  # unit is broken, while a connect or TLS failure means this control node
+  # cannot reach the tailnet and is not the deploy's problem. Five attempts, so
+  # a blocked path costs under two minutes rather than thirteen.
+  become: false
+  ansible.builtin.command: >-
+    timeout 20 curl -s -o /dev/null -w '%{http_code}'
+    --resolve {{ wake_page_published_host }}:{{ wake_page_serve_port }}:{{ wake_page_tailnet_ip.stdout | trim }}
+    {{ wake_page_published_url }}/status
+  delegate_to: localhost
+  register: wake_page_published_check
+  until: wake_page_published_check.stdout | default('000') == '200'
+  retries: 5
+  delay: 5
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - wake_page_control_status.rc | default(1) == 0
+
+- name: Fail when a peer reached Serve and Serve refused the page
+  ansible.builtin.assert:
+    that: wake_page_published_check.stdout | default('000') in ['200', '000', '']
+    fail_msg: >-
+      {{ wake_page_published_url }}/status answered HTTP
+      {{ wake_page_published_check.stdout | default('') }} from a tailnet peer, so
+      Serve or the wake-page unit is broken rather than the network. See "When the
+      page does not load" in docs/infrastructure/n5p-power-recovery.md.
+    quiet: true
+  when:
+    - not ansible_check_mode
+    - wake_page_published_check.stdout is defined
+    - wake_page_published_check.stdout not in ['200', '000', '']
+
+- name: Note that the peer could not reach this node
+  ansible.builtin.debug:
+    msg: >-
+      {{ wake_page_published_url }} was not verified from this control node
+      (curl rc={{ wake_page_published_check.rc | default('n/a') }}). Load it from
+      a tailnet device.
+  when:
+    - not ansible_check_mode
+    - wake_page_control_status.rc | default(1) == 0
+    - wake_page_published_check.stdout | default('000') in ['000', '']
+
+- name: Note that publication was not verified from this control node
+  ansible.builtin.debug:
+    msg: >-
+      This control node is not on the tailnet, so the published page was not
+      checked. Load {{ wake_page_published_url }} from a tailnet device.
+  when:
+    - not ansible_check_mode
+    - wake_page_control_status.rc | default(1) != 0
