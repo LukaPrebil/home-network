@@ -38,3 +38,9 @@ wake_page_hosts: []
 wake_page_user: wake-page
 wake_page_lib_dir: /usr/local/lib/wake-page
 wake_page_config_dir: /etc/wake-page
+
+# Publication. Serve puts the page on the ts.net name inside the tailnet only;
+# it needs HTTPS certificates enabled for the tailnet, which is a one-time
+# console consent. Nothing here exposes the page to the LAN or the internet.
+wake_page_serve_port: 443
+wake_page_serve_target: "http://{{ wake_page_listen }}:{{ wake_page_port }}"

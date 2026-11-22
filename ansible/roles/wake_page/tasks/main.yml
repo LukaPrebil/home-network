@@ -60,3 +60,53 @@
     state: started
     daemon_reload: true
   notify: Restart wake page
+
+- name: Flush handlers before the readiness check
+  ansible.builtin.meta: flush_handlers
+
+- name: Check the wake page answers on loopback
+  ansible.builtin.uri:
+    url: "{{ wake_page_serve_target }}/status"
+    headers:
+      Tailscale-User-Login: "{{ wake_page_allow_login }}"
+    status_code: 200
+  register: wake_page_health
+  until: wake_page_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+
+# Read-only probe. Publishing rewrites tailscaled state, so it only runs when
+# the config does not already point at this service.
+- name: Read the Tailscale Serve configuration
+  ansible.builtin.command: tailscale serve status --json
+  register: wake_page_serve_status
+  changed_when: false
+  check_mode: false
+
+- name: Publish the wake page to the tailnet
+  # `tailscale serve` waits on stdin when HTTPS certificates are not enabled for
+  # the tailnet, and prints a consent URL while it waits. The timeout keeps a
+  # converge from hanging on that, and the assert below surfaces the URL.
+  ansible.builtin.command: >-
+    timeout 30 tailscale serve --bg --https={{ wake_page_serve_port }}
+    {{ wake_page_serve_target }}
+  register: wake_page_serve_publish
+  changed_when: true
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - wake_page_serve_target not in wake_page_serve_status.stdout
+
+- name: Assert the wake page is published
+  ansible.builtin.assert:
+    that: wake_page_serve_publish.rc == 0
+    fail_msg: >-
+      tailscale serve did not publish {{ wake_page_serve_target }}.
+      {{ wake_page_serve_publish.stdout | default('') | trim }}
+      Open the login.tailscale.com/f/serve URL printed above in a browser to
+      enable Serve for this tailnet, then converge again.
+    quiet: true
+  when:
+    - wake_page_serve_publish.rc is defined
+    - wake_page_serve_publish.rc != 0

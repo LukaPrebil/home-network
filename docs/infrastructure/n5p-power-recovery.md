@@ -74,6 +74,31 @@ wakeonlan <n5p-nic-mac>       # n5p primary NIC MAC
 Verify the NIC is armed (on n5p): `ethtool enp197s0 | grep Wake-on` should
 show `Wake-on: g`.
 
+## Wake from the phone
+
+The `wake_page` role (tag `wake-page`) runs a small service on rpi4 that sends
+the magic packet and reports whether n5p came back. Tailscale Serve publishes it
+inside the tailnet at <https://rpi4.tail9aa5b5.ts.net/>, which is worth adding to
+the phone home screen: one tap opens the page, one more sends the packet.
+
+The page makes one claim: `reachable` means a TCP connection to
+`192.168.30.128:8006` opened, so Proxmox is answering. It does not report guest
+state. After a wake it probes at 2, 6, 14 and 29 seconds, then every 30 seconds,
+and stops at the first answer or after 10 minutes. The probe runs on rpi4, not in
+the browser, so locking the phone or closing the tab does not lose the outcome.
+
+The service binds `127.0.0.1` and authorises on the `Tailscale-User-Login`
+header that Serve injects, so the page is unreachable from the LAN and cannot be
+spoofed by it. If the phone's Tailscale app is disconnected, the page does not
+load at all.
+
+Prerequisite, once per tailnet: Serve needs HTTPS certificates. Without them the
+converge stops on an assertion that prints the consent URL to open in a browser.
+
+```bash
+cd ansible && ansible-playbook site.yml --tags wake-page --limit rpi4
+```
+
 ## Shell from the phone
 
 rpi4 is the only node that stays up when n5p is off, so it is the only host that
