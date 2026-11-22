@@ -265,7 +265,10 @@ def main() -> None:
     if not settings["allow_login"]:
         raise SystemExit("wake_page: allow_login is empty, every request would be refused")
     for host in settings["hosts"]:
-        parse_mac(host["mac"])
+        try:
+            parse_mac(host["mac"])
+        except ValueError as exc:
+            raise SystemExit(f"wake_page: host {host.get('name')!r}: {exc}") from exc
         if not host["name"] or not host["probe_host"]:
             raise SystemExit(f"wake_page: host entry incomplete: {host}")
         if not 0 < host["probe_port"] < 65536:

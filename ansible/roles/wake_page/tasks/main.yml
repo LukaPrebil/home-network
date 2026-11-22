@@ -128,18 +128,24 @@
   ansible.builtin.command: tailscale ip -4
   register: wake_page_tailnet_ip
   changed_when: false
-  check_mode: false
+  when: not ansible_check_mode
 
 - name: Read the node tailnet DNS name
   ansible.builtin.command: tailscale status --json
   register: wake_page_node_status
   changed_when: false
-  check_mode: false
+  when: not ansible_check_mode
+
+- name: Read the published page host
+  ansible.builtin.set_fact:
+    wake_page_published_host: "{{ (wake_page_node_status.stdout | from_json).Self.DNSName | regex_replace('\\.$', '') }}"
+  when: not ansible_check_mode
 
 - name: Compose the published page URL
   ansible.builtin.set_fact:
-    wake_page_published_host: "{{ (wake_page_node_status.stdout | from_json).Self.DNSName | regex_replace('\\.$', '') }}"
-    wake_page_published_url: "https://{{ (wake_page_node_status.stdout | from_json).Self.DNSName | regex_replace('\\.$', '') }}"
+    wake_page_published_url: >-
+      https://{{ wake_page_published_host }}{{ '' if wake_page_serve_port | int == 443 else ':' ~ wake_page_serve_port }}
+  when: not ansible_check_mode
 
 - name: Find a tailscale CLI on the control node
   # Not on PATH under a non-login shell, so the location is probed instead of
@@ -168,19 +174,50 @@
   when: wake_page_control_cli.results | selectattr('stat.exists') | list | length > 0
 
 - name: Check the published page answers from a tailnet peer
+  # A page body is not wanted, only the code: a 403 or 502 means Serve or the
+  # unit is broken, while a connect or TLS failure means this control node
+  # cannot reach the tailnet and is not the deploy's problem. Five attempts, so
+  # a blocked path costs under two minutes rather than thirteen.
   become: false
   ansible.builtin.command: >-
-    timeout 20 curl -sf --resolve {{ wake_page_published_host }}:443:{{ wake_page_tailnet_ip.stdout | trim }}
+    timeout 20 curl -s -o /dev/null -w '%{http_code}'
+    --resolve {{ wake_page_published_host }}:{{ wake_page_serve_port }}:{{ wake_page_tailnet_ip.stdout | trim }}
     {{ wake_page_published_url }}/status
   delegate_to: localhost
   register: wake_page_published_check
-  changed_when: false
-  until: wake_page_published_check.rc == 0
-  retries: 30
+  until: wake_page_published_check.stdout | default('000') == '200'
+  retries: 5
   delay: 5
+  changed_when: false
+  failed_when: false
   when:
     - not ansible_check_mode
     - wake_page_control_status.rc | default(1) == 0
+
+- name: Fail when a peer reached Serve and Serve refused the page
+  ansible.builtin.assert:
+    that: wake_page_published_check.stdout | default('000') in ['200', '000', '']
+    fail_msg: >-
+      {{ wake_page_published_url }}/status answered HTTP
+      {{ wake_page_published_check.stdout | default('') }} from a tailnet peer, so
+      Serve or the wake-page unit is broken rather than the network. See "When the
+      page does not load" in docs/infrastructure/n5p-power-recovery.md.
+    quiet: true
+  when:
+    - not ansible_check_mode
+    - wake_page_published_check.stdout is defined
+    - wake_page_published_check.stdout not in ['200', '000', '']
+
+- name: Note that the peer could not reach this node
+  ansible.builtin.debug:
+    msg: >-
+      {{ wake_page_published_url }} was not verified from this control node
+      (curl rc={{ wake_page_published_check.rc | default('n/a') }}). Load it from
+      a tailnet device.
+  when:
+    - not ansible_check_mode
+    - wake_page_control_status.rc | default(1) == 0
+    - wake_page_published_check.stdout | default('000') in ['000', '']
 
 - name: Note that publication was not verified from this control node
   ansible.builtin.debug:

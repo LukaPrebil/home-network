@@ -59,11 +59,11 @@ function render(rows) {
 }
 
 let timer = null;
+let lastBusy = false;
 
-function schedule(rows) {
+function schedule(busy) {
   clearTimeout(timer);
   timer = null;
-  const busy = rows.some((row) => row.monitoring);
   if (busy && !document.hidden) {
     timer = setTimeout(refresh, 3000);
   }
@@ -74,10 +74,14 @@ async function refresh() {
     const data = await (await fetch('/status')).json();
     render(data.hosts);
     foot.textContent = 'checked ' + new Date().toLocaleTimeString();
-    schedule(data.hosts);
+    lastBusy = data.hosts.some((row) => row.monitoring);
   } catch (err) {
+    // The probe runs on rpi4, so one failed read does not end the cycle: keep
+    // polling on the last known busy state and let the server catch up. Serve
+    // answers 502 across a unit restart, which is exactly this case.
     foot.textContent = 'status unavailable: ' + err;
   }
+  schedule(lastBusy);
 }
 
 async function wake(host) {
