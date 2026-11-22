@@ -68,22 +68,10 @@
     enabled: true
     state: started
     daemon_reload: true
-  notify: Restart wake page
 
 - name: Flush handlers before the readiness check
   ansible.builtin.meta: flush_handlers
 
-- name: Check the wake page answers on loopback
-  ansible.builtin.uri:
-    url: "{{ wake_page_serve_target }}/status"
-    headers:
-      Tailscale-User-Login: "{{ wake_page_allow_login }}"
-    status_code: 200
-  register: wake_page_health
-  until: wake_page_health.status == 200
-  retries: 30
-  delay: 5
-  changed_when: false
 
 # Read-only probe. Publishing rewrites tailscaled state, so it only runs when
 # the config does not already point at this service.
@@ -91,6 +79,7 @@
   ansible.builtin.command: tailscale serve status --json
   register: wake_page_serve_status
   changed_when: false
+  failed_when: false
   check_mode: false
 
 - name: Publish the wake page to the tailnet
@@ -105,7 +94,7 @@
   failed_when: false
   when:
     - not ansible_check_mode
-    - wake_page_serve_target not in wake_page_serve_status.stdout
+    - wake_page_serve_status.rc != 0 or wake_page_serve_target not in wake_page_serve_status.stdout
 
 - name: Assert the wake page is published
   ansible.builtin.assert:
@@ -119,3 +108,85 @@
   when:
     - wake_page_serve_publish.rc is defined
     - wake_page_serve_publish.rc != 0
+
+- name: Check the wake page answers on loopback
+  ansible.builtin.uri:
+    url: "{{ wake_page_serve_target }}/status"
+    headers:
+      Tailscale-User-Login: "{{ wake_page_allow_login }}"
+    status_code: 200
+  register: wake_page_health
+  until: wake_page_health.status == 200
+  retries: 30
+  delay: 5
+  changed_when: false
+
+# The phone loads the ts.net name through Serve, not loopback, and Serve only
+# accepts real tailnet peers: from the node itself the same request answers 403.
+# Loopback alone would leave a converge green while the entry point is dead.
+- name: Read the node tailnet address
+  ansible.builtin.command: tailscale ip -4
+  register: wake_page_tailnet_ip
+  changed_when: false
+  check_mode: false
+
+- name: Read the node tailnet DNS name
+  ansible.builtin.command: tailscale status --json
+  register: wake_page_node_status
+  changed_when: false
+  check_mode: false
+
+- name: Compose the published page URL
+  ansible.builtin.set_fact:
+    wake_page_published_host: "{{ (wake_page_node_status.stdout | from_json).Self.DNSName | regex_replace('\\.$', '') }}"
+    wake_page_published_url: "https://{{ (wake_page_node_status.stdout | from_json).Self.DNSName | regex_replace('\\.$', '') }}"
+
+- name: Find a tailscale CLI on the control node
+  # Not on PATH under a non-login shell, so the location is probed instead of
+  # assumed. The play runs become, and root has no need for this tailnet.
+  become: false
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  delegate_to: localhost
+  loop:
+    - /usr/local/bin/tailscale
+    - /opt/homebrew/bin/tailscale
+    - /usr/bin/tailscale
+  register: wake_page_control_cli
+  check_mode: false
+
+- name: Check whether this control node shares the tailnet
+  become: false
+  ansible.builtin.command: >-
+    {{ (wake_page_control_cli.results | selectattr('stat.exists') | map(attribute='item') | list | first) }}
+    status --json
+  delegate_to: localhost
+  register: wake_page_control_status
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: wake_page_control_cli.results | selectattr('stat.exists') | list | length > 0
+
+- name: Check the published page answers from a tailnet peer
+  become: false
+  ansible.builtin.command: >-
+    timeout 20 curl -sf --resolve {{ wake_page_published_host }}:443:{{ wake_page_tailnet_ip.stdout | trim }}
+    {{ wake_page_published_url }}/status
+  delegate_to: localhost
+  register: wake_page_published_check
+  changed_when: false
+  until: wake_page_published_check.rc == 0
+  retries: 30
+  delay: 5
+  when:
+    - not ansible_check_mode
+    - wake_page_control_status.rc | default(1) == 0
+
+- name: Note that publication was not verified from this control node
+  ansible.builtin.debug:
+    msg: >-
+      This control node is not on the tailnet, so the published page was not
+      checked. Load {{ wake_page_published_url }} from a tailnet device.
+  when:
+    - not ansible_check_mode
+    - wake_page_control_status.rc | default(1) != 0

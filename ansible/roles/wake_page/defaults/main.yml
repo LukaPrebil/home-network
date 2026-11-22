@@ -6,8 +6,10 @@
 # publishes it inside the tailnet; see docs/infrastructure/n5p-power-recovery.md.
 
 # Identity gate. Serve injects Tailscale-User-Login for user devices and strips
-# any incoming copy of the header, so this cannot be spoofed from the LAN.
-wake_page_allow_login: "LukaPrebil@github"
+# any incoming copy of the header, so nothing off-host can spoof it. The login
+# itself is host data; set it in host_vars. Empty refuses every request and
+# fails the service at startup.
+wake_page_allow_login: ""
 
 # Loopback only: Serve proxies to this port, nothing else should reach it.
 wake_page_listen: "127.0.0.1"

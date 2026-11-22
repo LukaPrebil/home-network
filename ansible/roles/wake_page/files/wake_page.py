@@ -29,6 +29,7 @@ PACKET_REPEATS = 16
 # down again. Past this age the monitor is dropped and /status probes live.
 STALE_PROBE_SECONDS = 5.0
 
+
 def parse_mac(mac: str) -> bytes:
     """Return the six raw bytes of a MAC given in colon or dash form."""
     raw = bytes.fromhex(mac.replace(":", "").replace("-", ""))
@@ -204,6 +205,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -211,6 +213,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(self.server.page)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(self.server.page)
 
@@ -235,6 +238,10 @@ class Handler(BaseHTTPRequestHandler):
         target = urlsplit(self.path)
         if target.path == "/wake":
             only = parse_qs(target.query).get("host", [None])[0]
+            known = {host["name"] for host in self.server.settings["hosts"]}
+            if only is not None and only not in known:
+                self.send_json({"error": f"unknown host {only}"}, 400)
+                return
             self.send_json({"woke": self.server.registry.wake(only)})
             return
         self.send_json({"error": "not found"}, 404)
@@ -254,6 +261,15 @@ def main() -> None:
     # Rendered by the role from templates/page.html.j2. Read once: the unit is
     # restarted when the template changes, so a reload path would never run.
     page = pathlib.Path(settings["page_path"]).read_bytes()
+
+    if not settings["allow_login"]:
+        raise SystemExit("wake_page: allow_login is empty, every request would be refused")
+    for host in settings["hosts"]:
+        parse_mac(host["mac"])
+        if not host["name"] or not host["probe_host"]:
+            raise SystemExit(f"wake_page: host entry incomplete: {host}")
+        if not 0 < host["probe_port"] < 65536:
+            raise SystemExit(f"wake_page: probe_port out of range: {host}")
 
     server = ThreadingHTTPServer((settings["listen"], settings["port"]), Handler)
     server.settings = settings

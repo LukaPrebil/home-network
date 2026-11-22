@@ -58,11 +58,23 @@ function render(rows) {
   previous = next;
 }
 
+let timer = null;
+
+function schedule(rows) {
+  clearTimeout(timer);
+  timer = null;
+  const busy = rows.some((row) => row.monitoring);
+  if (busy && !document.hidden) {
+    timer = setTimeout(refresh, 3000);
+  }
+}
+
 async function refresh() {
   try {
     const data = await (await fetch('/status')).json();
     render(data.hosts);
     foot.textContent = 'checked ' + new Date().toLocaleTimeString();
+    schedule(data.hosts);
   } catch (err) {
     foot.textContent = 'status unavailable: ' + err;
   }
@@ -70,7 +82,17 @@ async function refresh() {
 
 async function wake(host) {
   foot.textContent = 'waking ' + host;
-  await fetch('/wake?host=' + encodeURIComponent(host), { method: 'POST' });
+  let res;
+  try {
+    res = await fetch('/wake?host=' + encodeURIComponent(host), { method: 'POST' });
+  } catch (err) {
+    foot.textContent = 'wake failed: ' + err;
+    return;
+  }
+  if (!res.ok) {
+    foot.textContent = 'wake refused: HTTP ' + res.status + ' ' + (await res.text());
+    return;
+  }
   await refresh();
 }
 
@@ -79,7 +101,12 @@ for (const card of cards) {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) refresh();
+  if (document.hidden) {
+    clearTimeout(timer);
+    timer = null;
+  } else {
+    refresh();
+  }
 });
 
 refresh();

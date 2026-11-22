@@ -45,12 +45,13 @@ tailscale_advertise_routes:
 # by the ssh rule in the tailnet policy file, not by a key on the phone.
 tailscale_ssh: true
 
-# Hosts this box can wake over the LAN, rendered by the wake_page role. Probe
-# target is n5p's pveproxy: when it answers, the hypervisor is back, which is
-# the only claim the page makes.
+# Wake page: who may press the button, and which hosts it can wake. The probe
+# target is n5p's pveproxy: when it answers, the hypervisor is back, which is the
+# only claim the page makes.
+wake_page_allow_login: "LukaPrebil@github"
 wake_page_hosts:
   - name: n5p
     mac: "38:05:25:32:36:c8"  # enp197s0, the NIC wol-arm.service keeps armed
-    probe_host: 192.168.30.128
+    probe_host: "{{ hostvars['n5p'].ansible_host }}"
     probe_port: 8006
 tailscale_authkey: "{{ vault_tailscale_router_auth_key }}"
