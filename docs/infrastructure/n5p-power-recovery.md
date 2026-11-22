@@ -74,6 +74,44 @@ wakeonlan <n5p-nic-mac>       # n5p primary NIC MAC
 Verify the NIC is armed (on n5p): `ethtool enp197s0 | grep Wake-on` should
 show `Wake-on: g`.
 
+## Shell from the phone
+
+rpi4 is the only node that stays up when n5p is off, so it is the only host that
+advertises Tailscale SSH (`tailscale_ssh: true` in `ansible/host_vars/rpi4.yml`).
+Access needs no key on the phone: Tailscale authenticates the connection from the
+phone's tailnet identity, and the policy rule below decides who may log in.
+
+Connect from any SSH client on the phone to `rpi4.tail9aa5b5.ts.net` as `luka`.
+The client must accept an SSH server that offers no authentication. A client that
+refuses it can connect as `luka+password` and enter any password, which the
+Tailscale SSH docs recommend for exactly this case.
+
+Authorisation lives in the tailnet policy file at
+<https://login.tailscale.com/admin/acls>, which the admin console owns and this
+repo does not manage:
+
+```json
+"ssh": [
+  {
+    "action": "accept",
+    "src": ["LukaPrebil@github"],
+    "dst": ["tag:subnet-router"],
+    "users": ["luka"]
+  }
+]
+```
+
+`accept` is deliberate. Check mode delivers its sign-in URL as an SSH auth
+banner, and Android clients are known to swallow that banner and hang
+(connectbot/connectbot#1150), which is the wrong failure for a recovery path.
+The cost is that any device already logged into the tailnet as
+`LukaPrebil@github` reaches a shell without a prompt, so keep screen locks on and
+leave tailnet key expiry enabled.
+
+A tag cannot be a `check` source, and the rule above is pinned to one login and
+one destination tag on purpose: `autogroup:member` or `autogroup:nonroot` would
+widen it to every future member and every non-root account on rpi4.
+
 ## Two traps in `startall`
 
 Both bit on 2026-08-08 and both are worth knowing before reading any task log:

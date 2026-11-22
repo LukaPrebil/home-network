@@ -40,4 +40,8 @@ tailscale_subnet_router: true
 tailscale_advertise_routes:
   - "192.168.30.0/24"
   - "192.168.60.142/32"  # Traefik LXC (DMZ)
+# Shell access from the phone during an outage: rpi4 is the only always-on node,
+# so it is the one host that must accept a tailnet SSH login. Access is granted
+# by the ssh rule in the tailnet policy file, not by a key on the phone.
+tailscale_ssh: true
 tailscale_authkey: "{{ vault_tailscale_router_auth_key }}"

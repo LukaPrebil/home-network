@@ -18,3 +18,8 @@ tailscale_advertise_routes: []
 # is a state to converge to, not an absent one. Non-router hosts leave this false
 # and never touch forwarding or the routes flag.
 tailscale_subnet_router: false
+# Advertise Tailscale SSH, which claims port 22 for traffic arriving over the
+# tailnet only; the LAN sshd and its authorized_keys are untouched. Enabling it
+# needs a matching ssh rule in the tailnet policy file, which the admin console
+# owns - see the README.
+tailscale_ssh: false
