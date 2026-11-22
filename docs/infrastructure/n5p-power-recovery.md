@@ -137,6 +137,17 @@ A tag cannot be a `check` source, and the rule above is pinned to one login and
 one destination tag on purpose: `autogroup:member` or `autogroup:nonroot` would
 widen it to every future member and every non-root account on rpi4.
 
+Confirm the rule reached the node, not just the editor. The control plane sends
+each node only the rules that match it, so rpi4 must be asked, and the laptop's
+netmap will never show this one:
+
+```bash
+sudo tailscale debug netmap | python3 -c 'import sys,json;print(json.load(sys.stdin)["SSHPolicy"])'
+```
+
+A live rule shows `"accept": true` with `"sshUsers": {"luka": "luka"}`. Before
+the save lands, the same command shows the default `holdAndDelegate` rule alone.
+
 ## Two traps in `startall`
 
 Both bit on 2026-08-08 and both are worth knowing before reading any task log:
