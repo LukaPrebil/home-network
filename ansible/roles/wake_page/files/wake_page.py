@@ -23,6 +23,11 @@ LOG = logging.getLogger("wake_page")
 PACKET_PREFIX = b"\xff" * 6
 PACKET_REPEATS = 16
 
+# A finished monitor's answer goes stale: after a tap the page may sit open for
+# an hour, and "reachable" must not describe a probe from before the host went
+# down again. Past this age the monitor is dropped and /status probes live.
+STALE_PROBE_SECONDS = 5.0
+
 PAGE = b"""<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -246,8 +251,13 @@ class Registry:
             with self.lock:
                 monitor = self.monitors.get(host["name"])
             if monitor is not None:
-                rows.append(monitor.snapshot())
-                continue
+                snap = monitor.snapshot()
+                fresh = (snap["last_probe_seconds_ago"] or 0) <= STALE_PROBE_SECONDS
+                if snap["monitoring"] or fresh:
+                    rows.append(snap)
+                    continue
+                with self.lock:
+                    self.monitors.pop(host["name"], None)
             reachable = probe(host, self.settings["probe_timeout"])
             rows.append(
                 {
