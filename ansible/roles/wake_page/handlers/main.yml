@@ -1,0 +1,9 @@
+---
+# The unit reads its config at startup, so a template change must restart it.
+# This role has no containers, where compose would own the apply path.
+
+- name: Restart wake page
+  ansible.builtin.systemd:
+    name: wake-page
+    state: restarted
+    daemon_reload: true

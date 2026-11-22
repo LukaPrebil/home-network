@@ -44,4 +44,13 @@ tailscale_advertise_routes:
 # so it is the one host that must accept a tailnet SSH login. Access is granted
 # by the ssh rule in the tailnet policy file, not by a key on the phone.
 tailscale_ssh: true
+
+# Hosts this box can wake over the LAN, rendered by the wake_page role. Probe
+# target is n5p's pveproxy: when it answers, the hypervisor is back, which is
+# the only claim the page makes.
+wake_page_hosts:
+  - name: n5p
+    mac: "38:05:25:32:36:c8"  # enp197s0, the NIC wol-arm.service keeps armed
+    probe_host: 192.168.30.128
+    probe_port: 8006
 tailscale_authkey: "{{ vault_tailscale_router_auth_key }}"

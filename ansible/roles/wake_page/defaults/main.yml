@@ -1,0 +1,40 @@
+---
+# Defaults for the wake_page role.
+#
+# The service sends a Wake-on-LAN magic packet for each configured host and
+# probes a TCP port to report whether the host answered. Tailscale Serve
+# publishes it inside the tailnet; see docs/infrastructure/n5p-power-recovery.md.
+
+# Identity gate. Serve injects Tailscale-User-Login for user devices and strips
+# any incoming copy of the header, so this cannot be spoofed from the LAN.
+wake_page_allow_login: "LukaPrebil@github"
+
+# Loopback only: Serve proxies to this port, nothing else should reach it.
+wake_page_listen: "127.0.0.1"
+wake_page_port: 8099
+
+# Magic packets go to the broadcast address of the host's own L2 segment.
+# Ports 9 and 7 are both sent because NIC firmware varies on which it accepts.
+wake_page_broadcast: "192.168.30.255"
+wake_page_wol_ports:
+  - 9
+  - 7
+
+# Probe cycle after a wake request. A cold Proxmox boot needs 60 to 90 seconds
+# before pveproxy listens, so early probes are close together and later ones
+# settle at the poll interval.
+wake_page_probe_timeout: 2
+wake_page_backoff_seconds:
+  - 2
+  - 4
+  - 8
+  - 15
+wake_page_poll_seconds: 30
+wake_page_window_seconds: 600
+
+# Waking is a per-host decision, so the host list is host data, not a default.
+wake_page_hosts: []
+
+wake_page_user: wake-page
+wake_page_lib_dir: /usr/local/lib/wake-page
+wake_page_config_dir: /etc/wake-page
