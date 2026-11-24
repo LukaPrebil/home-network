@@ -145,11 +145,12 @@ class ScriptTestCase(unittest.TestCase):
         with open(path, encoding="utf-8") as handle:
             return json.load(handle)
 
-    def run_main(self, config, argv=None):
+    def run_main(self, config, extra=None):
         path = self.write_config(config)
+        argv = ["--config", path] + (extra or [])
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            code = ev.main(argv or ["--config", path])
+            code = ev.main(argv)
         return code, out.getvalue()
 
 
@@ -357,6 +358,26 @@ class DegradedTests(ScriptTestCase):
         self.assertNotIn("degraded", state)
         self.assertEqual(1, state["degraded_last"]["new_since_outage"])
         self.assertEqual(1, state["degraded_last"]["still_live"])
+
+
+class SelftestTests(ScriptTestCase):
+    def test_selftest_pass_and_fail(self):
+        config = self.config(["/selftest"])
+        code, out = self.run_main(config, ["--selftest"])
+        self.assertEqual(0, code, out)
+        self.assertIn("EV-HUNT SELFTEST", out)
+        self.assertIn("status: 200", out)
+        self.assertIn("cookies: __remote-test", out)
+        self.assertIn("cards: 1", out)
+        self.assertIn("result: PASS", out)
+        self.assertEqual(2, FixtureHandler.requests["/selftest"])
+        self.assertFalse(os.path.exists(config["state_file"]))
+
+        config = self.config(["/blocked"])
+        code, out = self.run_main(config, ["--selftest"])
+        self.assertEqual(1, code, out)
+        self.assertIn("result: FAIL", out)
+        self.assertFalse(os.path.exists(config["state_file"]))
 
 
 if __name__ == "__main__":

@@ -1153,12 +1153,40 @@ def fetch_detail(url, platform, config, user_agent):
     return DETAIL_PARSERS[platform](parse_html(body))
 
 
+def selftest(config):
+    source = next((item for item in config["sources"] if item["platform"] == "schadeautos"), None)
+    print("EV-HUNT SELFTEST %s" % now_iso())
+    if source is None:
+        print("error: no schadeautos source in the config")
+        print("result: FAIL")
+        return 1
+    print("source: %s %s" % (source["name"], source["url"]))
+    opener, jar = new_session()
+    try:
+        status, body = fetch(source["url"], config, config["user_agent"], opener=opener)
+    except RuntimeError as error:
+        print("error: %s" % error)
+        print("result: FAIL")
+        return 1
+    cards = CARD_PARSERS[source["platform"]](parse_html(body))
+    print("status: %d" % status)
+    print("bytes: %d" % len(body.encode("utf-8")))
+    print("cookies: %s" % (", ".join(sorted(cookie.name for cookie in jar)) or "none"))
+    print("cards: %d" % len(cards))
+    if status == 200 and cards:
+        print("result: PASS")
+        return 0
+    print("result: FAIL")
+    return 1
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", default=None, help="filter-contract JSON (default: alongside this script)")
     parser.add_argument("--state", default=None, help="override the state file path from the config")
     parser.add_argument("--digest", action="store_true", help="print the weekly digest from state instead of fetching")
     parser.add_argument("--digest-days", type=int, default=7, help="window for the digest (default: 7)")
+    parser.add_argument("--selftest", action="store_true", help="fetch one listing page with a cold session and report the result")
     args = parser.parse_args(argv)
 
     config_path = args.config or os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -1167,10 +1195,19 @@ def main(argv=None):
             config = json.load(handle)
         if args.state:
             config["state_file"] = args.state
+    except (OSError, ValueError) as error:
+        print("EV-HUNT FAILED %s" % now_iso())
+        print("error: cannot read the config: %s" % error)
+        return 1
+
+    if args.selftest:
+        return selftest(config)
+
+    try:
         state = load_state(config["state_file"])
     except (OSError, ValueError) as error:
         print("EV-HUNT FAILED %s" % now_iso())
-        print("error: cannot read the config or the state file: %s" % error)
+        print("error: cannot read the state file: %s" % error)
         return 1
 
     if args.digest:
