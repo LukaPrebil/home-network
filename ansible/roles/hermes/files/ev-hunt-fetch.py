@@ -39,6 +39,7 @@ platform would be indistinguishable from a quiet market.
 """
 
 import argparse
+import http.cookiejar
 import json
 import os
 import re
@@ -157,7 +158,22 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-OPENER = urllib.request.build_opener(NoRedirect)
+class ScrapeBlocked(RuntimeError):
+    """Every attempt returned a body too short to be a listing page."""
+
+
+DEFAULT_MIN_BODY_BYTES = 20000
+
+
+def new_session():
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(
+        NoRedirect, urllib.request.HTTPCookieProcessor(jar)
+    )
+    return opener, jar
+
+
+OPENER, COOKIE_JAR = new_session()
 
 
 def walk(node):
@@ -328,30 +344,49 @@ def now_iso():
 # ── Fetching ─────────────────────────────────────────────────────────
 
 
-def fetch(url, config, user_agent):
+def fetch(url, config, user_agent, opener=None, min_body_bytes=None):
     """One polite GET with internal retries. Returns (status, body).
 
     A redirect is reported as a status rather than followed: the clean brand
     landing pages 302 to the homepage when the dealer network has no stock of
     that brand, and following it would read the homepage's mixed listings as
-    that brand's stock.
+    that brand's stock. A 200 shorter than min_body_bytes is the cookie
+    challenge, so it is retried with the same session and then reported as
+    blocked instead of as an empty page.
     """
-    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+    opener = opener or OPENER
+    if min_body_bytes is None:
+        min_body_bytes = config.get("min_body_bytes", DEFAULT_MIN_BODY_BYTES)
+    attempts = config["retries"] + 1
     last_error = None
-    for attempt in range(config["retries"] + 1):
+    last_short_bytes = None
+    all_short = True
+    for attempt in range(attempts):
         if attempt:
             time.sleep(config["retry_backoff_seconds"] * attempt)
+        request = urllib.request.Request(url, headers={"User-Agent": user_agent})
         try:
-            with OPENER.open(request, timeout=config["timeout_seconds"]) as response:
-                body = response.read().decode("utf-8", "replace")
-                return response.status, body
+            with opener.open(request, timeout=config["timeout_seconds"]) as response:
+                raw = response.read()
+                status = response.status
+                if status == 200 and (not raw or len(raw) < min_body_bytes):
+                    last_short_bytes = len(raw)
+                    continue
+                return status, raw.decode("utf-8", "replace")
         except urllib.error.HTTPError as error:
             if error.code in (301, 302, 303, 307, 308):
                 return error.code, ""
+            all_short = False
             last_error = error
         except Exception as error:  # noqa: BLE001 - network stack raises broadly
+            all_short = False
             last_error = error
-    raise RuntimeError("GET %s failed after %d attempts: %s" % (url, config["retries"] + 1, last_error))
+    if all_short and last_short_bytes is not None:
+        raise ScrapeBlocked(
+            "GET %s returned a %d-byte body on all %d attempts"
+            % (url, last_short_bytes, attempts)
+        )
+    raise RuntimeError("GET %s failed after %d attempts: %s" % (url, attempts, last_error))
 
 
 # ── Landing pages ────────────────────────────────────────────────────
