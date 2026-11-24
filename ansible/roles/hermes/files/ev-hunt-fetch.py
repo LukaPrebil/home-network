@@ -770,24 +770,35 @@ def render_candidate(entry, change, model):
     return "\n".join(lines)
 
 
+def run_status(report):
+    if report["ok"] + report["empty"] == 0:
+        if report["blocked"] and not report["failed"] and not report["drift"]:
+            return "BLOCKED"
+        return "FAILED"
+    return "PARTIAL" if report["unhealthy"] else "RUN"
+
+
 def render_run(report):
     # A partial sweep is named in the first line because that line is what the
     # brain reads before anything else: a run that swept half the platform is
     # not a quiet market, and the rest of the report is indistinguishable from a
     # healthy one.
     out = [
-        "EV-HUNT %s %s" % ("PARTIAL" if report["failed"] else "RUN", now_iso()),
-        "sources: %d/%d fetched (%d pages), %d empty, %d failed"
-        % (report["ok"], report["total"], report["pages"], report["empty"], report["failed"]),
+        "EV-HUNT %s %s" % (run_status(report), now_iso()),
+        "sources: %d/%d fetched (%d pages), %d empty, %d blocked, %d failed, %d drift"
+        % (report["ok"], report["total"], report["pages"], report["empty"],
+           report["blocked"], report["failed"], report["drift"]),
         "listings parsed: %d | in scope: %d | matches: %d | near-misses: %d | rejected: %d"
         % (report["parsed"], report["scope"], report["matches"], report["near_misses"], report["rejected"]),
+        "blocked: %d | failed: %d | drift: %d"
+        % (report["blocked"], report["failed"], report["drift"]),
     ]
     if report["errors"]:
         out.append("source errors:")
         out.extend("  - %s" % error for error in report["errors"])
         out.append(
             "warning: %d of %d sources were not swept, so a [SILENT] here is not a quiet market"
-            % (report["failed"], report["total"])
+            % (report["unhealthy"], report["total"])
         )
     out.append("alerts: %d" % len(report["alerts"]))
     for entry, change, model in report["alerts"]:
@@ -888,13 +899,13 @@ def fetch_pages(source, config, user_agent):
 
 def run(config, state):
     report = {
-        "total": len(config["sources"]), "ok": 0, "empty": 0, "failed": 0, "pages": 0,
+        "total": len(config["sources"]), "ok": 0, "empty": 0, "failed": 0,
+        "blocked": 0, "drift": 0, "pages": 0,
         "parsed": 0, "scope": 0, "matches": 0, "near_misses": 0, "rejected": 0,
-        "alerts": [], "errors": [],
+        "alerts": [], "errors": [], "unhealthy_sources": [],
     }
     succeeded_sources = set()
     seen_keys = set()
-    hard_failures = []
     detail_fetches = 0
     user_agent = config["user_agent"]
 
@@ -903,8 +914,16 @@ def run(config, state):
         previous = state["sources"].get(name, {})
         try:
             outcome, cards, pages = fetch_pages(source, config, user_agent)
+        except ScrapeBlocked as error:
+            report["blocked"] += 1
+            report["unhealthy_sources"].append(name)
+            report["errors"].append("%s: blocked: %s" % (name, error))
+            state["sources"][name] = {"last_count": previous.get("last_count", 0), "last_ok": False,
+                                      "last_blocked": True, "last_run": now_iso()}
+            continue
         except RuntimeError as error:
             report["failed"] += 1
+            report["unhealthy_sources"].append(name)
             report["errors"].append("%s: %s" % (name, error))
             state["sources"][name] = {"last_count": previous.get("last_count", 0), "last_ok": False, "last_run": now_iso()}
             continue
@@ -926,13 +945,22 @@ def run(config, state):
             if not card["category"]:
                 card["category"] = source["category"]
         report["parsed"] += len(cards)
-        report["ok"] += 1
-        succeeded_sources.add(name)
 
         if not cards and previous.get("last_count", 0) > 0:
             # The source parsed cards last run and none now. Reading that as "no
-            # news" would hide a markup change, so it fails loudly instead.
-            hard_failures.append("%s: page yielded no listings but yielded %d last run" % (name, previous["last_count"]))
+            # news" would hide a markup change, so it becomes a drift failure
+            # for this source while the rest of the sweep still counts.
+            report["drift"] += 1
+            report["unhealthy_sources"].append(name)
+            report["errors"].append(
+                "%s: page yielded no listings but yielded %d last run"
+                % (name, previous["last_count"])
+            )
+            state["sources"][name] = {"last_count": 0, "last_pages": pages, "last_ok": False, "last_run": now_iso()}
+            continue
+
+        report["ok"] += 1
+        succeeded_sources.add(name)
         state["sources"][name] = {"last_count": len(cards), "last_pages": pages, "last_ok": True, "last_run": now_iso()}
 
         for card in cards:
@@ -1004,16 +1032,13 @@ def run(config, state):
         if entry["missing_streak"] >= config["missing_runs_before_gone"] and not entry.get("gone_at"):
             entry["gone_at"] = now_iso()
 
-    if hard_failures:
-        raise RuntimeError("; ".join(hard_failures))
-    if report["ok"] == 0 and report["empty"] == 0:
-        raise RuntimeError("no landing page could be fetched")
+    report["unhealthy"] = report["failed"] + report["blocked"] + report["drift"]
     return report
 
 
 def fetch_detail(url, platform, config, user_agent):
     try:
-        status, body = fetch(url, config, user_agent)
+        status, body = fetch(url, config, user_agent, min_body_bytes=0)
     except RuntimeError:
         return {}
     if status != 200:
@@ -1059,7 +1084,7 @@ def main(argv=None):
     # partial, which is the one thing the skill cannot infer from the report.
     save_state(config["state_file"], state)
     print(render_run(report))
-    return 2 if report["failed"] else 0
+    return 2 if report.get("unhealthy") else 0
 
 
 if __name__ == "__main__":

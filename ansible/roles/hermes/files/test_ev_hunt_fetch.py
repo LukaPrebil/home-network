@@ -176,5 +176,78 @@ class FetchTests(ScriptTestCase):
         self.assertEqual(config["retries"] + 1, FixtureHandler.requests["/blocked"])
 
 
+class AccountingTests(ScriptTestCase):
+    def test_blocked_source_is_not_empty(self):
+        config = self.config(["/blocked"])
+        self.write_state(
+            {
+                "version": 1,
+                "listings": {},
+                "sources": {
+                    "schadeautos-i4-salvage": {
+                        "last_count": 5,
+                        "last_ok": True,
+                        "last_run": "2026-11-18T21:00:00Z",
+                    }
+                },
+            }
+        )
+        code, out = self.run_main(config)
+        self.assertEqual(2, code, out)
+        self.assertIn("EV-HUNT BLOCKED", out)
+        self.assertIn("blocked: 1", out)
+        state = self.read_state()
+        self.assertEqual({}, state["listings"])
+        self.assertEqual(5, state["sources"]["schadeautos-i4-salvage"]["last_count"])
+        self.assertFalse(state["sources"]["schadeautos-i4-salvage"]["last_ok"])
+
+    def test_partial_run_saves_healthy_source(self):
+        config = self.config(["/blocked", "/listing"])
+        config["sources"][1]["name"] = "schadeautos-i4-clean"
+        self.write_state(
+            {
+                "version": 1,
+                "listings": {},
+                "sources": {
+                    "schadeautos-i4-salvage": {
+                        "last_count": 5,
+                        "last_ok": True,
+                        "last_run": "2026-11-18T21:00:00Z",
+                    }
+                },
+            }
+        )
+        code, out = self.run_main(config)
+        self.assertEqual(2, code, out)
+        self.assertIn("EV-HUNT PARTIAL", out)
+        self.assertIn("sources: 1/2 fetched", out)
+        state = self.read_state()
+        self.assertIn("schadeautos:1001", state["listings"])
+        self.assertEqual(5, state["sources"]["schadeautos-i4-salvage"]["last_count"])
+        self.assertEqual(1, state["sources"]["schadeautos-i4-clean"]["last_count"])
+
+    def test_zero_after_stock_is_drift_not_a_fatal_run(self):
+        config = self.config(["/empty-full"])
+        self.write_state(
+            {
+                "version": 1,
+                "listings": {},
+                "sources": {
+                    "schadeautos-i4-salvage": {
+                        "last_count": 5,
+                        "last_ok": True,
+                        "last_run": "2026-11-18T21:00:00Z",
+                    }
+                },
+            }
+        )
+        code, out = self.run_main(config)
+        self.assertEqual(2, code, out)
+        self.assertIn("drift: 1", out)
+        self.assertIn("page yielded no listings but yielded 5 last run", out)
+        state = self.read_state()
+        self.assertEqual(0, state["sources"]["schadeautos-i4-salvage"]["last_count"])
+
+
 if __name__ == "__main__":
     unittest.main()
