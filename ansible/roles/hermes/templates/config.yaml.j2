@@ -14,6 +14,12 @@ model:
 # Side tasks run on their own provider/model, so the brain's pin does not decide
 # them. Only vision is configured: it is the one aux lane this host depends on,
 # because reading listing photos is how an airbag verdict stops being a guess.
+#
+# The pin lives in the role defaults, not only in this file, so a redeploy cannot
+# quietly move it back to minimax-m3. glm-5.3-flash takes an image natively and
+# is cheap; never pin kimi-k3 here, which costs an order of magnitude more for
+# no better reading of the same airbag photos.
+#
 # Upstream falls back to a paid OpenRouter model when a configured aux provider
 # is unavailable; OPENROUTER_API_KEY is unset here, so that lane stays inert.
 auxiliary:
@@ -22,10 +28,15 @@ auxiliary:
     model: "{{ hermes_vision_model }}"
 
 # ── Provider model allowlist ─────────────────────────────────────────
-# The picker's view of ollama-cloud, narrowed to the models this host actually
-# uses. It keeps an expensive model from being chosen out of habit. Execution is
-# not gated by this list - hermes has no model denylist - so the pins above and
-# in `model` are what bound spending.
+# Cost control: discover_models false stops hermes live-probing the provider
+# catalog whenever the picker opens, and the list below narrows the picker to the
+# models this host actually uses, so an expensive model is not picked out of
+# habit.
+#
+# Be clear about what this buys: the list is picker-only. It does not gate
+# requests - hermes has no model denylist - so the pins above and in `model` are
+# what bound spending. Keep both pins in this list or the picker cannot offer the
+# model that is actually in use; configure.yml fails the converge otherwise.
 providers:
   ollama-cloud:
     discover_models: false
@@ -35,10 +46,17 @@ providers:
 {% endfor %}
 
 # ── Security gate ────────────────────────────────────────────────────
+# manual: a dangerous terminal command becomes a propose-wait prompt in the
+# Telegram chat rather than running. The command allowlist is narrow, and an
+# unattended run - cron job or event wake - has no approver present, so manual
+# mode fails those closed instead of letting them act. Valid upstream modes are
+# smart | manual | off; there is no "on".
 approvals:
   mode: "{{ hermes_approvals_mode }}"
 
 # ── Terminal sandbox ─────────────────────────────────────────────────
+# local: the LXC is the sandbox, so commands run inside its rootfs. A docker
+# backend would only add a second isolation layer this host does not need.
 terminal:
   backend: "{{ hermes_terminal_backend }}"
 
@@ -54,6 +72,12 @@ terminal:
 # watch_domains/watch_entities/watch_all set it logs a startup warning and drops
 # every state change, so an empty list here is a silent no-op rather than an
 # error.
+#
+# The list is a budget, not a feed: roughly 700-800k changes/day arrive on the
+# raw feed and this one is capped in the low tens. Every entry must pass the
+# watch-decision gate recorded next to the list in the role defaults, which is
+# also where the per-entity reasons live. The mower pair is commented out while
+# the mower sits in winter storage - a wake that cannot act is waste.
 {% if hermes_enable_homeassistant %}
 platforms:
   homeassistant:
@@ -74,8 +98,11 @@ platforms:
 
 # ── Tool surface ─────────────────────────────────────────────────────
 # agent.disabled_toolsets is a global suppression list that upstream applies
-# last, overriding per-platform toolset lists. See the role defaults for why
-# the built-in Home Assistant toolset is suppressed.
+# last, overriding per-platform toolset lists. The built-in homeassistant
+# toolset is on it because setting HASS_TOKEN switches that toolset on by
+# itself: a second HA service-call path that the ha-mcp include whitelist does
+# not govern. Suppressing it keeps the ha-mcp server the single HA tool surface,
+# so there is one privilege boundary and one result shape.
 #
 # image_input_mode: text keeps an attached photo out of a native attach. The
 # brain's catalog entry claims image input it does not honour, so a native
@@ -108,7 +135,7 @@ cron:
 
 # ── MCP servers ──────────────────────────────────────────────────────
 # Home Assistant MCP is bridged from the containers VM. It exposes HA
-# device control as tools — useful for "turn off the heat pump" style
+# device control as tools - useful for "turn off the heat pump" style
 # requests from Telegram. tools.include is a whitelist (empty = nothing
 # registered); the list lives in role defaults, one entry per tool.
 mcp_servers:
@@ -127,3 +154,12 @@ mcp_servers:
 {% endfor %}
     sampling:
       enabled: false  # Don't let the MCP server initiate LLM calls on our budget
+
+# ── First-touch hints ────────────────────────────────────────────────
+# hermes records each one-time onboarding hint under onboarding.seen when the
+# operator first meets it. This role owns the file wholesale, so the flag is
+# spelled out here: omitting it re-arms the busy-input tip and shows it again on
+# the next message that arrives mid-run.
+onboarding:
+  seen:
+    busy_input_prompt: true
