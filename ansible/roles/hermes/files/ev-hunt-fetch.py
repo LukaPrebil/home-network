@@ -32,13 +32,14 @@ schadeautos.nl (its robots.txt disallows them). The monitor never contacts a
 seller, never bids, and never writes outside its state directory.
 
 Exit codes are the contract with the judgment skill: 0 when every source was
-swept, 2 when some were not (a partial sweep, whose candidates are still worth
-judging), 1 when nothing was swept at all. A source that fails inside `run()`
-is collected rather than fatal, so without the 2 the report of a half-dead
-platform would be indistinguishable from a quiet market.
+swept, 2 when at least one source was blocked, failed or drifted (a partial or
+total sweep), and 1 when the script could not run at all. A source that fails
+inside `run()` is collected rather than fatal, so a half-dead platform cannot
+look like a quiet market. A blocked source is distinct from an empty one.
 """
 
 import argparse
+import http.cookiejar
 import json
 import os
 import re
@@ -157,7 +158,22 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-OPENER = urllib.request.build_opener(NoRedirect)
+class ScrapeBlocked(RuntimeError):
+    """Every attempt returned a body too short to be a listing page."""
+
+
+DEFAULT_MIN_BODY_BYTES = 20000
+
+
+def new_session():
+    jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(
+        NoRedirect, urllib.request.HTTPCookieProcessor(jar)
+    )
+    return opener, jar
+
+
+OPENER, COOKIE_JAR = new_session()
 
 
 def walk(node):
@@ -325,33 +341,69 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def iso_utc(moment):
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def parse_iso(value):
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
+def format_duration(seconds):
+    seconds = max(0, int(seconds))
+    days, remainder = divmod(seconds, 86400)
+    hours = remainder // 3600
+    if days:
+        return "%dd %dh" % (days, hours)
+    return "%dh" % hours
+
+
 # ── Fetching ─────────────────────────────────────────────────────────
 
 
-def fetch(url, config, user_agent):
+def fetch(url, config, user_agent, opener=None, min_body_bytes=None):
     """One polite GET with internal retries. Returns (status, body).
 
     A redirect is reported as a status rather than followed: the clean brand
     landing pages 302 to the homepage when the dealer network has no stock of
     that brand, and following it would read the homepage's mixed listings as
-    that brand's stock.
+    that brand's stock. A 200 shorter than min_body_bytes is the cookie
+    challenge, so it is retried with the same session and then reported as
+    blocked instead of as an empty page.
     """
-    request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+    opener = opener or OPENER
+    if min_body_bytes is None:
+        min_body_bytes = config.get("min_body_bytes", DEFAULT_MIN_BODY_BYTES)
+    attempts = config["retries"] + 1
     last_error = None
-    for attempt in range(config["retries"] + 1):
+    last_short_bytes = None
+    all_short = True
+    for attempt in range(attempts):
         if attempt:
             time.sleep(config["retry_backoff_seconds"] * attempt)
+        request = urllib.request.Request(url, headers={"User-Agent": user_agent})
         try:
-            with OPENER.open(request, timeout=config["timeout_seconds"]) as response:
-                body = response.read().decode("utf-8", "replace")
-                return response.status, body
+            with opener.open(request, timeout=config["timeout_seconds"]) as response:
+                raw = response.read()
+                status = response.status
+                if status == 200 and (not raw or len(raw) < min_body_bytes):
+                    last_short_bytes = len(raw)
+                    continue
+                return status, raw.decode("utf-8", "replace")
         except urllib.error.HTTPError as error:
             if error.code in (301, 302, 303, 307, 308):
                 return error.code, ""
+            all_short = False
             last_error = error
         except Exception as error:  # noqa: BLE001 - network stack raises broadly
+            all_short = False
             last_error = error
-    raise RuntimeError("GET %s failed after %d attempts: %s" % (url, config["retries"] + 1, last_error))
+    if all_short and last_short_bytes is not None:
+        raise ScrapeBlocked(
+            "GET %s returned a %d-byte body on all %d attempts"
+            % (url, last_short_bytes, attempts)
+        )
+    raise RuntimeError("GET %s failed after %d attempts: %s" % (url, attempts, last_error))
 
 
 # ── Landing pages ────────────────────────────────────────────────────
@@ -660,6 +712,80 @@ def save_state(path, state):
     os.replace(temporary, path)
 
 
+def update_degraded(state, report, config):
+    now = datetime.now(timezone.utc)
+    degraded = state.get("degraded")
+    if report["unhealthy"] == 0:
+        if degraded:
+            since = parse_iso(degraded["since"])
+            new = [
+                entry
+                for entry in state["listings"].values()
+                if entry.get("first_seen", "") >= degraded["since"]
+            ]
+            still_live = sum(1 for entry in new if entry.get("missing_streak", 0) == 0)
+            gone = sum(
+                1
+                for entry in state["listings"].values()
+                if entry.get("last_seen", "") < degraded["since"]
+                and entry.get("missing_streak", 0) > 0
+            )
+            state["degraded_last"] = {
+                "since": degraded["since"],
+                "recovered_at": now_iso(),
+                "duration_seconds": int((now - since).total_seconds()),
+                "consecutive_runs": degraded.get("consecutive_runs", 0),
+                "new_since_outage": len(new),
+                "still_live": still_live,
+                "gone_since_outage": gone,
+            }
+            del state["degraded"]
+            report["recovery"] = state["degraded_last"]
+            report["notify"] = "recovered"
+        else:
+            report["notify"] = "healthy"
+        state["last_healthy"] = {
+            "at": now_iso(),
+            "parsed": report["parsed"],
+            "scope": report["scope"],
+            "matches": report["matches"],
+            "near_misses": report["near_misses"],
+        }
+        return
+
+    reasons = []
+    if report["blocked"]:
+        reasons.append("blocked")
+    if report["failed"]:
+        reasons.append("failed")
+    if report["drift"]:
+        reasons.append("drift")
+    reason = "+".join(reasons) or "failed"
+    interval = timedelta(hours=config.get("degraded_notice_hours", 24))
+    if degraded:
+        degraded["consecutive_runs"] = degraded.get("consecutive_runs", 0) + 1
+        degraded["sources"] = report["unhealthy_sources"]
+        degraded["reason"] = reason
+        if now >= parse_iso(degraded["next_notice_at"]):
+            degraded["last_notice_at"] = now_iso()
+            degraded["next_notice_at"] = iso_utc(now + interval)
+            report["notify"] = "degraded-reminder"
+        else:
+            report["notify"] = "suppressed"
+    else:
+        state["degraded"] = {
+            "since": now_iso(),
+            "consecutive_runs": 1,
+            "last_healthy_count": state.get("last_healthy", {}).get("scope", len(state["listings"])),
+            "sources": report["unhealthy_sources"],
+            "reason": reason,
+            "last_notice_at": now_iso(),
+            "next_notice_at": iso_utc(now + interval),
+        }
+        report["notify"] = "first-degraded"
+    report["degraded"] = state["degraded"]
+
+
 def upsert(state, key, listing, classification, source):
     """Record a listing and report what changed since the last run."""
     now = now_iso()
@@ -735,24 +861,51 @@ def render_candidate(entry, change, model):
     return "\n".join(lines)
 
 
+def run_status(report):
+    if report["ok"] + report["empty"] == 0:
+        if report["blocked"] and not report["failed"] and not report["drift"]:
+            return "BLOCKED"
+        return "FAILED"
+    return "PARTIAL" if report["unhealthy"] else "RUN"
+
+
 def render_run(report):
     # A partial sweep is named in the first line because that line is what the
     # brain reads before anything else: a run that swept half the platform is
     # not a quiet market, and the rest of the report is indistinguishable from a
     # healthy one.
     out = [
-        "EV-HUNT %s %s" % ("PARTIAL" if report["failed"] else "RUN", now_iso()),
-        "sources: %d/%d fetched (%d pages), %d empty, %d failed"
-        % (report["ok"], report["total"], report["pages"], report["empty"], report["failed"]),
+        "EV-HUNT %s %s" % (run_status(report), now_iso()),
+        "sources: %d/%d fetched (%d pages), %d empty, %d blocked, %d failed, %d drift"
+        % (report["ok"], report["total"], report["pages"], report["empty"],
+           report["blocked"], report["failed"], report["drift"]),
         "listings parsed: %d | in scope: %d | matches: %d | near-misses: %d | rejected: %d"
         % (report["parsed"], report["scope"], report["matches"], report["near_misses"], report["rejected"]),
+        "blocked: %d | failed: %d | drift: %d"
+        % (report["blocked"], report["failed"], report["drift"]),
     ]
     if report["errors"]:
         out.append("source errors:")
         out.extend("  - %s" % error for error in report["errors"])
         out.append(
             "warning: %d of %d sources were not swept, so a [SILENT] here is not a quiet market"
-            % (report["failed"], report["total"])
+            % (report["unhealthy"], report["total"])
+        )
+    out.append("notify: %s" % report.get("notify", "healthy"))
+    if report.get("degraded"):
+        degraded = report["degraded"]
+        out.append(
+            "degraded: since %s, %d runs, last healthy %s in scope"
+            % (degraded["since"], degraded["consecutive_runs"], degraded["last_healthy_count"])
+        )
+        if report["notify"] != "suppressed":
+            out.append("next notice after %s" % degraded["next_notice_at"])
+    if report.get("recovery"):
+        recovery = report["recovery"]
+        out.append(
+            "recovery: healthy after %s, %d new since %s, %d still live, %d previously seen not listed"
+            % (format_duration(recovery["duration_seconds"]), recovery["new_since_outage"],
+               recovery["since"], recovery["still_live"], recovery["gone_since_outage"])
         )
     out.append("alerts: %d" % len(report["alerts"]))
     for entry, change, model in report["alerts"]:
@@ -853,13 +1006,13 @@ def fetch_pages(source, config, user_agent):
 
 def run(config, state):
     report = {
-        "total": len(config["sources"]), "ok": 0, "empty": 0, "failed": 0, "pages": 0,
+        "total": len(config["sources"]), "ok": 0, "empty": 0, "failed": 0,
+        "blocked": 0, "drift": 0, "pages": 0,
         "parsed": 0, "scope": 0, "matches": 0, "near_misses": 0, "rejected": 0,
-        "alerts": [], "errors": [],
+        "alerts": [], "errors": [], "unhealthy_sources": [],
     }
     succeeded_sources = set()
     seen_keys = set()
-    hard_failures = []
     detail_fetches = 0
     user_agent = config["user_agent"]
 
@@ -868,8 +1021,16 @@ def run(config, state):
         previous = state["sources"].get(name, {})
         try:
             outcome, cards, pages = fetch_pages(source, config, user_agent)
+        except ScrapeBlocked as error:
+            report["blocked"] += 1
+            report["unhealthy_sources"].append(name)
+            report["errors"].append("%s: blocked: %s" % (name, error))
+            state["sources"][name] = {"last_count": previous.get("last_count", 0), "last_ok": False,
+                                      "last_blocked": True, "last_run": now_iso()}
+            continue
         except RuntimeError as error:
             report["failed"] += 1
+            report["unhealthy_sources"].append(name)
             report["errors"].append("%s: %s" % (name, error))
             state["sources"][name] = {"last_count": previous.get("last_count", 0), "last_ok": False, "last_run": now_iso()}
             continue
@@ -891,13 +1052,22 @@ def run(config, state):
             if not card["category"]:
                 card["category"] = source["category"]
         report["parsed"] += len(cards)
-        report["ok"] += 1
-        succeeded_sources.add(name)
 
         if not cards and previous.get("last_count", 0) > 0:
             # The source parsed cards last run and none now. Reading that as "no
-            # news" would hide a markup change, so it fails loudly instead.
-            hard_failures.append("%s: page yielded no listings but yielded %d last run" % (name, previous["last_count"]))
+            # news" would hide a markup change, so it becomes a drift failure
+            # for this source while the rest of the sweep still counts.
+            report["drift"] += 1
+            report["unhealthy_sources"].append(name)
+            report["errors"].append(
+                "%s: page yielded no listings but yielded %d last run"
+                % (name, previous["last_count"])
+            )
+            state["sources"][name] = {"last_count": 0, "last_pages": pages, "last_ok": False, "last_run": now_iso()}
+            continue
+
+        report["ok"] += 1
+        succeeded_sources.add(name)
         state["sources"][name] = {"last_count": len(cards), "last_pages": pages, "last_ok": True, "last_run": now_iso()}
 
         for card in cards:
@@ -969,21 +1139,45 @@ def run(config, state):
         if entry["missing_streak"] >= config["missing_runs_before_gone"] and not entry.get("gone_at"):
             entry["gone_at"] = now_iso()
 
-    if hard_failures:
-        raise RuntimeError("; ".join(hard_failures))
-    if report["ok"] == 0 and report["empty"] == 0:
-        raise RuntimeError("no landing page could be fetched")
+    report["unhealthy"] = report["failed"] + report["blocked"] + report["drift"]
     return report
 
 
 def fetch_detail(url, platform, config, user_agent):
     try:
-        status, body = fetch(url, config, user_agent)
+        status, body = fetch(url, config, user_agent, min_body_bytes=0)
     except RuntimeError:
         return {}
     if status != 200:
         return {}
     return DETAIL_PARSERS[platform](parse_html(body))
+
+
+def selftest(config):
+    source = next((item for item in config["sources"] if item["platform"] == "schadeautos"), None)
+    print("EV-HUNT SELFTEST %s" % now_iso())
+    if source is None:
+        print("error: no schadeautos source in the config")
+        print("result: FAIL")
+        return 1
+    print("source: %s %s" % (source["name"], source["url"]))
+    opener, jar = new_session()
+    try:
+        status, body = fetch(source["url"], config, config["user_agent"], opener=opener)
+    except RuntimeError as error:
+        print("error: %s" % error)
+        print("result: FAIL")
+        return 1
+    cards = CARD_PARSERS[source["platform"]](parse_html(body))
+    print("status: %d" % status)
+    print("bytes: %d" % len(body.encode("utf-8")))
+    print("cookies: %s" % (", ".join(sorted(cookie.name for cookie in jar)) or "none"))
+    print("cards: %d" % len(cards))
+    if status == 200 and cards:
+        print("result: PASS")
+        return 0
+    print("result: FAIL")
+    return 1
 
 
 def main(argv=None):
@@ -992,6 +1186,7 @@ def main(argv=None):
     parser.add_argument("--state", default=None, help="override the state file path from the config")
     parser.add_argument("--digest", action="store_true", help="print the weekly digest from state instead of fetching")
     parser.add_argument("--digest-days", type=int, default=7, help="window for the digest (default: 7)")
+    parser.add_argument("--selftest", action="store_true", help="fetch one listing page with a cold session and report the result")
     args = parser.parse_args(argv)
 
     config_path = args.config or os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
@@ -1000,10 +1195,19 @@ def main(argv=None):
             config = json.load(handle)
         if args.state:
             config["state_file"] = args.state
+    except (OSError, ValueError) as error:
+        print("EV-HUNT FAILED %s" % now_iso())
+        print("error: cannot read the config: %s" % error)
+        return 1
+
+    if args.selftest:
+        return selftest(config)
+
+    try:
         state = load_state(config["state_file"])
     except (OSError, ValueError) as error:
         print("EV-HUNT FAILED %s" % now_iso())
-        print("error: cannot read the config or the state file: %s" % error)
+        print("error: cannot read the state file: %s" % error)
         return 1
 
     if args.digest:
@@ -1013,18 +1217,16 @@ def main(argv=None):
     try:
         report = run(config, state)
     except RuntimeError as error:
-        # Non-zero exit is the contract with the skill: the brain may fall back
-        # to its own web tools and mark the run degraded.
+        # A config or state problem is the only thing left that can fail the
+        # whole run; an unreachable source is a partial report.
         print("EV-HUNT FAILED %s" % now_iso())
         print("error: %s" % error)
         return 1
 
-    # State still advances: the sources that answered were read in full, and the
-    # next healthy run re-reads the rest. Only the exit code says the sweep was
-    # partial, which is the one thing the skill cannot infer from the report.
+    update_degraded(state, report, config)
     save_state(config["state_file"], state)
     print(render_run(report))
-    return 2 if report["failed"] else 0
+    return 2 if report.get("unhealthy") else 0
 
 
 if __name__ == "__main__":
