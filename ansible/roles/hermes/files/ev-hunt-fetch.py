@@ -341,6 +341,23 @@ def now_iso():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def iso_utc(moment):
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def parse_iso(value):
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
+def format_duration(seconds):
+    seconds = max(0, int(seconds))
+    days, remainder = divmod(seconds, 86400)
+    hours = remainder // 3600
+    if days:
+        return "%dd %dh" % (days, hours)
+    return "%dh" % hours
+
+
 # ── Fetching ─────────────────────────────────────────────────────────
 
 
@@ -695,6 +712,80 @@ def save_state(path, state):
     os.replace(temporary, path)
 
 
+def update_degraded(state, report, config):
+    now = datetime.now(timezone.utc)
+    degraded = state.get("degraded")
+    if report["unhealthy"] == 0:
+        if degraded:
+            since = parse_iso(degraded["since"])
+            new = [
+                entry
+                for entry in state["listings"].values()
+                if entry.get("first_seen", "") >= degraded["since"]
+            ]
+            still_live = sum(1 for entry in new if entry.get("missing_streak", 0) == 0)
+            gone = sum(
+                1
+                for entry in state["listings"].values()
+                if entry.get("last_seen", "") < degraded["since"]
+                and entry.get("missing_streak", 0) > 0
+            )
+            state["degraded_last"] = {
+                "since": degraded["since"],
+                "recovered_at": now_iso(),
+                "duration_seconds": int((now - since).total_seconds()),
+                "consecutive_runs": degraded.get("consecutive_runs", 0),
+                "new_since_outage": len(new),
+                "still_live": still_live,
+                "gone_since_outage": gone,
+            }
+            del state["degraded"]
+            report["recovery"] = state["degraded_last"]
+            report["notify"] = "recovered"
+        else:
+            report["notify"] = "healthy"
+        state["last_healthy"] = {
+            "at": now_iso(),
+            "parsed": report["parsed"],
+            "scope": report["scope"],
+            "matches": report["matches"],
+            "near_misses": report["near_misses"],
+        }
+        return
+
+    reasons = []
+    if report["blocked"]:
+        reasons.append("blocked")
+    if report["failed"]:
+        reasons.append("failed")
+    if report["drift"]:
+        reasons.append("drift")
+    reason = "+".join(reasons) or "failed"
+    interval = timedelta(hours=config.get("degraded_notice_hours", 24))
+    if degraded:
+        degraded["consecutive_runs"] = degraded.get("consecutive_runs", 0) + 1
+        degraded["sources"] = report["unhealthy_sources"]
+        degraded["reason"] = reason
+        if now >= parse_iso(degraded["next_notice_at"]):
+            degraded["last_notice_at"] = now_iso()
+            degraded["next_notice_at"] = iso_utc(now + interval)
+            report["notify"] = "degraded-reminder"
+        else:
+            report["notify"] = "suppressed"
+    else:
+        state["degraded"] = {
+            "since": now_iso(),
+            "consecutive_runs": 1,
+            "last_healthy_count": state.get("last_healthy", {}).get("scope", len(state["listings"])),
+            "sources": report["unhealthy_sources"],
+            "reason": reason,
+            "last_notice_at": now_iso(),
+            "next_notice_at": iso_utc(now + interval),
+        }
+        report["notify"] = "first-degraded"
+    report["degraded"] = state["degraded"]
+
+
 def upsert(state, key, listing, classification, source):
     """Record a listing and report what changed since the last run."""
     now = now_iso()
@@ -799,6 +890,22 @@ def render_run(report):
         out.append(
             "warning: %d of %d sources were not swept, so a [SILENT] here is not a quiet market"
             % (report["unhealthy"], report["total"])
+        )
+    out.append("notify: %s" % report.get("notify", "healthy"))
+    if report.get("degraded"):
+        degraded = report["degraded"]
+        out.append(
+            "degraded: since %s, %d runs, last healthy %s in scope"
+            % (degraded["since"], degraded["consecutive_runs"], degraded["last_healthy_count"])
+        )
+        if report["notify"] != "suppressed":
+            out.append("next notice after %s" % degraded["next_notice_at"])
+    if report.get("recovery"):
+        recovery = report["recovery"]
+        out.append(
+            "recovery: healthy after %s, %d new since %s, %d still live, %d previously seen not listed"
+            % (format_duration(recovery["duration_seconds"]), recovery["new_since_outage"],
+               recovery["since"], recovery["still_live"], recovery["gone_since_outage"])
         )
     out.append("alerts: %d" % len(report["alerts"]))
     for entry, change, model in report["alerts"]:
@@ -1073,15 +1180,13 @@ def main(argv=None):
     try:
         report = run(config, state)
     except RuntimeError as error:
-        # Non-zero exit is the contract with the skill: the brain may fall back
-        # to its own web tools and mark the run degraded.
+        # A config or state problem is the only thing left that can fail the
+        # whole run; an unreachable source is a partial report.
         print("EV-HUNT FAILED %s" % now_iso())
         print("error: %s" % error)
         return 1
 
-    # State still advances: the sources that answered were read in full, and the
-    # next healthy run re-reads the rest. Only the exit code says the sweep was
-    # partial, which is the one thing the skill cannot infer from the report.
+    update_degraded(state, report, config)
     save_state(config["state_file"], state)
     print(render_run(report))
     return 2 if report.get("unhealthy") else 0

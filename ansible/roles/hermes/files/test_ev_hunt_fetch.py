@@ -249,5 +249,115 @@ class AccountingTests(ScriptTestCase):
         self.assertEqual(0, state["sources"]["schadeautos-i4-salvage"]["last_count"])
 
 
+class DegradedTests(ScriptTestCase):
+    def existing_listing(self):
+        return {
+            "key": "schadeautos:9999",
+            "first_seen": "2026-11-01T07:00:00Z",
+            "last_seen": "2026-11-18T21:00:00Z",
+            "missing_streak": 0,
+            "source": "schadeautos-i4-salvage",
+            "status": "match",
+            "title": "BMW i4 eDrive40",
+        }
+
+    def test_total_block_exits_2_and_freezes_seen_set(self):
+        config = self.config(["/blocked"])
+        before = self.existing_listing()
+        self.write_state(
+            {
+                "version": 1,
+                "listings": {"schadeautos:9999": before},
+                "sources": {
+                    "schadeautos-i4-salvage": {
+                        "last_count": 5,
+                        "last_ok": True,
+                        "last_run": "2026-11-18T21:00:00Z",
+                    }
+                },
+                "last_healthy": {
+                    "at": "2026-11-18T21:00:00Z",
+                    "parsed": 80,
+                    "scope": 26,
+                    "matches": 9,
+                    "near_misses": 5,
+                },
+            }
+        )
+        code, out = self.run_main(config)
+        self.assertEqual(2, code, out)
+        self.assertIn("EV-HUNT BLOCKED", out)
+        self.assertIn("notify: first-degraded", out)
+        state = self.read_state()
+        self.assertEqual(before, state["listings"]["schadeautos:9999"])
+        self.assertEqual(1, state["degraded"]["consecutive_runs"])
+        self.assertEqual(26, state["degraded"]["last_healthy_count"])
+        self.assertIn("next notice after", out)
+
+    def test_healthy_run_advances_seen_set(self):
+        config = self.config(["/challenge"])
+        code, out = self.run_main(config)
+        self.assertEqual(0, code, out)
+        self.assertIn("EV-HUNT RUN", out)
+        self.assertIn("notify: healthy", out)
+        state = self.read_state()
+        self.assertIn("schadeautos:1001", state["listings"])
+        self.assertEqual(1, state["last_healthy"]["scope"])
+
+    def test_degraded_notice_cadence(self):
+        config = self.config(["/blocked"])
+        code, out = self.run_main(config)
+        self.assertEqual(2, code, out)
+        self.assertIn("notify: first-degraded", out)
+        state = self.read_state()
+        first_notice = state["degraded"]["last_notice_at"]
+
+        code, out = self.run_main(config)
+        self.assertEqual(2, code, out)
+        self.assertIn("notify: suppressed", out)
+        state = self.read_state()
+        self.assertEqual(2, state["degraded"]["consecutive_runs"])
+        self.assertEqual(first_notice, state["degraded"]["last_notice_at"])
+        self.assertNotIn("next notice after", out)
+
+        state["degraded"]["next_notice_at"] = "2020-01-01T00:00:00Z"
+        self.write_state(state)
+        code, out = self.run_main(config)
+        self.assertEqual(2, code, out)
+        self.assertIn("notify: degraded-reminder", out)
+        state = self.read_state()
+        self.assertEqual(3, state["degraded"]["consecutive_runs"])
+        self.assertGreaterEqual(state["degraded"]["last_notice_at"], first_notice)
+        self.assertNotEqual("2020-01-01T00:00:00Z", state["degraded"]["next_notice_at"])
+
+    def test_recovery_clears_degraded(self):
+        config = self.config(["/challenge"])
+        self.write_state(
+            {
+                "version": 1,
+                "listings": {},
+                "sources": {},
+                "degraded": {
+                    "since": "2026-11-19T07:00:00Z",
+                    "consecutive_runs": 4,
+                    "last_healthy_count": 26,
+                    "sources": ["schadeautos-i4-salvage"],
+                    "reason": "blocked",
+                    "last_notice_at": "2026-11-19T07:02:00Z",
+                    "next_notice_at": "2026-11-20T07:02:00Z",
+                },
+                "last_healthy": {"at": "2026-11-18T21:00:00Z", "scope": 26},
+            }
+        )
+        code, out = self.run_main(config)
+        self.assertEqual(0, code, out)
+        self.assertIn("notify: recovered", out)
+        self.assertIn("recovery:", out)
+        state = self.read_state()
+        self.assertNotIn("degraded", state)
+        self.assertEqual(1, state["degraded_last"]["new_since_outage"])
+        self.assertEqual(1, state["degraded_last"]["still_live"])
+
+
 if __name__ == "__main__":
     unittest.main()
