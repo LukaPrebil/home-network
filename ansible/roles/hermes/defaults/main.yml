@@ -19,7 +19,7 @@ hermes_install_dir: "{{ hermes_home }}/hermes-agent"    # uv venv + checkout
 # ── Upstream installer ───────────────────────────────────────────────
 # The official installer pins versions internally; we don't track an explicit
 # Hermes release here. `hermes update` is the supported upgrade path. Re-running
-# this role does NOT auto-upgrade — the install task is gated on binary presence.
+# this role does NOT auto-upgrade - the install task is gated on binary presence.
 hermes_installer_url: "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh"
 
 # ── Model / brain ────────────────────────────────────────────────────
@@ -129,8 +129,11 @@ hermes_ha_watch_entities:
   # Mower job ends and faults. sensor.vrt_luba_progress is deliberately absent:
   # gate rule 5 excludes progress state, and a job end is read from the state
   # change plus sensor.vrt_luba_last_error_time.
-  - lawn_mower.vrt_luba
-  - sensor.vrt_luba_last_error_time
+  #
+  # Both mower entries are parked until spring: the mower is in winter storage,
+  # so these wakes can only fire on noise. Restore them when it goes back out.
+  # - lawn_mower.vrt_luba
+  # - sensor.vrt_luba_last_error_time
   # Doorbell ring - the trigger for the visitor flow (plan decision 4).
   - binary_sensor.zvonec_zunaj_visitor
   # ARSO severe-weather warning going active for the Ljubljana airport region.
@@ -165,7 +168,7 @@ hermes_ha_channel_prompt: >-
 # approvals.mode "manual": every dangerous terminal command becomes a
 # propose-wait prompt in the Telegram chat; cron/webhook contexts fail
 # closed (upstream defaults: cron_mode/single_query_mode/unattended_mode
-# deny). Valid upstream modes are smart | manual | off — NOT "on".
+# deny). Valid upstream modes are smart | manual | off - NOT "on".
 # Tier-1 "act then notify" can come later via command_allowlist mining.
 hermes_approvals_mode: "manual"
 
@@ -215,7 +218,7 @@ hermes_disabled_toolsets:
 hermes_terminal_backend: "local"
 
 # Dashboard (web UI) and API server: localhost only. Reach via SSH tunnel or
-# Tailscale, never expose on LAN — dashboard stores API keys.
+# Tailscale, never expose on LAN - dashboard stores API keys.
 hermes_dashboard_bind: "127.0.0.1"
 hermes_dashboard_port: 9119
 
