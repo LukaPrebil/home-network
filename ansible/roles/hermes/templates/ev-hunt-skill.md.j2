@@ -24,15 +24,16 @@ script's state file is the only history.
    | Exit | Meaning |
    | --- | --- |
    | 0 | every watched source was swept |
-   | 2 | **partial sweep**: some sources were not reachable |
-   | 1 | nothing was swept (`EV-HUNT FAILED`) |
+   | 2 | at least one source was blocked, failed or drifted |
+   | 1 | the script could not run (`EV-HUNT FAILED`) |
 
-   Exit 0 means the data is trustworthy. Exit 1, or output starting with
-   `EV-HUNT FAILED`, is a **degraded run** (below). Exit 2 is a **partial
-   sweep** (below): the candidates it printed are real, the silence is not.
-   This skill is the whole contract: do not read the script, the config, or the
-   state file, and do not search the filesystem. The script run and the
-   judgment are the entire job.
+   Read the first line for the sweep state: `EV-HUNT RUN` is clean,
+   `EV-HUNT PARTIAL` has real data from the sources it read, `EV-HUNT BLOCKED`
+   means no source was swept, `EV-HUNT FAILED` means the script could not run.
+   The `notify:` line decides whether a degraded run sends a status message. Do
+   not fall back to web tools on your own. This skill is the whole contract: do
+   not read the script, the config, or the state file, and do not search the
+   filesystem. The script run and the judgment are the entire job.
 2. The output lists MATCH and NEAR-MISS candidates. Judge each one from that
    output alone. Do not re-read listing pages in a healthy run: the script has
    already read each candidate's live price and its declared damage, and a
@@ -41,7 +42,9 @@ script's state file is the only history.
    re-fetching. Reply-time inspection (below) is where you read a page closely,
    and that is one listing, on request.
 3. Deliver the alerts (below). If there is nothing new, or nothing worth
-   alerting, reply with exactly `[SILENT]` - unless the run was a partial sweep.
+   alerting, reply with exactly `[SILENT]`, unless the `notify:` line calls for
+   a first-degraded, degraded-reminder or recovered line. A `notify: suppressed`
+   run is deliberately silent.
 
 ## What the script already decided
 
@@ -148,30 +151,42 @@ The job delivers your final response to the Telegram home channel.
 - Two or more: send each block with `hermes send -t telegram '<block>'`, then
   reply exactly `[SILENT]` so the delivery does not duplicate them.
 
-## Degraded and partial runs
+## Degraded, blocked and partial runs
 
-A **degraded run** is one where the script exited 1 after its own retries, so
-nothing was swept. The listing feed is then unavailable, and you may fall back
-to `web_search` and `web_extract` for the same watched platforms, with the same
-bounds and the same damage rules.
+The script prints a `notify:` line. It is the only thing that decides whether a
+degraded run sends a status message. Candidate alerts always deliver.
 
-A **partial sweep** is exit 2. The sources listed under `source errors:` were
-never read; everything else was. Judge the candidates that came back and send
-them as ordinary alerts, then end your reply with one line naming the platforms
-that were not swept and why. Never reply `[SILENT]` to a partial sweep: half a
-feed cannot say the market is quiet.
+| notify | Action |
+| --- | --- |
+| `healthy` | Deliver candidate alerts, or `[SILENT]` when there are none. |
+| `first-degraded` | Send one short message naming what broke, since when, the last healthy count, and that it is being worked. Then deliver any candidate alerts. |
+| `suppressed` | Send no status message and do not call web tools. Deliver any candidate alerts. If there are none, reply `[SILENT]`. |
+| `degraded-reminder` | Send one short update from the `degraded:` line. Then deliver any candidate alerts. |
+| `recovered` | Send the one-line `recovery:` summary. Then deliver any candidate alerts. |
 
-Mark every alert from a degraded run with `DEGRADED: <script error>` as its
-first line, and say the data came from your own web tools rather than the
-listing feed. A degraded run advances no seen-set state, so the next healthy run
-re-alerts the same listing. A partial sweep advances it for the sources it did
-read, which is why its alerts are ordinary ones: the next healthy run reads the
-rest and only the genuinely new listings alert.
+`EV-HUNT PARTIAL` means some sources were read and the candidates are real.
+Name the unswept platforms in the status line when one is due, never in a
+separate hand-read dump. `EV-HUNT BLOCKED` means nothing was read, so there are
+no candidates.
 
-If a degraded run's web fallback yields nothing usable either, reply with a
-single line starting `[CRON_FAILURE]` describing the failure. A partial sweep
-never gets that reply: it has real data, so it reports the gap in its one
-closing line instead. Do not repair the script, the config, or the state file.
+A blocked source freezes only its own seen-set entries. A total block freezes
+all of them, so the first healthy run re-finds the listings that appeared during
+the outage. Do not try to reconstruct the missing interval by hand.
+
+If exit 1 gives `EV-HUNT FAILED`, reply with one line starting `[CRON_FAILURE]`
+describing the error. Do not repair the script, the config, or the state file.
+
+### Selftest
+
+When the operator asks whether the feed is reachable, run:
+
+```
+python3 {{ hermes_ev_home }}/{{ hermes_ev_script_name }} --selftest
+```
+
+Report its status, byte count, cookie names and card count. A pass proves the
+cold session completed the challenge. Do not use the selftest to bypass a
+block.
 
 ## Hard limits
 

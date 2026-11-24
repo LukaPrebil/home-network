@@ -265,13 +265,18 @@ hermes_ev_near_miss_factor: 1.2
 hermes_ev_missing_runs_before_gone: 2
 
 # Fetch politeness: one sequential GET per page, a delay between requests, and
-# a retry budget before the script reports a hard failure (which sends the run
-# to the brain's web-tool fallback).
+# a retry budget before the script reports the source as failed.
 hermes_ev_timeout_seconds: 30
 hermes_ev_retries: 2
 hermes_ev_retry_backoff_seconds: 5
 hermes_ev_request_delay_seconds: 1.5
 hermes_ev_max_detail_fetches: 25
+# A listing page shorter than this is the cookie challenge, not an empty
+# market. Current stock pages are above 100 KB; the challenge body is 0 bytes.
+hermes_ev_min_body_bytes: 20000
+# One notice when a platform breaks, then at most one reminder in this window.
+# Six runs a day must not become six messages.
+hermes_ev_degraded_notice_hours: 24
 # Pages per landing page, following the page's own <link rel="next">. Brand
 # listing pages paginate (the BMW occasion list is 32 cars across 3 pages);
 # model listing pages do not, and their sibling links are models rather than
@@ -365,6 +370,8 @@ hermes_ev_config:
   request_delay_seconds: "{{ hermes_ev_request_delay_seconds }}"
   max_detail_fetches: "{{ hermes_ev_max_detail_fetches }}"
   max_pages_per_source: "{{ hermes_ev_max_pages_per_source }}"
+  min_body_bytes: "{{ hermes_ev_min_body_bytes }}"
+  degraded_notice_hours: "{{ hermes_ev_degraded_notice_hours }}"
   missing_runs_before_gone: "{{ hermes_ev_missing_runs_before_gone }}"
   km_max: "{{ hermes_ev_km_max }}"
   near_miss_factor: "{{ hermes_ev_near_miss_factor }}"

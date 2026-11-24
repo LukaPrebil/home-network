@@ -32,10 +32,10 @@ schadeautos.nl (its robots.txt disallows them). The monitor never contacts a
 seller, never bids, and never writes outside its state directory.
 
 Exit codes are the contract with the judgment skill: 0 when every source was
-swept, 2 when some were not (a partial sweep, whose candidates are still worth
-judging), 1 when nothing was swept at all. A source that fails inside `run()`
-is collected rather than fatal, so without the 2 the report of a half-dead
-platform would be indistinguishable from a quiet market.
+swept, 2 when at least one source was blocked, failed or drifted (a partial or
+total sweep), and 1 when the script could not run at all. A source that fails
+inside `run()` is collected rather than fatal, so a half-dead platform cannot
+look like a quiet market. A blocked source is distinct from an empty one.
 """
 
 import argparse
