@@ -541,6 +541,30 @@ drift correction, which loops over declared guests only. An orphaned guest left 
 `onboot: 1` will be started by the boot-time reconciler on the next power event, colliding
 with its replacement on the same IP.
 
+### Proxmox integration
+
+**PVE custom integration**:
+The Marketplace-installed `dougiteixeira/proxmoxve` integration that supplies every Proxmox
+entity in HA. Its domain is `proxmoxve_custom` since 6.0; before that it was `proxmoxve`,
+which shadowed the core integration of the same name. Resolved 2026-11-26: the estate stays
+on it rather than moving to core, because the disk and SMART sensors, the snapshot history
+and the backup sensors have no core equivalent and nothing else in HA depends on it beyond
+one update notification.
+_Avoid_: "the Proxmox integration" unqualified - two integrations answer to that name.
+
+**Core PVE integration**:
+HA's built-in `proxmoxve` integration, Gold quality since 2026.11. It is installed nowhere
+here, and needs no Marketplace entry, but it reads only nodes, guests, storages, backups and
+updates.
+_Avoid_: "the native integration" as a synonym for what is actually installed.
+
+**Transition release**:
+Version `6.0.0b0` of the PVE custom integration, the only build that carries both the old
+`proxmoxve` and new `proxmoxve_custom` components and therefore the only one that can move
+an existing config entry across the domain rename. The Marketplace cannot offer it, because
+it is a prerelease and cannot follow a domain change.
+_Avoid_: "the beta" - it is a one-shot migration vehicle, not a preview of 6.x.
+
 ### Fleet SSH access
 
 **Pinned host key**:
