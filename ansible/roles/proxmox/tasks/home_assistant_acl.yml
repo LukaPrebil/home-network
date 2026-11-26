@@ -1,5 +1,5 @@
 ---
-# The service account behind Home Assistant's Proxmox VE integration: the four
+# The service account behind Home Assistant's Proxmox VE integration: the five
 # custom roles, the group that carries them and the user in that group.
 #
 # Like the monitoring token next door, the API token itself cannot be codified -
@@ -8,7 +8,8 @@
 # is reproducible, and without it a rebuild silently drops HA's ability to see or
 # power-cycle any guest, with nothing in the repo to say what was lost.
 #
-# Privileges are declared exactly as they were found on 2026-08-22. Note that the
+# Privileges are declared as they were found on 2026-08-22 plus
+# HomeAssistant.GuestAgent on 2026-11-26. Note that the
 # grant reaches Sys.PowerMgmt and Sys.Modify at / - it can power off the
 # hypervisor, not just read from it. Narrowing that is a deliberate change to make
 # against HA's automations, not a drive-by.
