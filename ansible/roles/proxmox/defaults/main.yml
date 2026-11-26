@@ -26,6 +26,14 @@ proxmox_ha_group: "HomeAssistant"
 proxmox_ha_token_name: "HomeAssistant"
 proxmox_ha_roles:
   HomeAssistant.Audit: "Datastore.Audit,Sys.Audit,VM.Audit"
+  # Read-only guest agent: VM IPs, in-guest disk usage and whether the agent
+  # answers. Added 2026-11-26 - without it the integration falls back to the
+  # host's view, which is nothing, and logs a repair for every VM.
+  # VM.GuestAgent.FileRead is deliberately absent: it buys one sensor showing
+  # the first 4 KB of a single path chosen for the whole integration, and
+  # nothing here consumes it. VM.GuestAgent.Unrestricted issues arbitrary
+  # commands inside the guest and must never be granted.
+  HomeAssistant.GuestAgent: "VM.GuestAgent.Audit"
   HomeAssistant.NodePowerMgmt: "Sys.PowerMgmt"
   HomeAssistant.Update: "Sys.Modify"
   HomeAssistant.VMPowerMgmt: "VM.PowerMgmt"
